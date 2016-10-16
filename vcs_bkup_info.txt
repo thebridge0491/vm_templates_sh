@@ -1,0 +1,5 @@
+# Cmdline (Sh)
+lang_group=cmdline
+lang_ext=sh
+build_tool=????
+project=vm_templates

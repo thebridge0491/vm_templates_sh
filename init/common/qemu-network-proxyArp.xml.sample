@@ -1,0 +1,16 @@
+<network>
+  <name>proxyArp</name>
+  <!--<uuid>36230415-634e-4e4e-82bd-79a41f4254d5</uuid>-->
+  <forward dev='wlp1s0' mode='route'>
+    <interface dev='wlp1s0'/>
+  </forward>
+  <bridge name='virbr1' stp='on' delay='0'/>
+  <!--<mac address='52:54:00:3f:e3:d8'/>-->
+  <domain name='proxyArp'/>
+  <ip address='192.168.0.161' netmask='255.255.255.224'>
+    <dhcp>
+      <range start='192.168.0.176' end='192.168.0.190'/>
+    </dhcp>
+  </ip>
+</network>
+

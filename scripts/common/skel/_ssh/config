@@ -1,0 +1,22 @@
+Protocol 2
+VisualHostKey yes
+AddKeysToAgent yes
+
+Host github.com
+  #IdentityFile ~/.ssh/id_ed25519
+  #CertificateFile ~/.ssh/id_ed25519-cert.pub
+  #User git
+  IdentitiesOnly yes
+
+Host ssh.github.com
+  Port 443
+  IdentitiesOnly yes
+
+Host bitbucket.org
+  #User git # git | hg
+  IdentitiesOnly yes
+
+Host altssh.bitbucket.org
+  Port 443
+  IdentitiesOnly yes
+

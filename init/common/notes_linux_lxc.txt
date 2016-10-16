@@ -1,0 +1,41 @@
+# NOTE, lxc config
+# /etc/lxc/default.conf             /etc/qemu/bridge.conf  /etc/sub{gid,uid}
+# -------------------------         ---------------------  -----------------
+# lxc.id_map = g 0 100000 65536     allow virbr0           root:100000:65536
+# lxc.id_map = u 0 100000 65536                            <user>:100000:65536
+# lxc.network.type = veth             
+# lxc.network.link = virbr0           /etc/sysctl.d/80-lxc-userns.conf
+# lxc.network.flags = up              --------------------------------
+# #lxc.apparmor.profile = generated   kernel.unprivileged_userns_clone=1
+# #lxc.apparmor.allow_nesting = 1     
+                                       /etc/default/lxc-net
+# $HOME/.config/lxc/default.conf       --------------------
+# ------------------------------       USE_LXC_BRIDGE="false"
+# lxc.include = /etc/lxc/default.conf  #LXC_BRIDGE="lxcbr0"
+# #lxc.id_map = g 0 100000 65536
+# #lxc.id_map = u 0 100000 65536       /etc/lxc/lxc-usernet
+# lxc.network.type = veth              --------------------
+# lxc.network.link = virbr0            <user> veth virbr0 10
+# 
+# lxc.mount.entry = /mnt/Data0 /media/sf_Data0 none bind 0 0
+
+
+# NOTE, make lxc container accessible by virt-manager/virsh:
+OS_VARIANT=${OS_VARIANT:-generic} ; VE_NAME=${VE_NAME:-archlinux-boxe0000}
+# ex: lxc-create -t download -n ${VE_NAME} -- -d archlinux -r current -a amd64
+#     lxc-start -d -n ${VE_NAME} ; lxc-attach -n ${VE_NAME} # (set root passwd)
+#     lxc-console --tty 0 -n ${VE_NAME} # verify root can login
+# virt-install --connect lxc:/// --video qxl --controller virtio-serial --console pty,target_type=lxc --graphics vnc,port=-1 --memory 768 --vcpus 1 --filesystem type=mount,mode=passthrough,source=/mnt/Data0,target=/media/sf_Data0 --init /sbin/init --os-variant ${OS_VARIANT} -n ${VE_NAME} --filesystem $HOME/.local/share/lxc/${VE_NAME}/rootfs,/
+# OR
+# cp init/common/lxc-domain.xml.sample ${VE_NAME}.xml ; $EDITOR ${VE_NAME}.xml
+# virsh --connect lxc:/// define ${VE_NAME}.xml
+
+
+# NOTE, (unprivileged) tar & untar container w/out su permissions
+# lxc-stop -n ${VE_NAME} ; cd $HOME/.local/share/lxc/${VE_NAME}
+# lxc-usernsexec -m b:0:$(id -u):1 -m b:1:100000:1 --tar --numeric-owner -czvf ../cntr.tar.gz ./*
+# #transfer (if needed): rsync -avh ../cntr.tar.gz user@host:.local/share/lxc/
+# #at [new] desired location, create empty container & untar tarball
+# lxc-create -t none -n ${NEW_NAME} ; cd $HOME/.local/share/lxc/${NEW_NAME}
+# lxc-usernsexec -m b:0:$(id -u):1 -m b:1:100000:1 --tar --numeric-owner -xzvf ../cntr.tar.gz
+# #edit config & log file name for ${NEW_NAME}

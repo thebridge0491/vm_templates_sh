@@ -1,0 +1,5 @@
+dname='C=US,ST=Texas,L=San Antonio,O=Sandbox Org,OU=Email Tasks (sign),CN=Plain User'
+[ req ]
+distinguished_name=req
+[ san ]
+subjectAltName=email:imcomputer2@yahoo.com,email:imcomputer@yahoo.com

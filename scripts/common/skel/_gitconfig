@@ -1,0 +1,6 @@
+[user]
+	name = imcomputer
+	email = imcomputer-codelab@yahoo.com
+[core]
+    ; comments - Linux|Freebsd|Mac(nano), Windows(notepad)
+	editor = nano

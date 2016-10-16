@@ -1,0 +1,18 @@
+{
+    "_info_iso_vars": "iso variables file for frequently changing iso info",
+    "_passwd_crypted_hash": "[ SPACE ] plain_passwd=abcd0123 ; salt='$6$16CHARACTERSSALT' ; crypted_passwd=$(python -c \"import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$salt\"))\")",
+    "_usage_build": "packer build -var plain_passwd=$plain_passwd -var crypted_passwd=$crypted_passwd [-var-file iso_vars.json] template.json",
+    
+    "vbox_guest_os": "Debian_64",
+    "iso_checksum": "",
+    "iso_checksum_type": "sha256",
+    "iso_url": "",
+    "iso_checksum_url": "file:///mnt/Data0/distros/fixed/debian/SHA256SUMS",
+    "iso_urls_list": "file:///mnt/Data0/distros/fixed/debian/debian-8.6.0-amd64-netinst.iso,http://mirrors.kernel.org/debian-cd/current/amd64/iso-cd/debian-8.6.0-amd64-netinst.iso",
+    
+    "isolive_checksum": "",
+    "isolive_checksum_type": "sha256",
+    "isolive_url": "",
+    "isolive_checksum_url": "file:///mnt/Data0/distros/fixed/debian-live/SHA256SUMS",
+    "isolive_urls_list": "file:///mnt/Data0/distros/fixed/debian-live/debian-live-8.6.0-amd64-lxde.iso,http://mirrors.kernel.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-8.6.0-amd64-lxde.iso"
+}

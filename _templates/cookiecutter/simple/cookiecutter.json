@@ -1,0 +1,19 @@
+{
+  "project_slug": "simple-project",
+  "description": "Simple project.",
+  "version": "0.1.0",
+  
+  "author": "imcomputer",
+  "email": "imcomputer-codelab@yahoo.com",
+  "maintainer": "{{ cookiecutter.author }}",
+  "maintainer_email": "{{ cookiecutter.email }}",
+  "repo_host": "https://bitbucket.org",
+  "repo_acct": "imcomputer",
+  "year": "{% now 'local', '%Y' %}",
+  "date": "{{ cookiecutter.year }}-{% now 'local', '%m-%d' %}",
+  
+  "title": "{{ cookiecutter.project_slug.split('-')|map('capitalize')|join('-') }}",
+  
+  "license": ["Apache-2.0", "MIT", "BSD-3-Clause", "GPL-3.0+", "ISC", 
+	"Unlicense", "Not open source"]
+}

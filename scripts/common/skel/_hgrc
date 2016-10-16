@@ -1,0 +1,14 @@
+[ui]
+username = imcomputer <imcomputer-codelab@yahoo.com>
+verbose = False
+
+; comments - Linux|Freebsd|Mac(nano), Windows(notepad)
+editor = nano
+
+[pager]
+pager = LESS='FRX' less
+
+[extensions]
+pager = 
+hgext.convert = 
+#hggit = 
