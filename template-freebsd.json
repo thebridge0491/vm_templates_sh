@@ -1,0 +1,178 @@
+{
+  "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
+  "_passwd_crypted_hash": "[ SPACE ] plain_passwd=abcd0123 ; salt='$6$16CHARACTERSSALT' ; crypted_passwd=$(python -c \"import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$salt\"))\")",
+  "_usage_build": "packer build -var plain_passwd=$plain_passwd -var crypted_passwd=$crypted_passwd -only=[qemu|virtualbox-iso] [-var-file iso_vars.json] template.json",
+  
+  "builders": [{
+    "type": "qemu",
+    "format": "qcow2",
+    "vm_name": "{{user `vm_name`}}.qcow2",
+    "machine_type": "q35",
+    "disk_interface": "virtio-scsi",
+    "disk_discard": "unmap",
+    "net_device": "virtio-net",
+    "qemuargs": [
+      ["-name", "{{user `vm_name`}}"], ["-boot", "order=cdn,menu=on"],
+      ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"],
+      ["-device", "virtio-net,netdev=user.0"], ["-m", "size=768"],
+      ["-bios", "{{user `qemu_uefi_firmware_dir`}}/OVMF_CODE.fd"],
+      ["-smbios", "type=0,uefi=on"], ["-rtc", "base=utc"],
+      ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"]
+    ],
+        
+    "boot_wait": "7s",
+    "ssh_wait_timeout": "10000s",
+    "ssh_username": "root",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "shutdown -p +3",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+    
+    "iso_checksum": "{{user `iso_checksum`}}",
+    "iso_checksum_type": "{{user `iso_checksum_type`}}",
+    "iso_url": "{{user `iso_url`}}",
+    "iso_checksum_url": "{{user `iso_checksum_url`}}",
+    "iso_urls": "{{user `iso_urls_list`}}",
+    "boot_command": [
+      "2<enter><wait10><wait10><enter><wait>",
+      "mdmfs -s 100m md1 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.pid em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/freebsd/vmdisk_setup.sh ; fetch -o /tmp/installerconfig http://{{.HTTPIP}}:{{.HTTPPort}}/freebsd/{{user `fstype`}}-installerconfig ; export CRYPTED_PASSWD='{{user `crypted_passwd`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; export DEVX=da0 ; gpart show -l ; sleep 3 ; bsdinstall script /tmp/installerconfig<enter>"
+    ]
+  },
+  {
+    "type": "virtualbox-iso",
+    "format": "ova",
+    "vm_name": "{{user `vm_name`}}",
+    "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+    "guest_additions_mode": "disable",
+    "hard_drive_interface": "sata",
+    "iso_interface": "sata",
+    "vboxmanage": [
+      ["storagectl", "{{.Name}}", "--name", "SCSI Controller", "--add", "scsi",
+        "--bootable", "on"],
+      ["modifyvm", "{{.Name}}", "--firmware", "efi", "--nictype1", "virtio",
+        "--memory", "768", "--vram", "64", "--rtcuseutc", "on",
+        "--clipboard", "bidirectional", "--draganddrop", "bidirectional",
+        "--accelerate3d", "on", "--groups", "/init_vm"]
+    ],
+    
+    "boot_wait": "7s",
+    "ssh_wait_timeout": "10000s",
+    "ssh_username": "root",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "shutdown -p +3",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+        
+    "guest_os_type": "{{user `vbox_guest_os`}}",
+    "iso_checksum": "{{user `iso_checksum`}}",
+    "iso_checksum_type": "{{user `iso_checksum_type`}}",
+    "iso_url": "{{user `iso_url`}}",
+    "iso_checksum_url": "{{user `iso_checksum_url`}}",
+    "iso_urls": "{{user `iso_urls_list`}}",
+    "boot_command": [
+      "<esc><wait5>boot -s<wait><enter><wait10><wait10>/bin/sh<enter><wait>",
+      "mdmfs -s 100m md1 /tmp ; mdmfs -s 100m md2 /mnt ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/freebsd/vmdisk_setup.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/freebsd/{{user `fstype`}}-install.sh ; export DEVX=ada0 ; gpart show -l ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk {{user `fstype`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh '{{user `crypted_passwd`}}' {{user `init_hostname`}}<enter><wait>"
+    ]
+  }],
+  "provisioners": [{
+      "type": "file",
+      "source": "scripts/common",
+      "destination": "/tmp/"
+    },
+    {
+      "type": "file",
+      "source": "{{user `home`}}/.ssh/publish_krls",
+      "destination": "/tmp/common/skel/_ssh/"
+    },
+    {
+      "type": "file",
+      "source": "scripts/freebsd/distro_pkgs.txt",
+      "destination": "/tmp/common/distro_pkgs.txt"
+    },
+    {
+      "type": "file",
+      "source": "init/freebsd/vmdisk_setup.sh",
+      "destination": "/tmp/common/disk_setup.sh"
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "inline": [
+        "cp -fR /tmp/common/* /root/",
+        "(cd /usr/share/skel ; mkdir -p dot.gnupg dot.ssh dot.pki)",
+        "cp -R /root/skel/_gnupg/* /usr/share/skel/dot.gnupg/",
+        "cp -R /root/skel/_ssh/* /usr/share/skel/dot.ssh/",
+        "cp -R /root/skel/_pki/* /usr/share/skel/dot.pki/"
+      ]
+    },
+    {
+      "type": "file",
+      "source": "init/common/dummy_metadata.json",
+      "destination": "/tmp/bento-metadata.json",
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "scripts": [
+        "init/common/vagrant.sh"
+      ],
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "scripts": [
+        "scripts/common/bsd_zerofill.sh"
+      ],
+      "only": ["virtualbox-iso"]
+    }
+  ],
+  "post-processors": [
+    {
+      "type": "vagrant",
+      "keep_input_artifact": false,
+      "output": "output-boxes/{{user `vm_name`}}.{{.Provider}}.box",
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "checksum",
+      "checksum_types": ["md5", "sha256"],
+      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+    }
+  ],
+  "variables": {
+    "vm_name": "freebsd-Release-init",
+    "init_hostname": "freebsd-boxv0000",
+    "fstype": "zfs",
+    "boot_cmdln_options": " ",
+    "qemu_uefi_firmware_dir": "/usr/share/OVMF",
+    
+    "vbox_guest_os": "FreeBSD_64",
+    "iso_checksum": "",
+    "iso_checksum_type": "sha256",
+    "iso_url": "",
+    "iso_checksum_url": "file:///mnt/Data0/distros/fixed/freebsd/CHECKSUM.SHA256-FreeBSD-11.0-RELEASE-amd64",
+    "iso_urls_list": "file:///mnt/Data0/distros/fixed/freebsd/FreeBSD-11.0-RELEASE-amd64-disc1.iso,http://ftp.freebsd.org/pub/FreeBSD/releases/ISO-IMAGES/11.0/FreeBSD-11.0-RELEASE-amd64-disc1.iso",
+    
+    "disk_size": "30720",
+    "headless": "",
+    "plain_passwd": null,
+    "crypted_passwd": null,
+    "build_timestamp": "{{isotime \"20160912153000\"}}",
+    "home": "{{env `HOME`}}"
+  }
+}

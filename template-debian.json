@@ -1,0 +1,188 @@
+{
+  "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
+  "_passwd_crypted_hash": "[ SPACE ] plain_passwd=abcd0123 ; salt='$6$16CHARACTERSSALT' ; crypted_passwd=$(python -c \"import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$salt\"))\")",
+  "_usage_build": "packer build -var plain_passwd=$plain_passwd -var crypted_passwd=$crypted_passwd -only=[qemu|virtualbox-iso] [-var-file iso_vars.json] template.json",
+  
+  "builders": [{
+    "type": "qemu",
+    "format": "qcow2",
+    "vm_name": "{{user `vm_name`}}.qcow2",
+    "machine_type": "q35",
+    "disk_interface": "virtio-scsi",
+    "disk_discard": "unmap",
+    "net_device": "virtio-net",
+    "qemuargs": [
+      ["-name", "{{user `vm_name`}}"], ["-boot", "order=cdn,menu=on"],
+      ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"],
+      ["-device", "virtio-net,netdev=user.0"], ["-m", "size=768"],
+      ["-bios", "{{user `qemu_uefi_firmware_dir`}}/OVMF_CODE.fd"],
+      ["-smbios", "type=0,uefi=on"], ["-rtc", "base=utc"],
+      ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
+      ["-virtfs", "local,path=/mnt/Data0,mount_tag=Data0,security_model=none"]
+    ],
+        
+    "boot_wait": "10s",
+    "ssh_wait_timeout": "10000s",
+    "ssh_username": "packer",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "sudo shutdown -hP +3",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+    
+    "iso_checksum": "{{user `iso_checksum`}}",
+    "iso_checksum_type": "{{user `iso_checksum_type`}}",
+    "iso_url": "{{user `iso_url`}}",
+    "iso_checksum_url": "{{user `iso_checksum_url`}}",
+    "iso_urls": "{{user `iso_urls_list`}}",
+    "boot_command": [
+      "<wait>c<wait>linux /install.amd/vmlinuz {{user `boot_cmdln_options`}} ",
+      "auto=true preseed/url=http://{{.HTTPIP}}:{{.HTTPPort}}/debian/{{user `fstype`}}-preseed.cfg hostname={{user `init_hostname`}} domain= locale=en_US keymap=us console-setup/ask_detect=false mirror/http/hostname=ftp.us.debian.org mirror/http/directory=/debian<enter>",
+      "initrd /install.amd/initrd.gz<enter>boot<enter>"
+    ]
+  },
+  {
+    "type": "virtualbox-iso",
+    "format": "ova",
+    "vm_name": "{{user `vm_name`}}",
+    "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+    "guest_additions_mode": "disable",
+    "hard_drive_interface": "sata",
+    "iso_interface": "sata",
+    "vboxmanage": [
+      ["storagectl", "{{.Name}}", "--name", "SCSI Controller", "--add", "scsi",
+        "--bootable", "on"],
+      ["modifyvm", "{{.Name}}", "--firmware", "efi", "--nictype1", "virtio",
+        "--memory", "768", "--vram", "64", "--rtcuseutc", "on",
+        "--clipboard", "bidirectional", "--draganddrop", "bidirectional",
+        "--accelerate3d", "on", "--groups", "/init_vm"],
+      ["sharedfolder", "add", "{{.Name}}", "--name", "Data0", "--hostpath",
+        "/mnt/Data0", "--automount"]
+    ],
+    
+    "boot_wait": "10s",
+    "ssh_wait_timeout": "10000s",
+    "ssh_username": "packer",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "sudo shutdown -hP +3",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+        
+    "guest_os_type": "{{user `vbox_guest_os`}}",
+    "iso_checksum": "{{user `isolive_checksum`}}",
+    "iso_checksum_type": "{{user `isolive_checksum_type`}}",
+    "iso_url": "{{user `isolive_url`}}",
+    "iso_checksum_url": "{{user `isolive_checksum_url`}}",
+    "iso_urls": "{{user `isolive_urls_list`}}",
+    "boot_command": [
+      "<wait>c<wait>linux /d-i/vmlinuz {{user `boot_cmdln_options`}} boot=live components systemd.unit=multi-user.target text<enter>initrd /d-i/initrd.gz<enter>boot<enter>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><enter>user<enter>live<enter>sudo su<enter>apt-get --yes update ; apt-get --yes install lvm2 gdisk ; cd /tmp ; aria2c -d / -o /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/linux_vmdisk_setup.sh' ; aria2c -d / -o /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/debian/{{user `fstype`}}-install.sh' ; export DEVX=sda ; sgdisk -p /dev/$DEVX ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk lvm vg0 pvol0 ; sh -x /tmp/disk_setup.sh mount_filesystems vg0 ; sh -x /tmp/install.sh '{{user `crypted_passwd`}}' {{user `init_hostname`}}<enter><wait>"
+    ]
+  }],
+  "provisioners": [{
+      "type": "file",
+      "source": "scripts/common",
+      "destination": "/tmp/"
+    },
+    {
+      "type": "file",
+      "source": "{{user `home`}}/.ssh/publish_krls",
+      "destination": "/tmp/common/skel/_ssh/"
+    },
+    {
+      "type": "file",
+      "source": "scripts/debian/distro_pkgs.txt",
+      "destination": "/tmp/common/distro_pkgs.txt"
+    },
+    {
+      "type": "file",
+      "source": "init/common/linux_vmdisk_setup.sh",
+      "destination": "/tmp/common/disk_setup.sh"
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "env {{.Vars}} sudo sh -x '{{.Path}}'",
+      "inline": [
+        "cp -fR /tmp/common/* /root/",
+        "(cd /etc/skel ; mkdir -p .gnupg .ssh .pki)",
+        "cp -R /root/skel/_gnupg/* /etc/skel/.gnupg/",
+        "cp -R /root/skel/_ssh/* /etc/skel/.ssh/",
+        "cp -R /root/skel/_pki/* /etc/skel/.pki/"
+      ]
+    },
+    {
+      "type": "file",
+      "source": "init/common/dummy_metadata.json",
+      "destination": "/tmp/bento-metadata.json",
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "env {{.Vars}} sudo -E sh -eux '{{.Path}}'",
+      "scripts": [
+        "init/common/vagrant.sh"
+      ],
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "env {{.Vars}} sudo -E sh -eux '{{.Path}}'",
+      "scripts": [
+        "scripts/common/linux_zerofill.sh"
+      ],
+      "only": ["virtualbox-iso"]
+    }
+  ],
+  "post-processors": [
+    {
+      "type": "vagrant",
+      "keep_input_artifact": false,
+      "output": "output-boxes/{{user `vm_name`}}.{{.Provider}}.box",
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "checksum",
+      "checksum_types": ["md5", "sha256"],
+      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+    }
+  ],
+  "variables": {
+    "vm_name": "debian-Stable-init",
+    "init_hostname": "debian-boxv0000",
+    "fstype": "ext4",
+    "boot_cmdln_options": " ",
+    "qemu_uefi_firmware_dir": "/usr/share/OVMF",
+    
+    "vbox_guest_os": "Debian_64",
+    "iso_checksum": "",
+    "iso_checksum_type": "sha256",
+    "iso_url": "",
+    "iso_checksum_url": "file:///mnt/Data0/distros/fixed/debian/SHA256SUMS",
+    "iso_urls_list": "file:///mnt/Data0/distros/fixed/debian/debian-8.6.0-amd64-netinst.iso,http://mirrors.kernel.org/debian-cd/current/amd64/iso-cd/debian-8.6.0-amd64-netinst.iso",
+    
+    "isolive_checksum": "",
+    "isolive_checksum_type": "sha256",
+    "isolive_url": "",
+    "isolive_checksum_url": "file:///mnt/Data0/distros/fixed/debian-live/SHA256SUMS",
+    "isolive_urls_list": "file:///mnt/Data0/distros/fixed/debian-live/debian-live-8.6.0-amd64-lxde.iso,http://mirrors.kernel.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-8.6.0-amd64-lxde.iso",
+    
+    "disk_size": "30720",
+    "headless": "",
+    "plain_passwd": null,
+    "crypted_passwd": null,
+    "build_timestamp": "{{isotime \"20160912153000\"}}",
+    "home": "{{env `HOME`}}"
+  }
+}
