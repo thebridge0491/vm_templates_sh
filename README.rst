@@ -25,7 +25,18 @@ version control repository clone:
 
 Usage
 -----
-        TODO - fix usage info
+if needed, create/update JSON file for iso variables:
+		
+		cp iso_vars.json.sample iso_vars.json ; $EDITOR iso_vars.json
+
+to build virtual machine from iso:
+		
+		 PLAIN_PASSWD=abcd0123 ; PACKER_CMD=$HOME/bin/packer
+		
+		CRYPTED_PASSWD=$(python -c "import crypt,getpass ; print(crypt.crypt(getpass.getpass(), '\$6\$16CHARACTERSSALT'))")
+		
+		$PACKER_CMD build -var plain_passwd=abcd0123 -var crypted_passwd=$CRYPTED_PASSWD \
+			[-var-file iso_vars.json] -only=[qemu|virtualbox-iso] template.json
 
 Author/Copyright
 ----------------

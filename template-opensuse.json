@@ -1,0 +1,189 @@
+{
+  "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
+  "_passwd_crypted_hash": "[ SPACE ] plain_passwd=abcd0123 ; salt='$6$16CHARACTERSSALT' ; crypted_passwd=$(python -c \"import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$salt\"))\")",
+  "_usage_build": "packer build -var plain_passwd=$plain_passwd -var crypted_passwd=$crypted_passwd -only=[qemu|virtualbox-iso] [-var-file iso_vars.json] template.json",
+  
+  "builders": [{
+    "type": "qemu",
+    "format": "qcow2",
+    "vm_name": "{{user `vm_name`}}.qcow2",
+    "machine_type": "q35",
+    "disk_interface": "virtio-scsi",
+    "disk_discard": "unmap",
+    "net_device": "virtio-net",
+    "qemuargs": [
+      ["-name", "{{user `vm_name`}}"], ["-boot", "order=cdn,menu=on"],
+      ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"],
+      ["-device", "virtio-net,netdev=user.0"], ["-m", "size=768"],
+      ["-bios", "{{user `qemu_uefi_firmware_dir`}}/OVMF_CODE.fd"],
+      ["-smbios", "type=0,uefi=on"], ["-rtc", "base=utc"],
+      ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
+      ["-virtfs", "local,path=/mnt/Data0,mount_tag=Data0,security_model=none"]
+    ],
+        
+    "boot_wait": "10s",
+    "ssh_wait_timeout": "10000s",
+    "ssh_username": "packer",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "sudo shutdown -hP +3",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+    
+    "iso_checksum": "{{user `iso_checksum`}}",
+    "iso_checksum_type": "{{user `iso_checksum_type`}}",
+    "iso_url": "{{user `iso_url`}}",
+    "iso_checksum_url": "{{user `iso_checksum_url`}}",
+    "iso_urls": "{{user `iso_urls_list`}}",
+    "boot_command": [
+      "<wait>c<wait>linuxefi /boot/x86_64/loader/linux ",
+      "netsetup=dhcp lang=en_US install=cd:/ hostname={{user `init_hostname`}} domain= textmode=1 autoyast=http://{{ .HTTPIP }}:{{ .HTTPPort }}/opensuse/{{user `fstype`}}-autoinst.xml<enter><wait10>",
+      "initrdefi /boot/x86_64/loader/initrd<enter><wait10>boot<enter><wait10>"
+    ]
+  },
+  {
+    "type": "virtualbox-iso",
+    "format": "ova",
+    "vm_name": "{{user `vm_name`}}",
+    "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+    "guest_additions_mode": "disable",
+    "hard_drive_interface": "sata",
+    "iso_interface": "sata",
+    "vboxmanage": [
+      ["storagectl", "{{.Name}}", "--name", "SCSI Controller", "--add", "scsi",
+        "--bootable", "on"],
+      ["modifyvm", "{{.Name}}", "--firmware", "efi", "--nictype1", "virtio",
+        "--memory", "768", "--vram", "64", "--rtcuseutc", "on",
+        "--clipboard", "bidirectional", "--draganddrop", "bidirectional",
+        "--accelerate3d", "on", "--groups", "/init_vm"],
+      ["sharedfolder", "add", "{{.Name}}", "--name", "Data0", "--hostpath",
+        "/mnt/Data0", "--automount"]
+    ],
+    
+    "boot_wait": "10s",
+    "ssh_wait_timeout": "10000s",
+    "ssh_username": "packer",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "sudo shutdown -hP +3",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+        
+    "guest_os_type": "{{user `vbox_guest_os`}}",
+    "iso_checksum": "{{user `isolive_checksum`}}",
+    "iso_checksum_type": "{{user `isolive_checksum_type`}}",
+    "iso_url": "{{user `isolive_url`}}",
+    "iso_checksum_url": "{{user `isolive_checksum_url`}}",
+    "iso_urls": "{{user `isolive_urls_list`}}",
+    "boot_command": [
+      "<wait>c<wait>linuxefi /boot/x86_64/loader/linux root=live:CDLABEL={{user `isolive_cdlabel`}} ro rd.live.image rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 {{user `boot_cmdln_options`}}<enter>initrdefi /boot/x86_64/loader/initrd<enter>boot<enter>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><enter>linux<enter><wait10>sudo su<enter><wait10>zypper --non-interactive refresh ; cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/linux_vmdisk_setup.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/opensuse/{{user `fstype`}}-install.sh' ; export DEVX=sda ; sgdisk -p /dev/$DEVX ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk lvm ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh '{{user `crypted_passwd`}}' {{user `init_hostname`}}<enter><wait>"
+    ]
+  }],
+  "provisioners": [{
+      "type": "file",
+      "source": "scripts/common",
+      "destination": "/tmp/"
+    },
+    {
+      "type": "file",
+      "source": "{{user `home`}}/.ssh/publish_krls",
+      "destination": "/tmp/common/skel/_ssh/"
+    },
+    {
+      "type": "file",
+      "source": "scripts/opensuse/distro_pkgs.txt",
+      "destination": "/tmp/common/distro_pkgs.txt"
+    },
+    {
+      "type": "file",
+      "source": "init/common/linux_vmdisk_setup.sh",
+      "destination": "/tmp/common/disk_setup.sh"
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "env {{.Vars}} sudo sh -x '{{.Path}}'",
+      "inline": [
+        "cp -fR /tmp/common/* /root/",
+        "(cd /etc/skel ; mkdir -p .gnupg .ssh .pki)",
+        "cp -R /root/skel/_gnupg/* /etc/skel/.gnupg/",
+        "cp -R /root/skel/_ssh/* /etc/skel/.ssh/",
+        "cp -R /root/skel/_pki/* /etc/skel/.pki/"
+      ]
+    },
+    {
+      "type": "file",
+      "source": "init/common/dummy_metadata.json",
+      "destination": "/tmp/bento-metadata.json",
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "env {{.Vars}} sudo -E sh -eux '{{.Path}}'",
+      "scripts": [
+        "init/common/vagrant.sh"
+      ],
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "env {{.Vars}} sudo -E sh -eux '{{.Path}}'",
+      "scripts": [
+        "scripts/common/linux_zerofill.sh"
+      ],
+      "only": ["virtualbox-iso"]
+    }
+  ],
+  "post-processors": [
+    {
+      "type": "vagrant",
+      "keep_input_artifact": false,
+      "output": "output-boxes/{{user `vm_name`}}.{{.Provider}}.box",
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "checksum",
+      "checksum_types": ["md5", "sha256"],
+      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+    }
+  ],
+  "variables": {
+    "vm_name": "opensuse-Stable-init",
+    "init_hostname": "opensuse-boxv0000",
+    "fstype": "ext4",
+    "boot_cmdln_options": " ",
+    "qemu_uefi_firmware_dir": "/usr/share/OVMF",
+    
+    "vbox_guest_os": "OpenSUSE_64",
+    "iso_checksum": "",
+    "iso_checksum_type": "sha256",
+    "iso_url": "",
+    "iso_checksum_url": "file:///mnt/Data0/distros/fixed/opensuse/openSUSE-Leap-42.1-NET-x86_64.iso.sha256",
+    "iso_urls_list": "file:///mnt/Data0/distros/fixed/opensuse/openSUSE-Leap-42.1-NET-x86_64.iso,http://mirrors.kernel.org/opensuse/distribution/openSUSE-stable/iso/openSUSE-Leap-42.1-NET-x86_64.iso",
+    
+    "isolive_checksum": "",
+    "isolive_checksum_type": "sha256",
+    "isolive_url": "",
+    "isolive_checksum_url": "file:///mnt/Data0/distros/fixed/opensuse/sha256sums.txt",
+    "isolive_urls_list": "file:///mnt/Data0/distros/fixed/opensuse/openSUSE-13.2-KDE-Live-x86_64.iso,http://mirrors.kernel.org/opensuse/distribution/openSUSE-stable/live/openSUSE-13.2-KDE-Live-x86_64.iso",
+    "isolive_cdlabel": "openSUSE_Leap_13.2_KDE_Live",
+    
+    "disk_size": "30720",
+    "headless": "",
+    "plain_passwd": null,
+    "crypted_passwd": null,
+    "build_timestamp": "{{isotime \"20160912153000\"}}",
+    "home": "{{env `HOME`}}"
+  }
+}

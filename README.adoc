@@ -27,7 +27,16 @@ version control repository clone:
         git clone https://bitbucket.org/thebridge0491/vm_templates_sh.git
 
 == Usage
-        TODO - fix usage info
+if needed, create/update JSON file for iso variables:
+		
+		cp iso_vars.json.sample iso_vars.json ; $EDITOR iso_vars.json
+
+to build virtual machine from iso:
+		
+		 PLAIN_PASSWD=abcd0123 ; PACKER_CMD=$HOME/bin/packer
+		CRYPTED_PASSWD=$(python -c "import crypt,getpass ; print(crypt.crypt(getpass.getpass(), '\$6\$16CHARACTERSSALT'))")
+		$PACKER_CMD build -var plain_passwd=$PLAIN_PASSWD -var crypted_passwd=$CRYPTED_PASSWD \
+			[-var-file iso_vars.json] -only=[qemu|virtualbox-iso] template.json
 
 == Author/Copyright
 Copyright (c) 2016 by thebridge0491 <thebridge0491-codelab@yahoo.com>
