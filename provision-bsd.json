@@ -1,0 +1,155 @@
+{
+  "_local_address_linux": "ip -o route get 8.8.8.8 | sed 's|.*src[ ]*\\([^ ]*\\)[ ]*.*$|\\1|'",
+  "_local_address_bsd": "ifconfig em0 | grep -e 'inet ' | cut -d' ' -f2",
+  "_default_printer_name": "lpstat -d | sed 's|.*:[ ]*\\([^ ]*\\)$|\\1|'",
+  "_usage_build": "[ SPACE ] plain_passwd=abcd0123 ; packer build -var plain_passwd=$plain_passwd [-var vm_spec=<vm_spec>] provision.json",
+    
+  "builders": [
+    {
+      "type": "null",
+      "name": "update-vm",
+      "ssh_host": "{{user `vm_spec`}}",
+      
+      "ssh_username": "packer",
+      "ssh_password": "{{user `plain_passwd`}}",
+      "ssh_timeout": "10000s"
+    },
+    {
+      "type": "null",
+      "name": "vm-base",
+      "ssh_host": "{{user `vm_spec`}}",
+      
+      "ssh_username": "packer",
+      "ssh_password": "{{user `plain_passwd`}}",
+      "ssh_timeout": "10000s"
+    },
+    {
+      "type": "virtualbox-ovf",      
+      "format": "ova",
+      "name": "update-ovf",
+      "vm_name": "{{user `vm_spec`}}",
+      "source_path": "input-vms/{{user `vm_spec`}}/{{user `vm_spec`}}.ova",
+      "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+      "guest_additions_mode": "disable",
+      "vboxmanage": [
+        
+      ],
+      
+      "ssh_username": "packer",
+      "ssh_password": "{{user `plain_passwd`}}",
+      "ssh_wait_timeout": "10000s",
+      "shutdown_command": "sudo shutdown -p +3",
+      "output_directory": "output-vms/{{user `vm_spec`}}"
+    },
+    {
+      "type": "virtualbox-ovf",
+      "format": "ova",
+      "name": "ovf-base",
+      "vm_name": "{{user `vm_spec`}}",
+      "source_path": "input-vms/{{user `vm_spec`}}/{{user `vm_spec`}}.ova",
+      "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+      "guest_additions_mode": "disable",
+      "vboxmanage": [
+        ["modifyvm", "{{.Name}}", "--groups", "/vm_base"],
+        ["sharedfolder", "remove", "{{.Name}}", "--name", "Data0"]
+      ],
+            
+      "ssh_username": "packer",
+      "ssh_password": "{{user `plain_passwd`}}",
+      "ssh_wait_timeout": "10000s",
+      "shutdown_command": "sudo shutdown -p +3",
+      "output_directory": "output-vms/{{user `vm_spec`}}"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "scripts/common",
+      "destination": "/tmp/"
+    },
+    {
+      "type": "file",
+      "source": "{{user `home`}}/.ssh/publish_krls",
+      "destination": "/tmp/common/skel/_ssh/"
+    },
+    {
+      "type": "file",
+      "source": "scripts/common_bsd/",
+      "destination": "/tmp/common/"
+    },
+    {
+      "type": "file",
+      "source": "scripts/{{user `distro_name`}}/",
+      "destination": "/tmp/common/"
+    },
+    {
+      "type": "file",
+      "source": "init/{{user `distro_name`}}/vmdisk_setup.sh",
+      "destination": "/tmp/common/disk_setup.sh"
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer", "http_proxy={{user `http_proxy`}}",
+        "https_proxy={{user `https_proxy`}}", "no_proxy={{user `no_proxy`}}"
+      ],
+      "execute_command": "env {{.Vars}} sudo sh -x '{{.Path}}'",
+      "inline": [
+        "cp -fR /tmp/common/* /root/"
+      ]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer", "http_proxy={{user `http_proxy`}}",
+        "https_proxy={{user `https_proxy`}}", "no_proxy={{user `no_proxy`}}",
+        "FETCH_RETRY=20", "FETCH_TIMEOUT=300"
+      ],
+      "execute_command": "env {{.Vars}} sudo -E sh -eux '{{.Path}}'",
+      "scripts": [
+        "scripts/{{user `distro_name`}}/update.sh"
+      ],
+      "only": ["update-vm", "update-ovf"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer", "http_proxy={{user `http_proxy`}}",
+        "https_proxy={{user `https_proxy`}}", "no_proxy={{user `no_proxy`}}",
+        "WITH_X11=nox11", "FETCH_RETRY=20", "FETCH_TIMEOUT=300"
+      ],
+      "execute_command": "env {{.Vars}} PLAIN_PASSWD='{{user `plain_passwd`}}' sudo -E sh -eux '{{.Path}}' {{user `shared_node`}}",
+      "scripts": [
+        "scripts/{{user `distro_name`}}/baseinstall.sh",
+        "scripts/{{user `distro_name`}}/vm_tools.sh"
+      ],
+      "only": ["vm-base", "ovf-base"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer", "http_proxy={{user `http_proxy`}}",
+        "https_proxy={{user `https_proxy`}}", "no_proxy={{user `no_proxy`}}"
+      ],
+      "execute_command": "env {{.Vars}} sudo -E sh -eux '{{.Path}}'",
+      "scripts": [
+        "scripts/common/bsd_zerofill.sh"
+      ],
+      "only": ["update-ovf", "ovf-base"]
+    }
+  ],
+  "variables": {
+    "distro_name": "freebsd",
+    
+    "http_proxy": "{{env `http_proxy`}}",
+    "https_proxy": "{{env `https_proxy`}}",
+    "no_proxy": "{{env `no_proxy`}}",
+    
+    "shared_node": "localhost.local",
+    "desktop": "",
+    "vm_spec": null,
+    "plain_passwd": null,
+    "build_timestamp": "{{isotime \"20160912153000\"}}",
+    "home": "{{env `HOME`}}"
+  }
+}

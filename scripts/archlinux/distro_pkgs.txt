@@ -38,3 +38,23 @@ pkgs_installed() {
 		done) | sort | column ;
 	fi
 }
+
+pkgs_cmdln_extras="linux-headers calcurse task msmtp-mta isync mutt abook transmission-cli rtorrent irssi finch rclone cmus"
+
+pkgs_filesys_utils="dosfstools gptfdisk parted fsarchiver exfat-utils"
+
+pkgs_cmdln_tools="base-devel sudo ntp python bash nfs-utils mc rlwrap nano nftables clamav curl wget aria2 gnu-netcat rsync bzip2 zip unzip p7zip gnupg openssh pass keychain openssl gnutls w3m cyrus-sasl cups-pdf nss-mdns qpdf sqlite git mercurial tcpdump nmap screen tmux"
+
+
+pkgs_lang_py2=""
+
+pkgs_lang_py3=""
+
+pkgs_lang_py="${pkgs_lang_py2} ${pkgs_lang_py3}"
+
+pkgs_lang_c=""
+# ddd
+
+pkgs_lang_java=""
+default_java_home="/usr/lib/jvm/default"
+default_java_version="1.7"

@@ -55,3 +55,24 @@ pkgs_installed() {
 		done) | sort | column ;
 	fi
 }
+
+pkgs_cmdln_extras="calcurse taskwarrior msmtp-mta isync mutt abook transmission-cli rtorrent irssi finch cmus"
+# rclone
+
+pkgs_filesys_utils="cryptsetup dosfstools gdisk parted fsarchiver exfat-fuse exfat-utils"
+
+pkgs_cmdln_tools="sudo ntp python bash bsdmainutils file nfs-common mc rlwrap nano ufw clamav curl wget aria2 netcat-traditional rsync bzip2 zip unzip p7zip-full gpg ssh pass keychain openssl gnutls-bin libnss3-dev libnss3-tools w3m printer-driver-cups-pdf qpdf avahi-daemon avahi-utils sqlite3 git mercurial tcpdump nmap dialog screen tmux"
+
+
+pkgs_lang_py2=""
+
+pkgs_lang_py3=""
+
+pkgs_lang_py="${pkgs_lang_py2} ${pkgs_lang_py3}"
+
+pkgs_lang_c=""
+# ddd
+
+pkgs_lang_java=""
+default_java_home="/usr/lib/jvm/default-java"
+default_java_version="1.7"

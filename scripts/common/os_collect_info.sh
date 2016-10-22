@@ -94,7 +94,7 @@ lang_devel_versions() {
 }
 
 bsd_info() {
-	sudo sh -c '. /root/distro_pkgs.txt'
+	sudo cp /root/distro_pkgs.txt /tmp/ ; . /tmp/distro_pkgs.txt
 	msgfile='msg5.txt' ; echo "($OS_NAME)" 'explicit_pkgs' >> $msgfile
 	pkgs_installed explicit >> $msgfile
 	msgfile='msg4.txt' ; echo "($OS_NAME)" 'leaf_pkgs' >> $msgfile
@@ -173,7 +173,7 @@ bsd_info() {
 linux_info() {
 	#distro_nm=$(lsb_release -i)
 	distro_nm=$(grep -e '^NAME' /etc/os-release)
-	sudo sh -c '. /root/distro_pkgs.txt'
+	sudo cp /root/distro_pkgs.txt /tmp/ ; . /tmp/distro_pkgs.txt
 	msgfile='msg5.txt' ; echo "($distro_nm)" 'explicit_pkgs' >> $msgfile
 	pkgs_installed explicit >> $msgfile
 	msgfile='msg4.txt' ; echo "($distro_nm)" 'leaf_pkgs' >> $msgfile
