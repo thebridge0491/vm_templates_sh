@@ -27,7 +27,7 @@ pkgs_installed_urpmi() {
 		pkg_nms=$(rpm -qa --queryformat '%{name} \n')
 		(for pkg_nm in $pkg_nms ; do
 			no_rdepns=$(rpm -q --whatrequires $pkg_nm | grep -e 'no package requires') ;
-			if [ -z "$no_rdepns" ] ; then continue ; fi ;
+			if [ ! -z "$no_rdepns" ] ; then continue ; fi ;
 			
 			rpm -q --queryformat '%{group}/%{name} \n' $pkg_nm ;
 		done) | sort | column ;
@@ -52,7 +52,7 @@ pkgs_installed() {
 		pkg_nms=$(dnf -C repoquery --queryformat '%{name}' --installed) ;
 		(for pkg_nm in $pkg_nms ; do
 			no_rdepns=$(rpm -q --whatrequires $pkg_nm | grep -e 'no package requires') ;
-			if [ -z "$no_rdepns" ] ; then continue ; fi ;
+			if [ ! -z "$no_rdepns" ] ; then continue ; fi ;
 			
 			pkg_repo=$(dnf -C repoquery --queryformat "%{reponame}" $pkg_nm) ;
 			
@@ -67,3 +67,26 @@ pkgs_installed() {
 		done) | sort | column ;
 	fi
 }
+
+pkgs_cmdln_extras="calcurse taskwarrior msmtp mutt abook transmission-cli rtorrent irssi finch moc"
+# cmus
+
+pkgs_filesys_utils="cryptsetup dosfstools gdisk parted fsarchiver"
+# fuse-exfat exfat-utils
+
+pkgs_cmdln_tools="man-pages sudo python bash ntp mc rlwrap nano clamav curl wget aria2 netcat-traditional rsync bzip2 zip unzip p7zip gnupg2 openssh pass keychain openssl gnutls w3m cups-pdf qpdf avahi avahi-dnsconfd lib64nss-mdns2 sqlite3-tools git mercurial tcpdump nmap cdialog screen tmux"
+# telnet clamav-database avahi-utils
+
+
+pkgs_lang_py2=""
+
+pkgs_lang_py3=""
+
+pkgs_lang_py="${pkgs_lang_py2} ${pkgs_lang_py3}"
+
+pkgs_lang_c=""
+# ddd
+
+pkgs_lang_java=""
+default_java_home="/usr/lib/jvm/default"
+default_java_version="1.7"

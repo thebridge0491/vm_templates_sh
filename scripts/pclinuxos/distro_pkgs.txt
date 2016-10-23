@@ -23,16 +23,39 @@ pkgs_installed() {
 	echo -e 'dpkg -l | grep -Ee "meta[-]*package" | sed -n "s|^\w*\s*\(\S*\)\s*.*|\1|p"\n----------'
 	dpkg -l | grep -Ee "meta[-]*package" | sed -n 's|^\w*\s*\(\S*\)\s*.*|\1|p' | column ; echo '' ; sleep 3
 	
-	if [ "leaf" = "$METHOD" ] ; then
-		# ;
-	else
-		# ;
-	fi
+	#if [ "leaf" = "$METHOD" ] ; then
+	#	;
+	#else
+	#	;
+	#fi
 	pkg_nms=$(rpm -qa --queryformat '%{name} \n')
 	(for pkg_nm in $pkg_nms ; do
 		no_rdepns=$(rpm -q --whatrequires $pkg_nm | grep -e 'no package requires') ;
-		if [ -z "$no_rdepns" ] ; then continue ; fi ;
+		if [ ! -z "$no_rdepns" ] ; then continue ; fi ;
 		
 		rpm -q --queryformat '%{group}/%{name} \n' $pkg_nm ;
 	done) | sort | column
 }
+
+pkgs_cmdln_extras="calcurse taskwarrior msmtp mutt abook transmission-cli rtorrent irssi finch moc"
+# cmus rclone
+
+pkgs_filesys_utils="cryptsetup dosfstools gdisk parted fsarchiver"
+# fuse-exfat exfat-utils
+
+pkgs_cmdln_tools="man-pages sudo python bash ntp mc rlwrap nano clamav curl wget aria2 netcat-traditional rsync bzip2 zip unzip p7zip gnupg2 openssh pass keychain openssl gnutls w3m cups-pdf qpdf nss_mdns avahi sqlite3-tools git mercurial tcpdump nmap cdialog screen tmux"
+# telnet clamav-database
+
+
+pkgs_lang_py2=""
+
+pkgs_lang_py3=""
+
+pkgs_lang_py="${pkgs_lang_py2} ${pkgs_lang_py3}"
+
+pkgs_lang_c=""
+# ddd
+
+pkgs_lang_java=""
+default_java_home="/usr/lib/jvm/default"
+default_java_version="1.7"

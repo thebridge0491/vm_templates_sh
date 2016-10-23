@@ -25,7 +25,7 @@ pkgs_installed() { # yum install yum-utils ; yum groups mark convert
 		pkg_nms=$(repoquery -C --installed) ;
 		(for pkg_nm in $pkg_nms ; do
 			no_rdepns=$(rpm -q --whatrequires $pkg_nm | grep -e 'no package requires') ;
-			if [ -z "$no_rdepns" ] ; then continue ; fi ;
+			if [ ! -z "$no_rdepns" ] ; then continue ; fi ;
 			
 			pkg_repo=$(yumdb info $pkg_nm | grep -e 'from_repo =' | sed 's|.*= \(.*\)|\1|') ;
 			
@@ -42,3 +42,26 @@ pkgs_installed() { # yum install yum-utils ; yum groups mark convert
 		done) | sort | column ;
 	fi
 }
+
+pkgs_cmdln_extras="task msmtp isync mutt abook transmission-cli rtorrent irssi finch"
+# calcurse # rclone # cmus
+
+pkgs_filesys_utils="cryptsetup dosfstools gdisk parted"
+# rlwrap exfat-fuse exfat-utils # fsarchiver 
+
+pkgs_cmdln_tools="@core yum-utils sudo man man-pages ntp sudo python bash which file nfs-utils mc nano clamav clamav-scanner-systemd clamav-update clamav-data telnet curl wget aria2 nc rsync bzip2 zip unzip p7zip gnupg2 openssh pass openssl gnutls w3m cups-pdf qpdf nss-mdns avahi-tools sqlite git mercurial tcpdump nmap dialog screen tmux"
+# keychain
+
+
+pkgs_lang_py2=""
+
+pkgs_lang_py3=""
+
+pkgs_lang_py="${pkgs_lang_py2} ${pkgs_lang_py3}"
+
+pkgs_lang_c=""
+# ddd
+
+pkgs_lang_java=""
+default_java_home="/usr/lib/jvm/default"
+default_java_version="1.7"

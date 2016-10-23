@@ -25,7 +25,7 @@ pkgs_installed() {
 		pkg_nms=$(zypper --no-refresh search --installed-only | grep ^i | cut -d'|' -f2) ;
 		(for pkg_nm in $pkg_nms ; do
 			no_rdepns=$(rpm -q --whatrequires $pkg_nm | grep -e 'no package requires') ;
-			if [ -z "$no_rdepns" ] ; then continue ; fi ;
+			if [ ! -z "$no_rdepns" ] ; then continue ; fi ;
 			
 			pkg_repo=$(zypper --no-refresh info $pkg_nm | grep -e Repository | cut -d: -f2 | tr -d ' ') ;
 			
@@ -40,3 +40,25 @@ pkgs_installed() {
 		done) | sort | column ;
 	fi
 }
+
+pkgs_cmdln_extras="calcurse taskwarrior msmtp isync mutt abook transmission rtorrent irssi finch moc"
+# cmus rclone
+
+pkgs_filesys_utils="cryptsetup dosfstools gptfdisk parted fsarchiver fuse-exfat exfat-utils"
+
+pkgs_cmdln_tools="+pattern:enhanced_base man-pages sudo ntp python bash nfs-utils mc rlwrap nano firewalld clamav telnet curl wget aria2 gnu-netcat rsync bzip2 zip unzip p7zip-full gpg2 openssh password-store keychain openssl gnutls mozilla-nss-devel mozilla-nss-tools w3m cups-pdf qpdf nss-mdns avahi-utils sqlite3 git mercurial tcpdump nmap dialog screen tmux"
+# clamav-database
+
+
+pkgs_lang_py2=""
+
+pkgs_lang_py3=""
+
+pkgs_lang_py="${pkgs_lang_py2} ${pkgs_lang_py3}"
+
+pkgs_lang_c=""
+# ddd
+
+pkgs_lang_java=""
+default_java_home="/usr/lib/jvm/default"
+default_java_version="1.7"
