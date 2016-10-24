@@ -24,6 +24,15 @@
       "ssh_timeout": "10000s"
     },
     {
+      "type": "null",
+      "name": "vm-user_ifc",
+      "ssh_host": "{{user `vm_spec`}}",
+      
+      "ssh_username": "packer",
+      "ssh_password": "{{user `plain_passwd`}}",
+      "ssh_timeout": "10000s"
+    },
+    {
       "type": "virtualbox-ovf",      
       "format": "ova",
       "name": "update-ovf",
@@ -57,6 +66,24 @@
       "ssh_username": "packer",
       "ssh_password": "{{user `plain_passwd`}}",
       "ssh_wait_timeout": "10000s",
+      "shutdown_command": "sudo shutdown -p +3",
+      "output_directory": "output-vms/{{user `vm_spec`}}"
+    },
+    {
+      "type": "virtualbox-ovf",
+      "format": "ova",
+      "name": "ovf-user_ifc",
+      "vm_name": "{{user `vm_spec`}}",
+      "source_path": "input-vms/{{user `vm_spec`}}/{{user `vm_spec`}}.ova",
+      "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+      "guest_additions_mode": "disable",
+      "vboxmanage": [
+        ["modifyvm", "{{.Name}}", "--groups", "/vm_user_ifc"]
+      ],
+      
+      "ssh_username": "packer",
+      "ssh_password": "{{user `plain_passwd`}}",
+      "ssh_wait_timeout": "10000s",      
       "shutdown_command": "sudo shutdown -p +3",
       "output_directory": "output-vms/{{user `vm_spec`}}"
     }
@@ -129,13 +156,28 @@
       "type": "shell",
       "environment_vars": [
         "HOME_DIR=/home/packer", "http_proxy={{user `http_proxy`}}",
+        "https_proxy={{user `https_proxy`}}", "no_proxy={{user `no_proxy`}}",
+        "WITH_X11=x11", "FETCH_RETRY=20", "FETCH_TIMEOUT=300",
+        "CHOICE_DESKTOP={{user `desktop`}}"
+      ],
+      "execute_command": "env {{.Vars}} sudo -E sh -x '{{.Path}}'",
+      "scripts": [
+        "scripts/{{user `distro_name`}}/user_ifc.sh",
+        "scripts/{{user `distro_name`}}/vm_tools.sh"
+      ],
+      "only": ["vm-user_ifc", "ovf-user_ifc"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer", "http_proxy={{user `http_proxy`}}",
         "https_proxy={{user `https_proxy`}}", "no_proxy={{user `no_proxy`}}"
       ],
       "execute_command": "env {{.Vars}} sudo -E sh -eux '{{.Path}}'",
       "scripts": [
         "scripts/common/bsd_zerofill.sh"
       ],
-      "only": ["update-ovf", "ovf-base"]
+      "only": ["update-ovf", "ovf-base", "ovf-user_ifc"]
     }
   ],
   "variables": {

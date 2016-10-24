@@ -36,6 +36,31 @@ pkgs_filesys_utils="fusefs-exfat exfat-utils"
 pkgs_cmdln_tools="sudo ntp python en-freebsd-doc mc-light rlwrap nano clamav aria2 netcat rsync bzip2 zip unzip p7zip gnupg password-store keychain base64 openssl gnutls ca_root_nss w3m cups-pdf qpdf nss_mdns sqlite3 git mercurial tcpdump nmap pinentry-curses cdialog screen tmux"
 
 
+pkgs_displaysvr_xorg="xorg-minimal xf86-video-vesa xf86-video-intel xf86-input-libinput xf86-input-evdev xterm xdg-utils xdg-user-dirs py27-xdg xscreensaver"
+
+pkgs_extras_qtapp="" # filled-in by for loop with field 1 apps
+pkgs_extras_gtkapp="" # filled-in by for loop with field 2 apps
+for qtapp_gtkapp in wpa_supplicant_gui wpa_supplicant :geany libreoffice \
+	gnucash clamtk transmission-qt5:transmission luckybackup:grsync \
+	keepassxc:keepass2 qtpass: kwalletmanager:seahorse falkon:firefox-esr \
+	thunderbird skanlite:simple-scan sqlitebrowser pidgin \
+	quassel:hexchat qgit:gitg tortoisehg: :zenmap \
+	clementine-player:gmusicbrowser smplayer:totem pavucontrol-qt:pavucontrol \
+	k3b:brasero calibre kamoso:guvcview okular:fbreader ; do
+  pkgs_extras_gtkapp="$pkgs_extras_gtkapp $(echo $qtapp_gtkapp | cut -d: -f2)" ;
+  pkgs_extras_qtapp="$pkgs_extras_qtapp $(echo $qtapp_gtkapp | cut -d: -f1)" ;
+done
+
+pkgs_deskenv_lxde="$pkgs_displaysvr_xorg lightdm-gtk-greeter gpicview parcellite xarchiver epdfview obconf menumaker gvfs lxde-meta conky leafpad gsimplecal"
+
+
+# addons browser: User Agent Switcher, AdBlock, Firebug, Https Everywhere,
+#  uBlock, NoScript
+
+# addons thunderbird: EnigMail, gContactSync, Lightning, Provider f/Ggl Cal,
+#  TorBirdy
+
+
 pkgs_lang_py2=""
 
 pkgs_lang_py3=""
