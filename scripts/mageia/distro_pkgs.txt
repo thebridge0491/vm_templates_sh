@@ -78,6 +78,31 @@ pkgs_cmdln_tools="man-pages sudo python bash ntp mc rlwrap nano clamav curl wget
 # telnet clamav-database avahi-utils
 
 
+pkgs_displaysvr_xorg="task-x11 x11-driver-video-vesa x11-driver-video-intel x11-driver-input-libinput x11-driver-input-evdev xdg-utils xdg-user-dirs xscreensaver"
+
+pkgs_extras_qtapp="" # filled-in by for loop with field 1 apps
+pkgs_extras_gtkapp="" # filled-in by for loop with field 2 apps
+for qtapp_gtkapp in partitionmanager:gparted cmst:wicd bluez-qt:blueman \
+	:geany libreoffice gnucash clamtk transmission-qt5:transmission-gtk3 \
+	luckybackup:grsync keepassxc:keepass2 qtpass: kwalletmanager:seahorse \
+	falkon:firefox-esr thunderbird skanlite:simple-scan sqlitebrowser \
+	pidgin quassel:hexchat qgit:gitg tortoisehg: nmapsi4:zenmap \
+	clementine:gmusicbrowser smplayer:totem pavucontrol-qt:pavucontrol \
+	k3b:brasero calibre kamoso:guvcview okular:fbreader ; do
+  pkgs_extras_gtkapp="$pkgs_extras_gtkapp $(echo $qtapp_gtkapp | cut -d: -f2)" ;
+  pkgs_extras_qtapp="$pkgs_extras_qtapp $(echo $qtapp_gtkapp | cut -d: -f1)" ;
+done
+
+pkgs_deskenv_lxde="$pkgs_displaysvr_xorg lightdm gpicview parcellite xarchiver epdfview obconf task-lxde conky leafpad orage"
+
+
+# addons browser: User Agent Switcher, AdBlock, Firebug, Https Everywhere,
+#  uBlock, NoScript
+
+# addons thunderbird: EnigMail, gContactSync, Lightning, Provider f/Ggl Cal,
+#  TorBirdy
+
+
 pkgs_lang_py2=""
 
 pkgs_lang_py3=""
