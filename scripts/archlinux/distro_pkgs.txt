@@ -71,15 +71,43 @@ pkgs_deskenv_lxde="$pkgs_displaysvr_xorg lightdm-gtk-greeter gpicview parcellite
 #  TorBirdy
 
 
-pkgs_lang_py2=""
+pkgs_lang_py2="python2-pip pychecker"
 
-pkgs_lang_py3=""
+pkgs_lang_py3="python-pip"
 
 pkgs_lang_py="${pkgs_lang_py2} ${pkgs_lang_py3}"
 
-pkgs_lang_c=""
-# ddd
+lang_c_gui="" # "gtk3 gtk2 qt5 qt4"
+lang_c_crypto="" # "libgcrypt gpgme openssl gnutls mbedtls"
+lang_c_db="" # "sqlite libdbi-drivers sqlite-jdbc"
+pkgs_lang_c="cmake automake scons premake4 ninja gdb pkg-config splint cppcheck clang llvm check cunit bcunit gcc-fortran lldb ruby-rake swig json-glib ${lang_c_gui} ${lang_c_crypto} ${lang_c_db}"
+# dnld & compile: log4c
+# ddd valgrind doxygen
 
-pkgs_lang_java=""
+pkgs_lang_java="jdk7-openjdk jdk8-openjdk junit gradle apache-ant maven groovy"
 default_java_home="/usr/lib/jvm/default"
 default_java_version="1.7"
+
+
+pkgs_lang_scm="gauche"
+
+pkgs_lang_hs="ghc stack"
+
+pkgs_lang_scala="jdk7-openjdk jdk8-openjdk junit gradle apache-ant maven scala"
+
+pkgs_lang_ml="ocaml opam camlp4 ocamlbuild ocaml-findlib"
+
+pkgs_lang_lisp="sbcl"
+
+
+pkgs_lang_go="go gpm"
+
+pkgs_lang_cs="mono dotnet-sdk"
+
+pkgs_lang_clj="clojure leiningen"
+
+pkgs_lang_fs="fsharp"
+
+pkgs_lang_rs="rust"
+
+pkgs_lang_rb="ruby jruby"
