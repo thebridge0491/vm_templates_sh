@@ -1,0 +1,186 @@
+{
+  "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
+  "_passwd_crypted_hash": "[ SPACE ] plain_passwd=abcd0123 ; salt='$6$16CHARACTERSSALT' ; crypted_passwd=$(python -c \"import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$salt\"))\")",
+  "_usage_build": "packer build -var plain_passwd=$plain_passwd -var crypted_passwd=$crypted_passwd -only=[qemu|virtualbox-iso] [-var-file iso_vars.json] template.json",
+  
+  "builders": [{
+    "type": "qemu",
+    "format": "qcow2",
+    "vm_name": "{{user `vm_name`}}.qcow2",
+    "machine_type": "pc",
+    "disk_interface": "virtio-scsi",
+    "disk_discard": "unmap",
+    "net_device": "virtio-net",
+    "qemuargs": [
+      ["-name", "{{user `vm_name`}}"], ["-boot", "order=cdn,menu=on"],
+      ["-vga", "cirrus"], ["-smp", "cpus=2"],
+      ["-device", "virtio-net,netdev=user.0"], ["-m", "size=1536"],
+      ["-bios", "{{user `qemu_uefi_firmware_dir`}}/OVMF_CODE.fd"],
+      ["-smbios", "type=0,uefi=on"], ["-rtc", "base=utc"],
+      ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"]
+    ],
+        
+    "boot_wait": "10s",
+    "ssh_wait_timeout": "10000s",
+    "ssh_username": "root",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "shutdown -p +3",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+    
+    "disk_image": "true",
+    "iso_checksum": "{{user `fs_checksum`}}",
+    "iso_checksum_type": "{{user `fs_checksum_type`}}",
+    "iso_url": "{{user `fs_url`}}",
+    "iso_checksum_url": "{{user `fs_checksum_url`}}",
+    "iso_urls": "{{user `fs_urls_list`}}",
+    "boot_command": [
+      "<wait10><wait10>S<enter><wait10>dhclient vio0<enter><wait>",
+      "cd /tmp ; export DEVX=sd0 ; (cd /dev ; sh MAKEDEV $DEVX) ; ftp -o /tmp/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/openbsd/custom.disklabel ; ftp -o /tmp/install.conf http://{{.HTTPIP}}:{{.HTTPPort}}/openbsd/install.conf ; ftp -o /tmp/autoinstall.sh http://{{.HTTPIP}}:{{.HTTPPort}}/openbsd/autoinstall.sh ; sh -x /tmp/autoinstall.sh<enter>"
+    ]
+  },
+  {
+    "type": "virtualbox-iso",
+    "format": "ova",
+    "vm_name": "{{user `vm_name`}}",
+    "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+    "guest_additions_mode": "disable",
+    "hard_drive_interface": "sata",
+    "iso_interface": "sata",
+    "vboxmanage": [
+      ["storagectl", "{{.Name}}", "--name", "SCSI Controller", "--add", "scsi",
+        "--bootable", "on"],
+      ["modifyvm", "{{.Name}}", "--firmware", "bios", "--nictype1", "virtio",
+        "--memory", "1536", "--vram", "64", "--rtcuseutc", "on", "--cpus", "2",
+        "--clipboard", "bidirectional", "--draganddrop", "bidirectional",
+        "--accelerate3d", "on", "--groups", "/init_vm"]
+    ],
+    
+    "boot_wait": "10s",
+    "ssh_wait_timeout": "10000s",
+    "ssh_username": "root",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "shutdown -p +3",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+        
+    "guest_os_type": "{{user `vbox_guest_os`}}",
+    "iso_checksum": "{{user `iso_checksum`}}",
+    "iso_checksum_type": "{{user `iso_checksum_type`}}",
+    "iso_url": "{{user `iso_url`}}",
+    "iso_checksum_url": "{{user `iso_checksum_url`}}",
+    "iso_urls": "{{user `iso_urls_list`}}",
+    "boot_command": [
+      "<wait10><wait10>S<enter><wait10>",
+      "mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; dhclient -L /tmp/dhclient.lease.em0 em0 ; dhclient -L /tmp/dhclient.lease.vio0 vio0 ; cd /tmp ; ftp -o /tmp/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/openbsd/custom.disklabel ; ftp -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/openbsd/vmdisk_setup.sh ; ftp -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/openbsd/{{user `fstype`}}-install.sh ; export DEVX=sd0 ; (cd /dev ; sh MAKEDEV $DEVX) ; sh -x /tmp/disk_setup.sh part_format_vmdisk ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh '{{user `plain_passwd`}}' {{user `init_hostname`}}<enter><wait>"
+    ]
+  }],
+  "provisioners": [{
+      "type": "file",
+      "source": "scripts/common",
+      "destination": "/tmp/"
+    },
+    {
+      "type": "file",
+      "source": "{{user `home`}}/.ssh/publish_krls",
+      "destination": "/tmp/common/skel/_ssh/"
+    },
+    {
+      "type": "file",
+      "source": "scripts/openbsd/distro_pkgs.txt",
+      "destination": "/tmp/common/distro_pkgs.txt"
+    },
+    {
+      "type": "file",
+      "source": "init/openbsd/vmdisk_setup.sh",
+      "destination": "/tmp/common/disk_setup.sh"
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "inline": [
+        "cp -fR /tmp/common/* /root/",
+        "(cd /etc/skel ; mkdir -p .gnupg .ssh .pki)",
+        "cp -R /root/skel/_gnupg/* /etc/skel/.gnupg/",
+        "cp -R /root/skel/_ssh/* /etc/skel/.ssh/",
+        "cp -R /root/skel/_pki/* /etc/skel/.pki/"
+      ]
+    },
+    {
+      "type": "file",
+      "source": "init/common/dummy_metadata.json",
+      "destination": "/tmp/bento-metadata.json",
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "scripts": [
+        "init/common/vagrant.sh"
+      ],
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": [
+        "HOME_DIR=/home/packer"
+      ],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "scripts": [
+        "scripts/common/bsd_zerofill.sh"
+      ],
+      "only": ["virtualbox-iso"]
+    }
+  ],
+  "post-processors": [
+    {
+      "type": "vagrant",
+      "keep_input_artifact": false,
+      "output": "output-boxes/{{user `vm_name`}}.{{.Provider}}.box",
+      "except": ["qemu", "virtualbox-iso"]
+    },
+    {
+      "type": "checksum",
+      "checksum_types": ["md5", "sha256"],
+      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+    }
+  ],
+  "variables": {
+    "vm_name": "openbsd-Release-init",
+    "init_hostname": "openbsd-boxv0000",
+    "fstype": "ffs",
+    "boot_cmdln_options": " ",
+    "qemu_uefi_firmware_dir": "/usr/share/OVMF",
+    
+    "vbox_guest_os": "OpenBSD_64",
+    "iso_checksum": "",
+    "iso_checksum_type": "sha256",
+    "iso_url": "",
+    "iso_checksum_url": "file:///mnt/Data0/distros/fixed/openbsd/SHA256",
+    "iso_urls_list": "file:///mnt/Data0/distros/fixed/openbsd/install59.iso,http://cdn.openbsd.org/pub/OpenBSD/5.9/amd64/install59.iso",
+    
+    "disk_image": "true",
+    "fs_checksum": "",
+    "fs_checksum_type": "sha256",
+    "fs_url": "",
+    "fs_checksum_url": "file:///mnt/Data0/distros/fixed/openbsd/SHA256",
+    "fs_urls_list": "file:///mnt/Data0/distros/fixed/openbsd/install59.fs,http://cdn.openbsd.org/pub/OpenBSD/5.9/amd64/install59.fs",
+    
+    "disk_size": "30720",
+    "headless": "",
+    "plain_passwd": null,
+    "crypted_passwd": null,
+    "build_timestamp": "{{isotime \"20160912153000\"}}",
+    "home": "{{env `HOME`}}"
+  }
+}
