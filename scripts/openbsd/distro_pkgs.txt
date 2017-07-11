@@ -27,3 +27,22 @@ pkgs_installed() {
 		pkg_info -mq ;
 	fi
 }
+pkgs_cmdln_extras="calcurse-- taskwarrior-- msmtp-- isync-- mutt-- abook-- transmission-- rtorrent-- irssi-- finch-- rclone-- cmus--"
+
+pkgs_filesys_utils="exfat-fuse--"
+
+pkgs_cmdln_tools="sudo-- ntp-- python--%2 python--%3 mc-- rlwrap-- nano-- clamav-- aria2-- rsync-- bzip2-- zip-- unzip-- p7zip-- gnupg-- password-store-- keychain-- base64-- openssl-- gnutls-- w3m-- cups-pdf-- qpdf-- openmdns-- sqlite-- git-- mercurial-- nmap-- pinentry-- dialog-- screen--"
+# ca_root_nss--?
+
+
+pkgs_lang_py2=""
+
+pkgs_lang_py3=""
+
+pkgs_lang_py="${pkgs_lang_py2} ${pkgs_lang_py3}"
+
+pkgs_lang_c=""
+# ddd
+
+pkgs_lang_java=""
+default_java_home="/usr/local/openjdk8"

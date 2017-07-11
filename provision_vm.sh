@@ -20,7 +20,7 @@ if [ -e output-vms/${VM_SPEC} ] ; then
 fi
 
 case $DISTRO_NAME in
-	'freebsd')
+	'freebsd'|'openbsd'|'netbsd')
 		$PACKER_CMD build -only=$BUILD_NAME -var distro_name=$DISTRO_NAME \
 			-var vm_spec=$VM_SPEC -var desktop=$CHOICE_DESKTOP \
 			-var plain_passwd=$PLAIN_PASSWD -force provision-bsd.json ;;

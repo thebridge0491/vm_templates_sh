@@ -48,8 +48,8 @@ cfg_printer_pdf() { # requires sudo/root access
     PPD=${1:-/usr/share/cups/model/CUPS-PDF.ppd}
     CUPS_PDF_CONF=${2:-/etc/cups/cups-pdf.conf}
     lpadmin -E -U root -p CUPS_PDF -E -v "cups-pdf:/" -i $PPD
-    sed -i '/Out / s|^[#]*\(Out .*\)|#\1\nOut \${HOME}\/Documents\/PDF|'  \
-		$CUPS_PDF_CONF
+    sed -i '/Out / s|^[#]*\(Out .*\)|#\1|' $CUPS_PDF_CONF
+	echo "Out \${HOME}/Documents/PDF" >> $CUPS_PDF_CONF
 }
 
 share_nfs_data0() { # requires sudo/root access

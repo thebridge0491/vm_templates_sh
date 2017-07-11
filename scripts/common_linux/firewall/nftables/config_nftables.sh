@@ -7,7 +7,9 @@ config_nftables() {
 	#nft flush table inet filter
 	nft flush ruleset
 	
-	cp -b --suffix '.old' /etc/nftables/out${policy_out}_nftables.conf /etc/nftables.conf
+	#cp -b --suffix '.old' /etc/nftables/out${policy_out}_nftables.conf /etc/nftables.conf
+	cp /etc/nftables.conf /etc/nftables.conf.old
+	cp /etc/nftables/out${policy_out}_nftables.conf /etc/nftables.conf
 	
 	nft list tables ; sleep 5 ; nft list ruleset ; sleep 5
 }
@@ -20,7 +22,9 @@ cmds_nftables() {
 	
 	nft list ruleset > /tmp/out${policy_out}_nftables.conf
 	
-	cp -b --suffix '.old' /tmp/out${policy_out}_nftables.conf /etc/nftables.conf
+	#cp -b --suffix '.old' /tmp/out${policy_out}_nftables.conf /etc/nftables.conf
+	cp /etc/nftables.conf /etc/nftables.conf.old
+	cp /tmp/out${policy_out}_nftables.conf /etc/nftables.conf
 	
 	nft list tables ; sleep 5 ; nft list ruleset ; sleep 5
 }

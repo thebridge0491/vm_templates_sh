@@ -5,22 +5,24 @@
 #aria2c --check-certificate=false <url_prefix>/script.sh
 
 #========================================================================#
+sed_inplace=${sed_inplace:-"sed -i ''"}
+
 cfg_sshd() { # requires sudo/root access
     SSHD_CONFIG="/etc/ssh/sshd_config"
 
     # ensure that there is a trailing newline before attempting to concatenate
-    sed -i '' '$a\' "$SSHD_CONFIG"
+    ${sed_inplace} '$a\' "$SSHD_CONFIG"
 
     USEDNS="UseDNS no"
     if grep -q -E "^[[:space:]]*UseDNS" "$SSHD_CONFIG" ; then
-        sed -i '' "s|^\s*UseDNS.*|${USEDNS}|" "$SSHD_CONFIG" ;
+        ${sed_inplace} "s|^\s*UseDNS.*|${USEDNS}|" "$SSHD_CONFIG" ;
     else
         echo "$USEDNS" >> "$SSHD_CONFIG" ;
     fi
 
     GSSAPI="GSSAPIAuthentication no"
     if grep -q -E "^[[:space:]]*GSSAPIAuthentication" "$SSHD_CONFIG" ; then
-        sed -i '' "s|^\s*GSSAPIAuthentication.*|${GSSAPI}|" "$SSHD_CONFIG" ;
+        ${sed_inplace} "s|^\s*GSSAPIAuthentication.*|${GSSAPI}|" "$SSHD_CONFIG" ;
     else
         echo "$GSSAPI" >> "$SSHD_CONFIG" ;
     fi
@@ -49,8 +51,8 @@ cfg_printer_pdf() { # requires sudo/root access
     PPD=${1:-/usr/local/share/cups/model/CUPS-PDF.ppd}
     CUPS_PDF_CONF=${2:-/usr/local/etc/cups/cups-pdf.conf}
     lpadmin -E -U root -p CUPS_PDF -E -v "cups-pdf:/" -i $PPD
-    sed -i '' '/Out / s|^[#]*\(Out .*\)|#\1\nOut \${HOME}\/Documents\/PDF|' \
-		$CUPS_PDF_CONF
+    ${sed_inplace} '/Out / s|^[#]*\(Out .*\)|#\1|' $CUPS_PDF_CONF
+	echo "Out \${HOME}/Documents/PDF" >> $CUPS_PDF_CONF
 }
 
 share_nfs_data0() { # requires sudo/root access
@@ -60,7 +62,7 @@ share_nfs_data0() { # requires sudo/root access
     #Linux NFS server example /etc/exports
       #/mnt/Data0  192.168.*.*(rw,sync,root_squash,anongid=100)
     
-    sed -i '' "/^Data0 / s|^Data0|#Data0|" /etc/fstab
+    ${sed_inplace} "/^Data0 / s|^Data0|#Data0|" /etc/fstab
     echo "${NODE}:/mnt/Data0  /media/nfs_Data0  nfs  rw,noauto  0  0" \
         >> /etc/fstab
     mkdir -p /media/nfs_Data0

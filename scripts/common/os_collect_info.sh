@@ -132,7 +132,7 @@ bsd_info() {
     for file in /etc/hostname /etc/myname /etc/hosts /etc/resolv.conf ; do
     	concat_sep $file >> $msgfile ;
     done
-    concat_sep 'sysctl -a | grep -e kern.hostuuid -e hw.uuid' >> $msgfile
+    concat_sep '(sysctl -n kern.hostuuid ; sysctl -n hw.uuid)' >> $msgfile
     pkg_repos_sources >> $msgfile
     
     concat_sep 'sudo fdisk sd0' >> $msgfile

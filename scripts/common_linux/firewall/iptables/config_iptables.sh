@@ -16,7 +16,9 @@ _config_ipset() {
 	done
 	ipset add udp_svcs domain
 	ipset list ; sleep 5 ; ipset save > /tmp/ipset.conf
-	cp -b --suffix='.old' /tmp/ipset.conf /etc/ipset.conf
+	#cp -b --suffix='.old' /tmp/ipset.conf /etc/ipset.conf
+	cp /etc/ipset.conf /etc/ipset.conf.old
+	cp /tmp/ipset.conf /etc/ipset.conf
 }
 
 config_iptables() {
