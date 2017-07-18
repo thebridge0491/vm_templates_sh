@@ -55,20 +55,31 @@ pkgs_cmdln_tools="@core yum-utils sudo man man-pages ntp sudo python bash which 
 
 pkgs_displaysvr_xorg="@x11 xorg-x11-drv-vesa xorg-x11-drv-intel xorg-x11-drv-libinput xorg-x11-drv-evdev xdg-utils xdg-user-dirs python2-pyxdg xscreensaver startup-notification"
 
-pkgs_extras_qtapp="" # filled-in by for loop with field 1 apps
-pkgs_extras_gtkapp="" # filled-in by for loop with field 2 apps
-for qtapp_gtkapp in partitionmanager:gparted cmst:wicd bluez-qt:blueman \
-	:geany libreoffice gnucash clamtk transmission-qt:transmission \
-	luckybackup:grsync keepassxc:keepass2 qtpass: kwalletmanager:seahorse \
-	falkon:firefox-esr thunderbird skanlite:simple-scan sqlitebrowser \
-	pidgin quassel:hexchat qgit:gitg tortoisehg: nmapsi4:zenmap \
-	clementine:gmusicbrowser smplayer:totem pavucontrol-qt:pavucontrol \
-	k3b:brasero calibre kamoso:guvcview okular:fbreader ; do
-  pkgs_extras_gtkapp="$pkgs_extras_gtkapp $(echo $qtapp_gtkapp | cut -d: -f2)" ;
-  pkgs_extras_qtapp="$pkgs_extras_qtapp $(echo $qtapp_gtkapp | cut -d: -f1)" ;
-done
+pkgs_deskenv_xfce="$pkgs_displaysvr_xorg lightdm-gtk gamin gvfs @xfce-desktop conky"
 
-pkgs_deskenv_xfce="$pkgs_displaysvr_xorg lightdm-gtk ristretto parcellite xarchiver evince gamin gvfs @xfce-desktop conky leafpad orage"
+
+# possibly extra Qt:Gtk deskenv apps
+# ----------------------------------------
+# (disk utils) partitionmanager:gparted
+# (ifc connect) cmst:wicd bluez-qt:blueman
+# (editors, office apps) :geany libreoffice :gnucash
+# (file share) transmission-qt:transmission-gtk luckybackup:grsync
+# (archivers) ark:xarchiver
+# (clipboard tool) qlipper:parcellite
+# (crypt utils) keepassxc:keepass2 qtpass: kwalletmanager:seahorse
+# (browser) :chromium falkon:firefox-esr
+# (email) :thunderbird
+# (print utils) skanlite:simple-scan qpdfview:epdfview
+# (db utils) sqlitebrowser:
+# (IM-IRC) quassel:hexchat :pidgin
+# (vcs gui) qgit:gitg tortoisehg:
+# (traffic util) nmapsi4:zenmap wireshark
+# (media plyr) clementine:gmusicbrowser smplayer:totem
+# (audio tool) pavucontrol-qt:pavucontrol k3b:brasero
+# (image tool) lximage-qt:gpicview :gimp
+# (webcam tool) kamoso:guvcview
+# (PIM tools) :gsimplecal :orage
+# (ebook utils) calibre: okular:fbreader
 
 
 # addons browser: User Agent Switcher, AdBlock, Firebug, Https Everywhere,

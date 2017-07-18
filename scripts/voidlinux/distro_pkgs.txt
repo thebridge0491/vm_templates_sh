@@ -40,6 +40,42 @@ pkgs_filesys_utils="dosfstools gptfdisk parted fsarchiver fuse-exfat"
 pkgs_cmdln_tools="sudo ntp python bash nfs-utils mc rlwrap nano nftables clamav curl wget aria2 netcat rsync bzip2 zip unzip p7zip gnupg openssh pass keychain libressl gnutls w3m cyrus-sasl dbus cups cups-pdf avahi-utils nss-mdns qpdf sqlite git mercurial tcpdump nmap screen tmux"
 
 
+pkgs_displaysvr_xorg="xorg xf86-video-vesa xf86-video-intel xf86-input-libinput xf86-input-evdev xterm xdg-utils xdg-user-dirs python-xdg dejavu-fonts-ttf xscreensaver"
+
+pkgs_deskenv_lxde="$pkgs_displaysvr_xorg lightdm-gtk-greeter obconf menumaker gvfs lxde conky"
+
+
+# possibly extra Qt:Gtk deskenv apps
+# ----------------------------------------
+# (disk utils) partitionmanager:gparted
+# (ifc connect) cmst:wicd bluez-qt:blueman
+# (editors, office apps) :geany libreoffice :gnucash
+# (file share) transmission-qt:transmission-gtk luckybackup:grsync
+# (archivers) ark:xarchiver
+# (clipboard tool) qlipper:parcellite
+# (crypt utils) keepassxc:keepass2 qtpass: kwalletmanager:seahorse
+# (browser) :chromium falkon:firefox-esr
+# (email) :thunderbird
+# (print utils) skanlite:simple-scan qpdfview:epdfview
+# (db utils) sqlitebrowser:
+# (IM-IRC) quassel:hexchat :pidgin
+# (vcs gui) qgit:gitg tortoisehg:
+# (traffic util) nmapsi4:zenmap wireshark
+# (media plyr) clementine:gmusicbrowser smplayer:totem
+# (audio tool) pavucontrol-qt:pavucontrol k3b:brasero
+# (image tool) lximage-qt:gpicview :gimp
+# (webcam tool) kamoso:guvcview
+# (PIM tools) :gsimplecal :orage
+# (ebook utils) calibre: okular:fbreader
+
+
+# addons browser: User Agent Switcher, AdBlock, Firebug, Https Everywhere,
+#  uBlock, NoScript
+
+# addons thunderbird: EnigMail, gContactSync, Lightning, Provider f/Ggl Cal,
+#  TorBirdy
+
+
 pkgs_lang_py2=""
 
 pkgs_lang_py3=""

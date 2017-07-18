@@ -37,6 +37,43 @@ pkgs_cmdln_tools="sudo openntpd python2 python3 bash file nfs-utils mc nano nfta
 # cups-pdf pass
 
 
+pkgs_displaysvr_xorg="xorg-server xf86-video-vesa xf86-video-intel xf86-input-libinput xf86-input-evdev xdg-utils xscreensaver"
+# xdg-user-dirs
+
+pkgs_deskenv_xfce="$pkgs_displaysvr_xorg lightdm-gtk-greeter consolekit2 xfce4-terminal xfce-polkit xfce4 conky"
+
+
+# possibly extra Qt:Gtk deskenv apps
+# ----------------------------------------
+# (disk utils) partitionmanager:gparted
+# (ifc connect) cmst:wicd bluez-qt:blueman
+# (editors, office apps) :geany libreoffice :gnucash
+# (file share) transmission-qt:transmission-gtk luckybackup:grsync
+# (archivers) ark:xarchiver
+# (clipboard tool) qlipper:parcellite
+# (crypt utils) keepassxc:keepass2 qtpass: kwalletmanager:seahorse
+# (browser) :chromium falkon:firefox-esr
+# (email) :thunderbird
+# (print utils) skanlite:simple-scan qpdfview:epdfview
+# (db utils) sqlitebrowser:
+# (IM-IRC) quassel:hexchat :pidgin
+# (vcs gui) qgit:gitg tortoisehg:
+# (traffic util) nmapsi4:zenmap wireshark
+# (media plyr) clementine:gmusicbrowser smplayer:totem
+# (audio tool) pavucontrol-qt:pavucontrol k3b:brasero
+# (image tool) lximage-qt:gpicview :gimp
+# (webcam tool) kamoso:guvcview
+# (PIM tools) :gsimplecal :orage
+# (ebook utils) calibre: okular:fbreader
+
+
+# addons browser: User Agent Switcher, AdBlock, Firebug, Https Everywhere,
+#  uBlock, NoScript
+
+# addons thunderbird: EnigMail, gContactSync, Lightning, Provider f/Ggl Cal,
+#  TorBirdy
+
+
 pkgs_lang_py2=""
 
 pkgs_lang_py3=""

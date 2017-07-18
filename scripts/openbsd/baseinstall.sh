@@ -28,7 +28,7 @@ set +e
 # fetch missing distribution sets like: xbase59.tgz
 #arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
 #ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/xbase59.tgz
-#tar -C / -xpzf xbase59.tgz
+#tar -C / -xpzf xbase59.tgz ; sysmerge
 
 
 pkg_add -u #; pkg_add -ziU mupdf
