@@ -8,6 +8,10 @@
 # python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 # perl -e 'print crypt("password", "\$6\$16CHARACTERSSALT") . "\n"'
 
+#set path = (~/bin /bin /sbin /usr/{bin,sbin,X11R7/bin,pkg/{,s}bin,games} \
+#			/usr/local/{,s}bin)
+export PATH=$HOME/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11R7/bin:/usr/pkg/bin:/usr/pkg/sbin:/usr/pkg/games:/usr/local/bin:/usr/local/sbin
+
 set +x
 export sed_inplace="sed -i"
 PLAIN_PASSWD=${PLAIN_PASSWD:-abcd0123}
@@ -25,56 +29,64 @@ check_clamav() {
 
 set +e
 
-# fetch missing distribution sets like: xbase59.tgz
-#arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
-#ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/xbase59.tgz
-#tar -C / -xpzf xbase59.tgz ; sysmerge
+# fetch missing distribution sets like: xbase.tgz
+#arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
+#ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/xbase.tgz
+#tar -C / -xpzf xbase.tgz
 
 
-pkg_add -u #; pkg_add -ziU mupdf
+pkgin update ; pkgin -y upgrade
 . /root/distro_pkgs.txt
-pkg_add -ziU -n $pkgs_cmdln_tools ; pkg_add -ziU $pkgs_cmdln_tools
+pkgin -yd install $pkgs_cmdln_tools ; pkgin -y install $pkgs_cmdln_tools
 
+# clamd freshclamd
+for svc in dbus avahidaemon cupsd ; do
+	cp /usr/pkg/share/examples/rc.d/$svc /etc/rc.d/ ;
+done
+mkdir -p /var/run/dbus
+
+hash_passwd=$(pwhash ${PLAIN_PASSWD})
 mkdir -p /home/packer
 #DIR_MODE=0750 
 useradd -m -G wheel,operator -s /bin/ksh -c 'Packer User' packer
-usermod -p "$(echo -n ${PLAIN_PASSWD} | encrypt)" packer
+usermod -p "${hash_passwd}" packer
 chown -R packer:$(id -gn packer) /home/packer
 
-if [ ! -z "$(grep 0000 /etc/myname)" ] ; then
+if [ ! -z "$(sysctl -n kern.hostname | grep 0000)" ] ; then
 	#last4=$(cat /etc/hostid | cut -b33-36) ;
-	last4=$(sysctl -n hw.uuid | cut -b33-36) ;
+	last4=$(sysctl -n machdep.dmi.system-uuid | cut -b33-36) ;
 	init_hostname=$(hostname) ;
 	NAME=$(echo ${init_hostname} | sed "s|0000|${last4}|") ;
-	echo "${NAME}" > /etc/myname ;
+	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|" /etc/rc.conf ;
 	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|" /etc/hosts ;
 fi
 
 set +e ; set +u
 
-#rcctl enable ntpd
+#echo 'ntpd=YES' >> /etc/rc.conf
 # Set the time correctly
 #ntpd -u ntp:ntp ; ntpq -p ; sleep 3
 ntpdate -v -u -b us.pool.ntp.org
 
 pfctl -d
-rcctl enable pf
-rcctl enable pflogd
+echo 'pf=YES' >> /etc/rc.conf
+echo 'pflogd=YES' >> /etc/rc.conf
 sh /root/firewall/pf/pfconf.sh config_pf allow >> /etc/pf.conf
+sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outallow_in_allow.rules
+sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outdeny_out_allow.rules
 pfctl -vf /etc/pf.conf ; pfctl -s info ; sleep 5 ; pfctl -s rules -a '*'
 sleep 5
 
-#rcctl enable freshclam
-#rcctl enable clamd
+#echo 'freshclamd=YES' >> /etc/rc.conf
+#echo 'clamd=YES' >> /etc/rc.conf
 #sh /root/baseinstall.sh check_clamav
 
-rcctl enable sshd
-rcctl enable messagebus
-rcctl enable lpd
-rcctl enable cupsd
-rcctl enable cups_browsed
+#echo 'sshd=YES' >> /etc/rc.conf
 
-rcctl enable avahi_daemon
+# clamd freshclamd
+for svc in dbus avahidaemon cupsd lpd ; do
+	echo "${svc}=YES" >> /etc/rc.conf ;
+done
 
 #sed -i '/hosts:/ s| dns| mdns_minimal \[NOTFOUND=return\] dns mdns|' /etc/nsswitch.conf
 sed -i '/hosts:/ s|files|files mdns_minimal \[NOTFOUND=return\]|' /etc/nsswitch.conf
@@ -83,30 +95,30 @@ sed -i '/hosts:/ s|files|files mdns_minimal \[NOTFOUND=return\]|' /etc/nsswitch.
 
 #sh /root/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
 sh /root/misc_config.sh cfg_printer_pdf \
-    /usr/local/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
+    /usr/pkg/share/cups/model/CUPS-PDF.ppd /usr/pkg/etc/cups/cups-pdf.conf
 #echo 'pass in proto udp from any to any port { mdns } keep state' >> /etc/pf/outallow_in_allow.rules
 sed -i 's|domain|domain, mdns|' /etc/pf/outallow_in_allow.rules
 set -e ; set -u
 
 
 # As sharedfolders are not in defaults ports tree, we will use NFS sharing
-#rcctl enable rpcbind
-#rcctl enable nfsd
-#rcctl enable mountd
+#echo 'rpcbind=YES' >> /etc/rc.conf
+#echo 'nfsd=YES' >> /etc/rc.conf
+#echo 'mountd=YES' >> /etc/rc.conf
 
 sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin no|" /etc/ssh/sshd_config
-sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
-sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
-if [ -z "$(grep '^%wheel ALL=(ALL) NOPASSWD: ALL' /etc/sudoers)" ] ; then
-	echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers ;
+sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /usr/pkg/etc/sudoers
+sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /usr/pkg/etc/sudoers
+if [ -z "$(grep '^%wheel ALL=(ALL) NOPASSWD: ALL' /usr/pkg/etc/sudoers)" ] ; then
+	echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /usr/pkg/etc/sudoers ;
 fi
-sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
+sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /usr/pkg/etc/sudoers
 
-#sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
+#sh -c 'cat >> /usr/pkg/etc/sudoers.d/99_packer' << EOF
 #Defaults:packer !requiretty
 #$(id -un packer) ALL=(ALL) NOPASSWD: ALL
 #EOF
-#chmod 0440 /etc/sudoers.d/99_packer
+#chmod 0440 /usr/pkg/etc/sudoers.d/99_packer
 
 sh /root/misc_config.sh cfg_sshd
 sh /root/misc_config.sh cfg_shell_keychain /etc/skel/.cshrc

@@ -22,6 +22,15 @@ check_clamav() {
     rm /tmp/eicar.com.txt
 }
 
+enable_svc() {
+	svc=${1}
+	. /etc/os-release
+	case $ID in
+		'devuan') update-rc.d $svc defaults ;;
+		*) systemctl enable $svc ;;
+	esac
+}
+
 ## debian/update.sh
 arch="$(uname -r | sed 's|^.*[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\(-[0-9]\{1,2\}\)-||')"
 sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
@@ -64,13 +73,13 @@ set +e ; set +u
 tasksel --list-tasks ; sleep 5
 
 ntpd -u ntp:ntp ; ntpq -p ; sleep 3
-systemctl enable ntp.service
+enable_svc ntp
 
 sh /root/firewall/ufw/config_ufw.sh cmds_ufw allow
-systemctl enable ufw.service
+enable_svc ufw
 
 #sh /root/baseinstall.sh check_clamav
-systemctl enable clamav-freshclam.service
+enable_svc clamav-freshclam
 
 
 #sh /root/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
