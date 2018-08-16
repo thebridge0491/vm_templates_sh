@@ -8,6 +8,7 @@ CHOICE_DESKTOP=${CHOICE_DESKTOP:-lxde}
 dnf -y check-update ; dnf -y upgrade
 . /root/distro_pkgs.txt
 case $CHOICE_DESKTOP in
+	lxqt) pkgs_var=$pkgs_deskenv_lxqt ;;
 	*) pkgs_var=$pkgs_deskenv_lxde ;;
 esac
 
@@ -21,6 +22,7 @@ done
 sleep 3
 
 case $CHOICE_DESKTOP in
+	lxqt) systemctl enable sddm ;;
 	*) mv /etc/lightdm /etc/lightdm.old ;
 	  systemctl enable lightdm ;;
 esac

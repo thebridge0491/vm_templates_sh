@@ -7,6 +7,7 @@ CHOICE_DESKTOP=${CHOICE_DESKTOP:-lxde}
 xbps-install -S ; xbps-install -y -u
 . /root/distro_pkgs.txt
 case $CHOICE_DESKTOP in
+	lxqt) pkgs_var=$pkgs_deskenv_lxqt ;;
 	*) pkgs_var=$pkgs_deskenv_lxde ;;
 esac
 
@@ -17,10 +18,11 @@ done
 sleep 3
 
 case $CHOICE_DESKTOP in
+	lxqt) ln -s /etc/sv/sdddm /etc/runit/runsvdir/default/sdddm ;;
 	*) #mv /etc/lightdm /etc/lightdm.old ;
-	  ln -s /etc/sv/polkitd /etc/runit/runsvdir/default/polkitd ;
 	  ln -s /etc/sv/lightdm /etc/runit/runsvdir/default/lightdm ;;
 esac
+ln -s /etc/sv/polkitd /etc/runit/runsvdir/default/polkitd
 
 # update XDG user dir config
 export LANG=en_US.UTF-8 ; export CHARSET=UTF-8

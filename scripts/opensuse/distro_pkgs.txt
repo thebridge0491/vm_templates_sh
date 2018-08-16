@@ -55,6 +55,9 @@ pkgs_displaysvr_xorg="+pattern:x11 xf86-video-vesa xf86-video-intel xf86-input-l
 pkgs_deskenv_lxde="$pkgs_displaysvr_xorg obconf +pattern:lxde conky"
 #+pattern:fonts
 
+pkgs_deskenv_lxqt="$pkgs_displaysvr_xorg obconf-qt +pattern:lxqt conky"
+#+pattern:fonts
+
 
 # possibly extra Qt:Gtk deskenv apps
 # ----------------------------------------

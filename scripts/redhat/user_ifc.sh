@@ -7,6 +7,7 @@ CHOICE_DESKTOP=${CHOICE_DESKTOP:-xfce}
 yum -y check-update ; yum -y upgrade
 . /root/distro_pkgs.txt
 case $CHOICE_DESKTOP in
+	lxqt) pkgs_var=$pkgs_deskenv_lxqt ;;
 	*) pkgs_var=$pkgs_deskenv_xfce ;;
 esac
 
@@ -17,6 +18,7 @@ done
 sleep 3
 
 case $CHOICE_DESKTOP in
+	lxqt) systemctl enable sddm ;;
 	*) mv /etc/lightdm /etc/lightdm.old ;
 	  systemctl enable lightdm ;;
 esac

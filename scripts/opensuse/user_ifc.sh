@@ -7,6 +7,7 @@ CHOICE_DESKTOP=${CHOICE_DESKTOP:-lxde}
 zypper --non-interactive refresh ; zypper --non-interactive update
 . /root/distro_pkgs.txt
 case $CHOICE_DESKTOP in
+	lxqt) pkgs_var=$pkgs_deskenv_lxqt ;;
 	*) pkgs_var=$pkgs_deskenv_lxde ;;
 esac
 
@@ -17,6 +18,7 @@ done
 sleep 3
 
 case $CHOICE_DESKTOP in
+	lxqt) systemctl enable sddm ;;
 	*) mv /etc/lightdm /etc/lightdm.old ;
 	  systemctl enable lightdm ;;
 esac

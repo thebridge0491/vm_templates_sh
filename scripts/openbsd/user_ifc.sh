@@ -7,6 +7,7 @@ CHOICE_DESKTOP=${CHOICE_DESKTOP:-xfce}
 pkg_add -u
 . /root/distro_pkgs.txt
 case $CHOICE_DESKTOP in
+	lxqt) pkgs_var=$pkgs_deskenv_lxqt ;;
 	*) pkgs_var=$pkgs_deskenv_xfce ;;
 esac
 

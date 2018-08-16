@@ -57,6 +57,8 @@ pkgs_displaysvr_xorg="@x11 xorg-x11-drv-vesa xorg-x11-drv-intel xorg-x11-drv-lib
 
 pkgs_deskenv_xfce="$pkgs_displaysvr_xorg lightdm-gtk gamin gvfs @xfce-desktop conky"
 
+pkgs_deskenv_lxqt="$pkgs_displaysvr_xorg sddm obconf-qt lxqt-common lxqt-config lxqt-notificationd lxqt-openssh-askpass lxqt-panel lxqt-policykit lxqt-powermanagement lxqt-qtplugin lxqt-session lxqt-sudo qterminal pcmanfm-qt gamin gvfs conky"
+
 
 # possibly extra Qt:Gtk deskenv apps
 # ----------------------------------------

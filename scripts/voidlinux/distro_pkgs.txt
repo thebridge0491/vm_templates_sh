@@ -44,6 +44,8 @@ pkgs_displaysvr_xorg="xorg xf86-video-vesa xf86-video-intel xf86-input-libinput 
 
 pkgs_deskenv_lxde="$pkgs_displaysvr_xorg lightdm-gtk-greeter obconf menumaker gvfs lxde conky"
 
+pkgs_deskenv_lxqt="$pkgs_displaysvr_xorg breeze-icons sddm obconf-qt menumaker gvfs lxqt conky"
+
 
 # possibly extra Qt:Gtk deskenv apps
 # ----------------------------------------

@@ -10,6 +10,7 @@ CHOICE_DESKTOP=${CHOICE_DESKTOP:-lxde}
 pkg update ; pkg fetch -dy --available-updates ; pkg upgrade -y
 . /root/distro_pkgs.txt
 case $CHOICE_DESKTOP in
+	lxqt) pkgs_var=$pkgs_deskenv_lxqt ;;
 	*) pkgs_var=$pkgs_deskenv_lxde ;;
 esac
 
@@ -20,6 +21,7 @@ done
 sleep 3
 
 case $CHOICE_DESKTOP in
+	lxqt) sysrc sddm_enable="YES" ;;
 	*) mv /usr/local/etc/lightdm /usr/local/etc/lightdm.old ;
 	  sysrc lightdm_enable="YES" ;;
 esac

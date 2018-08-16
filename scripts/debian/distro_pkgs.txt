@@ -69,6 +69,9 @@ pkgs_displaysvr_xorg="xorg xserver-xorg-video-vesa xserver-xorg-video-intel xser
 pkgs_deskenv_lxde="$pkgs_displaysvr_xorg lightdm obconf obsession menu lxde conky"
 # obmenu openbox-menu
 
+pkgs_deskenv_lxqt="$pkgs_displaysvr_xorg sddm obconf-qt obsession menu lxqt conky"
+# obmenu openbox-menu
+
 
 # possibly extra Qt:Gtk deskenv apps
 # ----------------------------------------

@@ -51,6 +51,8 @@ pkgs_displaysvr_xorg="task-x11 x11-driver-video-vesa x11-driver-video-intel x11-
 
 pkgs_deskenv_lxde="$pkgs_displaysvr_xorg lightdm obconf task-lxde conky"
 
+pkgs_deskenv_lxqt="$pkgs_displaysvr_xorg sddm obconf-qt task-lxqt conky"
+
 
 # possibly extra Qt:Gtk deskenv apps
 # ----------------------------------------

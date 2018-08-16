@@ -41,6 +41,10 @@ pkgs_displaysvr_xorg="xdg-utils-- xdg-user-dirs-- py-xdg-- xscreensaver--"
 pkgs_deskenv_xfce="$pkgs_displaysvr_xorg gvfs-- xfce-- conky--"
 # slim-themes-- slim-- consolekit2-- polkit--
 
+pkgs_deskenv_lxqt="$pkgs_displaysvr_xorg breeze-icons-- obconf-qt-- menumaker-- gvfs-- lxqt-- conky--"
+# sddm--?
+
+
 # possibly extra Qt:Gtk deskenv apps
 # ----------------------------------------
 # (disk utils) partitionmanager:gparted

@@ -7,6 +7,7 @@ CHOICE_DESKTOP=${CHOICE_DESKTOP:-lxde}
 apt-get update ; apt-get -y dist-upgrade
 . /root/distro_pkgs.txt
 case $CHOICE_DESKTOP in
+	lxqt) pkgs_var=$pkgs_deskenv_lxqt ; chkconfig --add lightdm ;;
 	*) pkgs_var=$pkgs_deskenv_lxde ; chkconfig --add slim ;;
 esac
 
