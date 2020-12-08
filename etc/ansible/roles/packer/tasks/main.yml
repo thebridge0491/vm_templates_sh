@@ -49,3 +49,8 @@
   tags: always
 
 - import_tasks: nano.yml
+
+- block:
+  - block:
+    - include_tasks: upgradepkgs.yml
+    tags: upgradepkgs

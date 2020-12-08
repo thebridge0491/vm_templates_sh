@@ -1,0 +1,6 @@
+---
+# Non-default OS based (using family, distribution, ...) vars file
+
+variant: "{{(ansible_facts.get('os_family') or ansible_facts.get('distribution') or ansible_facts.get('lsb')['codename'])|lower}}"
+pkg_mgr: "{{ansible_facts.get('pkg_mgr') or 'xbps'}}"
+pkgupgd_params: {"update_cache": yes, "upgrade": yes, "use": "{{pkg_mgr}}"}

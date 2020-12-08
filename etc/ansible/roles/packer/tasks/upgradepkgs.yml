@@ -1,0 +1,23 @@
+---
+
+- name: "Upgrade packages (variant: {{variant}})"
+  #command: env PAGER=cat freebsd-update fetch
+  shell: |
+    env PAGER=cat freebsd-update fetch
+    env PAGER=cat freebsd-update install || true
+    pkg update ; pkg fetch -udy ; pkg upgrade -y ; pkg clean -y
+  when: variant == 'freebsd'
+
+- name: "Upgrade packages (variant: {{variant}})"
+  shell: dnf -y check-update ; dnf -y upgrade
+  when: variant == 'redhat'
+
+- name: "Upgrade packages (variant: {{variant}})"
+  shell: |
+    apt-get -y update ; apt-get -y --fix-broken install
+    apt-get -y upgrade ; apt-get -y dist-upgrade ; apt-get -y update
+  when: variant == 'pclinuxos'
+
+- name: "Upgrade packages (variant: {{variant}})"
+  package: '{{pkgupgd_params}}'
+  when: variant not in ['freebsd', 'redhat', 'pclinuxos']

@@ -1,0 +1,4 @@
+---
+# Non-default OS based (using family, distribution, ...) vars file
+
+pkgupgd_params: {"update_cache": yes, "upgrade": "dist", "autoclean": yes}
