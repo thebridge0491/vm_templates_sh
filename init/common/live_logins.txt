@@ -1,0 +1,27 @@
+live logins:
+
+  distro		root/login		user/login
+  ------		----------		----------
+  FreeBSD		root/-			
+  Arch			root/-			
+  Debian						user/live
+  GParted						user/live
+  
+  CentOS		root/-			liveuser/-
+  PCLinuxOS		root/-			guest/-
+  openSUSE		root/-			linux/-
+  Mageia		root/-			live/-
+  
+  OpenBSD		root/-			
+  Alpine		root/-			
+  Void			root/voidlinux	anon/voidlinux
+  
+  NetBSD		
+  Devuan		root/toor		devuan/devuan
+  Artix			root/artix		artix/artix
+  
+  Ubuntu						user/-
+  Tails			
+  heads			root/toor		luther/luther
+  Whonix		root/-			user/changeme
+  Qubes			

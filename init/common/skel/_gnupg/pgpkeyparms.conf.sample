@@ -1,0 +1,22 @@
+%echo Generating a basic OpenPGP keypair
+# Key Generation Options for GnuPG
+Key-Type: RSA
+Key-Length: 4096
+Key-Usage: cert
+Subkey-Type: RSA
+Subkey-Length: 3072
+Subkey-Usage: sign,auth
+# gpg --verbose --version
+#Preferences: S9 S8 S13 S12 H10 H9 H8 Z3 Z2 Z1 Z0
+Preferences: AES256 AES192 CAMELLIA256 CAMELLIA192 SHA512 SHA384 SHA256 BZIP2 ZLIB ZIP Uncompressed
+#%ask-passphrase
+%no-ask-passphrase
+
+#Creation-Date: 2011-10-01
+Expire-Date: 13m
+Name-Real: plain_user
+Name-Email: plain_user@yahoo.com
+#Name-Comment: Practice PGP Keyring
+%commit
+%echo Done!
+#========================================

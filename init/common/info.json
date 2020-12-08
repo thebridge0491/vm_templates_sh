@@ -1,0 +1,5 @@
+{
+ "Author": "thebridge0491 <thebridge0491-codelab@yahoo.com>",
+ "Repository": "https://bitbucket.org/thebridge0491/vm_templates_sh.git",
+ "Description": "Virtual machine templates (KVM/QEMU hybrid boot: BIOS+UEFI) using auto install methods and/or chroot install scripts."
+}

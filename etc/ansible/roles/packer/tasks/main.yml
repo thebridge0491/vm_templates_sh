@@ -1,0 +1,51 @@
+---
+# tasks file for packer
+
+- block:
+  - name: Load OS based (using family, distribution, ...) vars file
+    include_vars: '{{item}}'
+    with_first_found:
+      - files:
+        - "{{ansible_lsb['id']|lower}}.yml"
+        - "{{ansible_lsb['codename']|lower}}.yml"
+        - "{{ansible_distribution|lower}}.yml"
+        - "{{ansible_os_family|lower}}.yml"
+        skip: True
+
+  - name: Get keys from ini
+    shell: sed -n '/^[a-z0-9_]*=/ s|\(.*\)=.*|\1|p' /root/init/{{variant}}/distro_pkgs.ini
+    ignore_errors: true
+    register: keysout
+
+  #- name: (shell cmd) Get matching key|value's from ini
+  #  shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo ${{item}}
+  #  ignore_errors: true
+  #  register: inivalue
+  #  loop: '{{keysout.stdout_lines}}'
+
+  #- name: (ini values fm shell cmd) Set dictionary of variables from ini
+  #  set_fact:
+  #    cacheable: yes
+  #    distro_pkgs: '{{ distro_pkgs|default({})|combine({ item.item: item.stdout }) }}'
+  #  loop: '{{inivalue.results}}'
+
+  - name: retrieve remote ini file
+    fetch:
+      src: /root/init/{{variant}}/distro_pkgs.ini
+      dest: /tmp/
+    ignore_errors: true
+
+  #- name: (lookup:ini) Set variable from ini
+  #  set_fact:
+  #    cacheable: yes
+  #    pkgs_cmdln_tools: "{{ lookup('ini', 'pkgs_cmdln_tools type=properties file=/tmp/{{inventory_hostname}}/root/init/{{variant}}/distro_pkgs.ini')|replace('\"', '') }}"
+
+  - name: (lookup:ini) Set dictionary of variables from ini
+    set_fact:
+      cacheable: yes
+      distro_pkgs: "{{ distro_pkgs|default({})|combine({item: lookup('ini', item ~ ' type=properties file=/tmp/{{inventory_hostname}}/root/init/{{variant}}/distro_pkgs.ini')|replace('\"', '')}) }}"
+    loop: '{{keysout.stdout_lines}}'
+  #- debug: var=distro_pkgs
+  tags: always
+
+- import_tasks: nano.yml

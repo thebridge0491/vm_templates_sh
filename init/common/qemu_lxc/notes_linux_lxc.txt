@@ -1,0 +1,42 @@
+# NOTE, lxc config
+# /etc/lxc/default.conf             /etc/qemu/bridge.conf  /etc/sub{gid,uid}
+# -------------------------         ---------------------  -----------------
+# lxc.idmap = g 0 165536 65536      allow virbr0           root:100000:65536
+# lxc.idmap = u 0 165536 65536      allow virbr1           $USER:165536:65536
+# #lxc.net.0.type = veth
+# lxc.net.0.link = virbr0              /etc/sysctl.d/80-lxc-userns.conf
+# lxc.net.0.flags = up                 --------------------------------
+# #lxc.apparmor.profile = generated    kernel.unprivileged_userns_clone=1
+# #lxc.apparmor.allow_nesting = 1
+                                       /etc/default/lxc-net
+# $HOME/.config/lxc/default.conf       --------------------
+# ------------------------------       USE_LXC_BRIDGE="false"
+# lxc.include = /etc/lxc/default.conf  #LXC_BRIDGE="lxcbr0"
+# #lxc.idmap = g 0 165536 65536
+# #lxc.idmap = u 0 165536 65536        /etc/lxc/lxc-usernet
+# #lxc.network.type = veth             --------------------
+# #lxc.network.link = virbr0           $USER veth virbr0 10
+#
+# lxc.mount.entry = /mnt/Data0 /media/9p_Data0 none bind 0 0
+
+
+# NOTE, make lxc container accessible by virt-manager/virsh:
+GUEST=${GUEST:-devuan-boxe0000} ; HOME=${HOME:-/home/packer}
+# ex: lxc-create -t download -n ${GUEST} -- -d devuan -r beowulf -a amd64
+#     lxc-start -d -n ${GUEST} ; lxc-attach -n ${GUEST} -- passwd
+#     #if console access errors, ? fix /etc/inittab tty's
+#     lxc-console --tty 0 -n ${GUEST} # verify root can login
+# sed -e "s|/home/packer|${HOME}|" -e "s|devuan-boxe0000|${GUEST}|" init/common/qemu_lxc/domain-lxc.xml.sample > ${GUEST}.xml
+# virsh --connect lxc:/// define ${GUEST}.xml
+# OR
+# virt-install --connect lxc:/// --init /sbin/init --memory 768 --vcpus 1 --controller virtio-serial --console pty,target_type=virtio --network network=default,model=virtio-net,mac=RANDOM --boot menu=on --filesystem type=mount,mode=passthrough,source=/mnt/Data0,target=/media/9p_Data0 --filesystem $HOME/.local/share/lxc/${GUEST}/rootfs,/ -n ${GUEST}
+
+
+# NOTE, (unprivileged) tar & untar container w/out su permissions
+# lxc-stop -n ${GUEST} ; cd $HOME/.local/share/lxc/${GUEST}
+# lxc-usernsexec -m b:0:$(id -u):1 -m b:1:165536:1 -- tar --numeric-owner -czvf ../cntr.tar.gz ./*
+# #transfer (if needed): rsync -avh ../cntr.tar.gz user@host:.local/share/lxc/
+# #at [new] desired location, create empty container & untar tarball
+# lxc-create -t none -n ${NEW_GUEST} ; cd $HOME/.local/share/lxc/${NEW_GUEST}
+# lxc-usernsexec -m b:0:$(id -u):1 -m b:1:165536:1 -- tar --numeric-owner -xzvf ../cntr.tar.gz
+# #edit config & log file name for ${NEW_GUEST}

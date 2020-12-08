@@ -1,0 +1,17 @@
+---
+
+- block:
+  - name: install nano
+    package: use={{ansible_facts.get("pkg_mgr") or pkg_mgr}} name=nano state=present
+    register: out
+    when: not variant in ['redhat', 'pclinuxos', 'mageia']
+  - name: install nano
+    package: use={{pkg_mgr}} name=nano state=present
+    register: out
+    when: variant in ['pclinuxos', 'mageia']
+  - name: install nano
+    shell: dnf -y install nano
+    register: out
+    when: variant in ['redhat']
+  - debug: var=out
+  tags: never, nanopkg

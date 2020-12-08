@@ -1,0 +1,147 @@
+# NOTE, Linux|BSD config for qemu network(s) - nat br0 & ethernet bridged br1
+# (Linux)                              (BSD)
+# /etc/sysctl.d/99-sysctl.conf ..      /etc/sysctl.conf ..
+# ----------------------------------   ------------------------
+# net.ipv4.ip_forward=1                net.link.tap.user_open="1"
+# net.ipv4.conf.wlan0.forwarding=1     net.link.tap.up_on_open="1"
+# net.ipv6.conf.default.forwarding=1   net.inet.ip.forwarding="1"
+# net.ipv6.conf.all.forwarding=1       net.inet6.ip6.forwarding="1"
+
+# (Debian & derivatives)      (FreeBSD)
+# /etc/network/interfaces ..  /boot/loader.conf ..  /etc/devfs.conf ..
+# --------------------------  --------------------  -------------------
+# allow-hotplug eth0          if_bridge_load="YES"  own   tap*  :operator
+# iface eth0 inet manual      if_tap_load="YES"     perm  tap*  0660
+# iface br0 inet dhcp
+#   bridge_ports none         /etc/rc.conf ..
+#   bridge_stp off            ----------------------
+#   bridge_maxwait 0          ifconfig_alc0="up"
+#   bridge_fd 0               cloned_interfaces="bridge0 bridge1"
+#   address 192.168.1.161     ifconfig_bridge0_name="br0"
+# auto br1                    ifconfig_bridge1_name="br1"
+# iface br1 inet dhcp         autobridge_interfaces="br0 br1"
+#   bridge_ports regex eth.*  #autobridge_br0=""
+#   bridge_stp off            ifconfig_br0="inet 192.168.1.161/27 up"
+#   bridge_maxwait 0          autobridge_br1="alc0"
+#   bridge_fd 0               ifconfig_br1="SYNCDHCP"
+# iface br1 inet6 auto        ifconfig_br1_ipv6="inet6 accept_rtadv"
+
+# (Void Linux)                    (Linux)
+# /etc/rc.local                   /etc/qemu/bridge.conf
+# ------------------------------  ---------------------
+# ip link add br0 type bridge     allow br0
+# ip addr add 192.168.1.161/27 \  allow br1
+#   dev br0
+# ip link set dev br0 up          $ chown root:kvm /etc/qemu/bridge.conf
+#                                 $ chmod 0640 /etc/qemu/bridge.conf
+# ip link add br1 type bridge     $ chmod u+s /usr/lib/qemu/qemu-bridge-helper
+# ip link set dev br1 up            or
+# ip link set dev enp3s0 up       $ chmod u+s /usr/libexec/qemu-bridge-helper
+# ip addr flush dev enp3s0
+# ip link set enp3s0 master br1
+#
+# ip[6]tables -t nat -X
+
+
+# NOTE, Linux|BSD dnsmasq config for qemu network - nat br0
+# (Linux|BSD)                     (FreeBSD)
+# [/usr/local]/etc/dnsmasq.conf   /etc/rc.conf ..
+# -----------------------------   ---------------
+# except-interface=lo[0]          dnsmasq_conf="/usr/local/etc/dnsmasq.conf"
+# interface=br0                   dnsmasq_enable="YES"
+# bind-dynamic                    gateway_enable="YES"
+# dhcp-range=192.168.1.162, \     #ipv6_gateway_enable="YES"
+#   192.168.190,12h
+# strict-order
+
+
+# NOTE, qemu-ifup & qemu-ifdown scripts
+# (Linux)                          (Linux)
+# /etc/qemu-ifup                   /etc/qemu-ifdown
+# -------------------------------  --------------------------------
+# #!/bin/sh                        #!/bin/sh
+# set -x                           set -x
+# switch=${switch:-br0}            switch=${switch:-br0}
+# if [ -n "$1" ] ; then            if [ -n "$1" ] ; then
+#   ip tuntap add dev $1 \           ip link set $1 nomaster
+#      mode tap group kvm            ip link set dev $1 down
+#   ip link set dev $1 up            ip tuntap del dev $1 mode tap
+#   sleep 3s                         exit 0
+#   ip link set $1 master $switch  else
+#   exit 0                           echo "Error: no interface \
+# else                                 (tapN) specified"
+#   echo "Error: no interface \      exit 1
+#     (tapN) specified"            fi
+#   exit 1
+# fi
+
+# (FreeBSD)                        (FreeBSD)
+# /usr/local/etc/qemu-ifup         /usr/local/etc/qemu-ifdown
+# -------------------------------  --------------------------------
+# #!/bin/sh                        #!/bin/sh
+# set -x                           set -x
+# switch=${switch:-br0}            switch=${switch:-br0}
+# if [ -n "$1" ] ; then            if [ -n "$1" ] ; then
+#   ifconfig $1 create               ifconfig $switch deletem $1
+#   ifconfig $1 up                   ifconfig $1 down
+#   sleep 3s                         ifconfig $1 destroy
+#   ifconfig $switch addm $1 up      exit 0
+#   exit 0                         else
+# else                               echo "Error: no interface \
+#   echo "Error: no interface \        (tapN) specified"
+#     (tapN) specified"              exit 1
+#   exit 1                         fi
+# fi
+
+# (FreeBSD) auto create|destroy tap interfaces - tap0 on br0 & tap1 on br1
+# /etc/rc.local ..
+# --------------------------------------------
+# /usr/local/etc/qemu-ifup tap0
+# env switch=br1 /usr/local/etc/qemu-ifup tap1
+#
+# /etc/rc.shutdown ..
+# --------------------------------------------
+# /usr/local/etc/qemu-ifdown tap0
+# env switch=br1 /usr/local/etc/qemu-ifdown tap1
+
+
+# NOTE, Linux|BSD modify firewall rules|services for qemu network - nat br0
+# ### natip_cidr=192.168.1.160/27 ###
+# (Linux - firewalld|iptables|nftables)
+# #?firewall-offline-cmd [--zone=external] --add-source=$natip_cidr \
+# #?  --add-masquerade
+# #iptables -t nat -I POSTROUTING -s $natip_cidr ! -d $natip_cidr -j MASQUERADE
+# #nft insert rule ip nat postrouting ip saddr $natip_cidr ip daddr != \
+# #  $natip_cidr counter masquerade
+# #iptables -t nat -I POSTROUTING -o wlan0 -j MASQUERADE
+# nft insert rule ip nat postrouting oifname "wlan0" counter masquerade
+#
+# #?firewall-offline-cmd [--zone=external] --add-rich-rule='rule family=ipv4 \
+# #?  source address=$natip_cidr accept'
+# #iptables -I FORWARD -s $natip_cidr -i br0 -j ACCEPT
+# #nft insert rule inet filter forward ip saddr $natip_cidr iifname "br0" \
+# #  counter accept
+# #iptables -I FORWARD -i br0 -o wlan0 -j ACCEPT
+# nft insert rule inet filter forward iifname "br0" oifname "wlan0" counter \
+#   accept
+#
+# #?firewall-offline-cmd [--zone=external] --add-rich-rule='rule family=ipv4 \
+# #?  destination address=$natip_cidr accept'
+# #iptables -I FORWARD -d $natip_cidr -o br0 -m conntrack --ctstate \
+# #  RELATED,ESTABLISHED -j ACCEPT
+# #nft insert rule inet filter forward ip daddr $natip_cidr oifname "br0" \
+# #  ct state related,established counter accept
+# #iptables -I FORWARD -i wlan0 -o br0 -m conntrack --ctstate RELATED, \
+# #  ESTABLISHED -j ACCEPT
+# nft insert rule inet filter forward iifname "wlan0" oifname "br0" \
+#   ct state related,established counter accept
+
+# (BSD - pf)
+# nat on wlan0 inet from br0:network to any -> (wlan0)
+# #pass from br0:network to any keep state
+# pass on br0 from br0:network to any
+# pass on wlan0 from br0:network to any keep state
+
+# (Linux) $ sed -i 's|domain|domain, bootps, bootpc, mdns|g' /etc/nftables.conf
+# (Linux) $ sed -i 's|domain|domain, bootps, bootpc, mdns|g' /etc/nftables/*.conf
+# (BSD) $ sed -i '' 's|domain|domain, bootps, bootpc, mdns|g' /etc/pf/*.rules

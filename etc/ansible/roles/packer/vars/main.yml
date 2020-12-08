@@ -1,0 +1,5 @@
+---
+# vars file for packer
+
+variant: "{{(ansible_facts.get('os_family') or ansible_facts.get('distribution'))|lower}}"
+pkgupgd_params: {"update_cache": yes, "upgrade": yes}

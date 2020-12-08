@@ -1,0 +1,46 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - block:
+      - name: Brief ansible_facts
+        #setup: filter={{ item }}
+        #register: out
+        #loop: "{{(lookup('env', 'items') or 'ansible_os_family,ansible_lsb,ansible_distribution*').split(',')}}"
+      #- debug: var=out.results[1].ansible_facts
+        setup: gather_subset=!all,!min,{{lookup('env', 'items') or 'os_family,lsb,distribution'}}
+        register: out
+      - debug: var=out.ansible_facts
+      tags: never, brieffacts
+
+    - block:
+      - name: All ansible_facts
+        setup:
+        register: out
+      - debug: var=out.ansible_facts
+      tags: never, allfacts
+
+    - block:
+      - stat: path=/tmp/scripts.tar
+        ignore_errors: true
+        register: scripts_tar_st
+
+      - block:
+        - name: Xfer scripts
+          file: path={{item}} state=absent
+          loop: [/tmp/init, /tmp/scripts, /root/init, /root/scripts]
+
+        - unarchive: remote_src=yes src=/tmp/scripts.tar dest=/tmp
+
+        - shell: mv /tmp/{{variant}} /tmp/scripts ; cp -R /tmp/init /tmp/scripts /root/
+
+        #- file: path=/tmp/scripts.tar state=absent
+        when: scripts_tar_st.stat.exists
+      tags: xferscripts
+
+  roles:
+    - role: packer
+      #vars:
+      #  variant: "{{(ansible_facts.get('os_family') or ansible_facts.get('distribution'))|lower}}"

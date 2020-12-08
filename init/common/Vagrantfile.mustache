@@ -1,0 +1,89 @@
+{{! usage: cat << EOF | mustache - <template>
+---
+variant: freebsd
+---
+EOF
+}}
+
+## minimal contents
+#Vagrant.configure("2") do |config|
+#  config.vm.provider :libvirt do |libvirt|
+#    libvirt.driver = 'kvm'
+#  end
+#end
+
+# custom contents
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# provision runscript usage:
+#   env RUNSCRIPT_ARGS="script.sh arg0 argN" vagrant provision --provision-with runscript
+# provision runscript ex:
+#   env RUNSCRIPT_ARGS="upgradepkgs.sh" vagrant provision --provision-with runscript
+RUNSCRIPT_ARGS = ENV.fetch('RUNSCRIPT_ARGS', 'upgradepkgs.sh').split()
+
+variant = '{{variant}}{{^variant}}freebsd{{/variant}}'
+repo_dir = "#{ENV.fetch('repo_dir', '/mnt/Data0/vm_templates_sh')}"
+
+Vagrant.configure(2) do |config|
+
+  config.ssh.shell = 'sh'
+  config.vm.boot_timeout = 1800
+  config.vm.synced_folder '.', '/vagrant', disabled: true
+
+  config.vm.provider :libvirt do |p, override|
+    p.driver = 'kvm'
+    p.cpus = 2
+    p.memory = 2048
+    p.video_vram = 64
+    p.video_type = 'qxl'
+    p.disk_bus = 'virtio'
+    p.nic_model_type = 'virtio'
+    p.management_network_name = 'default'
+    p.management_network_address = '192.168.122.0/24'
+    p.storage_pool_name = 'vm_samples'
+    p.default_prefix = ''
+    p.loader = '/usr/share/OVMF/OVMF_CODE.fd'
+  end
+
+  config.vm.define ENV.fetch('vm_name', File.basename(Dir.pwd))
+
+  config.vm.provision 'example', type: 'shell', run: 'never' do |s|
+    s.inline = 'echo "Example provisioning ..."'
+  end
+
+  config.vm.provision 'shell', privileged: false do |s|
+    s.inline = <<-EOF
+echo '##########'
+echo 'Manually copy updated scripts tarball, then run provision xferscripts.'
+echo "  cd #{repo_dir} ; cp -R ~/.ssh/publish_krls init/common/skel/_ssh/"
+echo "  cp -R ~/.pki/publish_crls init/common/skel/_pki/"
+echo "  tar -cf /tmp/scripts.tar init/common init/#{variant} -C scripts #{variant}"
+echo '  xfr: scp /tmp/scripts.tar packer@10.0.2.10:/tmp/scripts.tar'
+echo '  xfr: ssh packer@10.0.2.10 "cat - > /tmp/scripts.tar" < /tmp/scripts.tar'
+echo '##########'
+EOF
+  end
+
+  config.vm.provision 'xferscripts', type: 'shell', run: 'never', privileged: false do |s|
+    s.inline = <<-EOF
+set -x
+sudo rm -r /tmp/init ; sudo rm -r /tmp/scripts
+mkdir -p /tmp/init ; sudo chmod 1777 /tmp
+tar -xf /tmp/scripts.tar -C /tmp
+for path in /root/init.tar /root/init /root/scripts ; do
+  sudo rm -r $path ;
+done
+mv /tmp/#{variant} /tmp/scripts ; sudo cp -fR /tmp/init /tmp/scripts /root/
+EOF
+  end
+
+  config.vm.provision 'runscript', type: 'shell', run: 'never' do |s|
+    s.env = {'HOME_DIR': '/home/vagrant', 'WITH_X11': 'nox11',
+      'FETCH_RETRY': '20', 'FETCH_TIMEOUT': '300',
+      'PLAIN_PASSWD': "#{ENV.fetch('PLAIN_PASSWD', 'abcd0123')}"}
+    s.inline = "sh /root/scripts/#{RUNSCRIPT_ARGS[0]}"
+    s.args = RUNSCRIPT_ARGS[1..-1]
+  end
+
+end

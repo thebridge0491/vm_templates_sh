@@ -1,0 +1,26 @@
+Protocol 2
+VisualHostKey yes
+AddKeysToAgent yes
+UpdateHostKeys yes
+HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+
+Host github.com
+  #IdentityFile ~/.ssh/id_<keytype>
+  #CertificateFile ~/.ssh/id_<keytype>-cert.pub
+  #User git
+  #Port 22
+  IdentitiesOnly yes
+
+Host ssh.github.com
+  Port 443
+  IdentitiesOnly yes
+
+Host bitbucket.org
+  #User git # git | hg
+  IdentitiesOnly yes
+
+Host altssh.bitbucket.org
+  Port 443
+  IdentitiesOnly yes
+

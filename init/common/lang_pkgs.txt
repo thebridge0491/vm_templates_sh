@@ -1,0 +1,180 @@
+# lang_pkgs.txt
+# to use variables, source this file:           install dir: (S), (H), (P)
+#                                               S-sys dir, H-home, P-project
+#					search pkg /				install pkg /
+#					list installed				update installed
+#					------------------------	------------------------
+# pypi.python.:		pip search xx			 (H)pip install --user xx
+#   org				pip list					pip list --outdated ;
+#												  pip install --upgrade xx
+# (jip=jython -m pip)jip search xx			 (H)jip install --user gId:aId:ver
+#					jip list					jip update xx
+# ----------------------------------------------------------------------
+# maven.apache.org:	???					     (H)mvn -f pom.xml depn:resolve
+#   org/maven		mvn -f <path> depn:tree
+# repo1.maven.:		???					     (H)ant -f <path> resolve
+#   org/maven		ant -f <path> depntree
+# ----------------------------------------------------------------------
+# hackage. :		???					   (H,P)stack install xx
+#   haskell.org		stack exec ghc-pkg --       stack update ;
+#					  list		      			  stack install xx
+# ----------------------------------------------------------------------
+# quicklisp.:		(ql:system-apropos "xx")?(P)(ql:quickload 'xx)
+#   org				(ql-dist:					(ql:update-client) ;
+#					  installed-systems t)		  (ql:update-all-dists)
+# ----------------------------------------------------------------------
+# opam.ocaml.:		opam search xx			 (H)opam install xx
+#  org				opam list					opam update; opam upgrade
+# ----------------------------------------------------------------------
+
+# godoc.org:		go get -n xx			?(P)go get xx
+#					go list						go get -u
+# ----------------------------------------------------------------------
+# nuget.org:		nuget list xx			 (P)nuget install xx
+#					???							nuget update
+# ----------------------------------------------------------------------
+# github.com/:		lein search "/xx$"		?(P)edit project.clj; lein deps
+#   clojure			???							???
+# ----------------------------------------------------------------------
+# crates.io:		cargo search xx			?(H)cargo install xx
+#   rust(cargo)		cargo install --list		cargo update
+# ----------------------------------------------------------------------
+# rubygems.org:		gem search "^xx$"		 (H)gem install --user-install xx
+#					gem list					gem update
+# ----------------------------------------------------------------------
+
+# luarocks.org:		luarocks search xx		 (S)sudo luarocks install xx
+#					luarocks list				???
+# ----------------------------------------------------------------------
+# cpan.org:			cpanm --info xx			 (S)sudo cpanm --sudo xx
+#					instmodsh ; cmd? l			cpan-outdated -p | cpanm
+# ----------------------------------------------------------------------
+# npmjs.com:		npm search /^xx			 (P)npm install [-g] xx
+#					npm list [-g]				npm update [-g]
+# ----------------------------------------------------------------------
+# pear.php.net:		pear search xx			 (S)sudo pear install xx
+#   [pear|pecl] 	pear list					pear list-upgrades ; 
+#												  pear upgrade-all
+# packagist.org:	composer search xx		 (S)sudo composer install xx
+#   composer.phar 	composer show				composer update
+# ----------------------------------------------------------------------
+
+
+pip_gui="" # "python-qt5"
+pip_crypto="" # "gpgme m2crypto pycrypto openssl gnutls dtls"
+pip_db="" # "psycopg2 MySQLdb redis pymongo"
+pkgs_pip="cffi pytest pytest-timeout hypothesis coverage configparser click pylint Sphinx nose2 PyYAML toml pyxdg cookiecutter invoke pep8 pycodestyle pydocstyle ${pip_gui} ${pip_crypto} ${pip_db}"
+# pyev pylibnet dnet pcap PyOpenGL
+# PasteScript flake8 pyev libnet dnet pcap qt5-opengl qt4-opengl
+# django Flask bottle
+# ----------------------------------------------------------------------
+
+java_gui="" # 
+java_crypto="" # 
+java_db="" # 
+pkgs_java="jna junit testng log4j-over-slf4j logback-classic ini4j scala scalatest ${java_gui} ${java_crypto} ${java_db}"
+# download jars: cobertura scalastyle
+
+scala_gui="" # 
+scala_crypto="" # 
+scala_db="" # 
+pkgs_scala="jna junit testng log4j-over-slf4j logback-classic ini4j scala scalatest ${scala_gui} ${scala_crypto} ${scala_db}"
+# download jars: cobertura scalastyle
+# ----------------------------------------------------------------------
+
+stack_gui="" # "gtk gtk3"
+stack_crypto="" # "hsopenssl tls"
+stack_db="" # "hdbi-sqlite" # postgresql mysql redis mongoDB
+pkgs_stack="hslogger HUnit QuickCheck test-framework-hunit test-framework-quickcheck2 hspec tasty-hunit tasty-quickcheck hlint ConfigFile ${stack_gui} ${stack_crypto} ${stack_db}"
+# hlibev pcap OpenGL
+# happstack yesod bird scotty
+# stack.yaml extra-deps: clock-*, unbounded-delays-*, tasty-*, tasty-hunit-*, tasty-quickcheck-*
+# ----------------------------------------------------------------------
+
+#quicklisp_gui="" # "gtk-cffi qt"
+#quicklisp_crypto="" # 
+#quicklisp_db="" # 
+#pkgs_quicklisp="cl-project xlunit clunit sb-cover log4cl getopt cli-parser cl-ppcre py-configparser ${quicklisp_gui} ${quicklisp_crypto} ${quicklisp_db}"
+# caveman ningle
+# ----------------------------------------------------------------------
+
+opam_gui="" # "lablgtk"
+opam_crypto="" # "ssl"
+opam_db="" # "sqlite3" # postgresql mysql
+pkgs_opam="camlp4 oasis ocamlbuild pcre ounit ocamllint bolt ocaml-inifiles bisect bisect_ppx ctypes ctypes-foreign qcheck quickcheck batteries utop core ppx_sexp_conv ${opam_gui} ${opam_crypto} ${opam_db}"
+# ocamldebug lablgl
+# eliom ocsigenserver
+# ----------------------------------------------------------------------
+
+
+goget_gui="" # "github.com/conformal/gotk3/gtk github.com/mattn/go-gtk/gtk"
+goget_crypto="" #
+goget_db="" # "github.com/mattn/go-sqlite3" # github.com/go-sql-driver/mysql
+pkgs_goget="golang.org/x/tools/godoc golang.org/x/tools/cover github.com/alecthomas/log4go github.com/unknwon/goconfig github.com/leanovate/gopter ${goget_gui} ${goget_crypto} ${goget_db}"
+# ----------------------------------------------------------------------
+
+nuget_gui="" # "GtkSharp"
+nuget_crypto="" # "openssl GpgAPI BouncyCastle"
+nuget_db="" # "sqlite-net" # Npgsql ServiceStack.Redis MongoDB.Driver
+pkgs_nuget="NUnit log4net slf4net glib Mono.Options FSharpLint FsUnit FsCheck ${nuget_gui} ${nuget_crypto} ${nuget_db}"
+# SharpPcap nupengl.core glm
+# ----------------------------------------------------------------------
+
+lein_gui="" # 
+lein_crypto="" # 
+lein_db="" # "'org.clojure/java.jdbc "0.3.6"'"
+pkgs_lein="'org.clojure/clojure "1.6.0"' 'jonase/eastwood "0.2.1"' 'clojure.test' 'org.clojure/test.check "0.7.0"' 'org.clojure/tools.logging "0.3.1"' 'org.clojure/tools.cli "0.3.1"' ${lein_gui} ${lein_crypto} ${lein_db}"
+# 'compojure "1.3.2"'
+# ----------------------------------------------------------------------
+
+cargo_gui="" # 
+cargo_crypto="" # 
+cargo_db="" # 
+pkgs_cargo="quickcheck ${cargo_gui} ${cargo_crypto} ${cargo_db}"
+# ----------------------------------------------------------------------
+
+gem_gui="" # "ffi gir_ffi-gtk gtk3 gtk2 qtbindings"
+gem_crypto="" # 
+gem_db="" # "rdbi-driver-sqlite3" #rdbi-driver-postgresql rdbi-driver-mysql redis mongo
+pkgs_gem="rlint rubocop hoe minitest rubycheck simplecov rcov logging logger log4r inifile parseconfig ffi toml ${gem_gui} ${gem_crypto} ${gem_db}"
+# eventmachine pcaprub opengl jruby-lint jruby-rcov jruby-openssl rails sinatra padrino
+# ----------------------------------------------------------------------
+
+
+#luarocks_gui="" # "lgi lqt"
+#luarocks_crypto="" # "luacrypto luaossl luasec"
+#luarocks_db="" # "luasql-sqlite3 luadbi-sqlite3" # luasql-postgres luadbi-postgresql redis-lua
+#pkgs_luarocks="luacheck luadoc lunit luaunit lualogging argparse luacov ${luarocks_gui} ${luarocks_crypto} ${luarocks_db}"
+# luasocket lua-ev lluv luagl orbit mercury
+# ----------------------------------------------------------------------
+
+#cpanm_gui="" # "Gtk3 Gtk2 Qt"
+#cpanm_crypto="" # "Crypt::GCrypt Crypt::OpenSSL::RSA Crypt::OpenSSL::X509 IO::Socket::SSL"
+#cpanm_db="" # "DBD::SQLite" # DBD::Pg DBD::mysql Redis MongoDB
+#pkgs_cpanm="Module::Starter Perl::Critic Perl::Tidy Test::Class Devel::Cover Log::Log4perl Config::IniFiles ${cpanm_gui} ${cpanm_crypto} ${cpanm_db}"
+# EV POE Net::Libdnet Net::Pcap OpenGL OpenGL::GLM
+# Catalyst::Runtime Dancer
+# ----------------------------------------------------------------------
+
+#npm_gui="" # 
+#npm_crypto="" # 
+#npm_db="" # 
+#pkgs_npm="jslint jsdoc nodeunit jscoverage log4js cli argparse node-ini ${npm_gui} ${npm_crypto} ${npm_db}"
+# express tower
+# ----------------------------------------------------------------------
+
+#pear_gui="" # 
+#pear_crypto="" # 
+#pear_db="" # 
+#pkgs_pear="phpDocumentor XML_Serializer PEAR_PackageFileManager2 PHPUnit Log parse_ini_file ${pear_gui} ${pear_crypto} ${pear_db}"
+#pecl_gui="" # 
+#pecl_crypto="" # "crypto OpenSSL"
+#pecl_db="" # "PDO_SQLITE" # PDO_MYSQL PDO_PGSQL redis mongo
+#pkgs_pecl="xdebug ${pecl_gui} ${pecl_crypto} ${pecl_db}"
+# ZendFramework cakephp Slim
+
+#composer_gui="" # 
+#composer_crypto="" # 
+#composer_db="" # 
+#pkgs_composer=" ${composer_gui} ${composer_crypto} ${composer_db}"
+# ----------------------------------------------------------------------

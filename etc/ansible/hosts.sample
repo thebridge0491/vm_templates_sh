@@ -1,0 +1,17 @@
+## ini format inventory
+#[targets]
+#guest01 ansible_host=10.0.2.10 ansible_python_interpreter='/usr/bin/env python'
+#
+#[targets:vars]
+#ansible_user=packer
+#ansible_become=yes
+
+# yaml format inventory
+targets:
+  hosts:
+    guest01:
+      ansible_host: 10.0.2.10
+      ansible_python_interpreter: '/usr/bin/env python'
+  vars:
+    ansible_user: packer
+    ansible_become: yes

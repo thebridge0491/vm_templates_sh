@@ -1,0 +1,16 @@
+<%# usage: erb author=thebridge0491 guest=freebsd-Release-zfs datestamp=2020.09.05 <template> %>
+{
+  "name": "<%=author%>/<%=guest%>",
+  "description": "Vagrant box (<distribution>-<branch>-<volume-manager>)",
+  "versions": [
+    {
+    "version": "<%=datestamp%>",
+    "providers": [{
+      "name": "libvirt",
+      "url": "<%=guest%>-<%=datestamp%>.libvirt.box"<% if defined?(checksum) %>,
+      "checksum_type": "sha256",
+      "checksum": "<%=checksum%>"<% end %>
+      }]
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+<domain type='lxc'>
+  <name>devuan-boxe0000</name>
+  <!--<uuid>64ea5cd9-2311-4c9a-bd31-c3f985298eb9</uuid>-->
+  <memory unit='KiB'>786432</memory>
+  <currentMemory unit='KiB'>786432</currentMemory>
+  <vcpu placement='static'>1</vcpu>
+  <resource>
+    <partition>/machine</partition>
+  </resource>
+  <os>
+    <type arch='x86_64'>exe</type>
+    <init>/sbin/init</init>
+  </os>
+  <features>
+    <privnet/>
+  </features>
+  <clock offset='utc'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <devices>
+    <emulator>/usr/lib/libvirt/libvirt_lxc</emulator>
+    <controller type='virtio-serial' index='0'/>
+    <filesystem type='mount' accessmode='passthrough'>
+      <source dir='/mnt/Data0'/>
+      <target dir='/media/9p_Data0'/>
+    </filesystem>
+    <filesystem type='mount' accessmode='mapped'>
+      <source dir='/home/packer/.local/share/lxc/devuan-boxe0000/rootfs'/>
+      <target dir='/'/>
+    </filesystem>
+    <interface type='network'>
+      <!--<mac address='00:16:3e:eb:85:98'/>-->
+      <source network='default'/>
+    </interface>
+    <console type='pty'>
+      <target type='virtio' port='0'/>
+    </console>
+  </devices>
+</domain>
+

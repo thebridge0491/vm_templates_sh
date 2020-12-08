@@ -1,0 +1,4 @@
+keytype_bitopts="ed25519: rsa:-b3072"
+comment=plain_user
+certid=plain_user
+principals=plain_user@yahoo.com,plain_user
