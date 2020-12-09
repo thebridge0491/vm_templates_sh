@@ -97,6 +97,93 @@ void() {
   #-----------------------------------------
 }
 
+archlinux() {
+  variant=${variant:-archlinux} ; GUEST=${1:-artix-Rolling-lvm}
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'archlinux-*.iso' | tail -n1)}
+  #(cd ${ISOS_PARDIR}/archlinux ; sha1sum --ignore-missing -c sha1sums.txt)
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/artix -name 'artix-*-openrc-*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/artix ; sha256sum --ignore-missing -c sha256sums)
+  sleep 5
+
+  ##!! (arch) login user/passwd: -/-
+  ##!! (artix) login user/passwd: artix/artix
+
+  #sudo su
+  #(arch) mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5
+  #(arch) pacman-key --init ; pacman-key --populate archlinux
+  #(arch) pacman -Sy archlinux-keyring
+  #(artix) mount -o remount,size=1G /run/artix/cowspace ; df -h ; sleep 5
+  #(artix) pacman-key --init ; pacman-key --populate artix
+  #(artix) pacman -Sy artix-keyring gnu-netcat parted dosfstools gptfdisk [lvm2]
+  #pacman -Sy
+
+  #------------ if using ZFS ---------------
+  ## NOTE, transfer archzfs config file: init/archlinux/repo_archzfs.cfg
+  #cat init/archlinux/repo_archzfs.cfg >> /etc/pacman.conf
+  #curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg
+  #pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
+
+  #pacman -Sy zfs-dkms ; pacman -Sy --needed zfs-utils
+  ##--- (arch) or retrieve archived zfs-linux package instead of zfs-dkms ---
+  ## Note, xfer archived zfs-linux package matching kernel (uname -r)
+  ## example kernelver -> 5.7.11-arch1-1 becomes 5.7.11.arch1.1-1
+  ## curl -o /tmp/zfs-linux.pkg.tar.zst 'http://mirror.sum7.eu/archlinux/archzfs/archive_archzfs/zfs-linux-<ver>_<kernelver>-x86_64.pkg.tar.zst'
+  ## pacman -U /tmp/zfs-linux.pkg.tar.zst
+  ##--- (arch)
+
+  #modprobe zfs ; zpool version ; sleep 5
+  #-----------------------------------------
+}
+
+alpine() {
+  variant=${variant:-alpine} ; GUEST=${1:-alpine-Stable-lvm}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name 'alpine-extended-*-x86_64.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-extended-*-x86_64.iso.sha256)
+  sleep 5
+
+  ##!! login user/passwd: root/-
+
+  #ifconfig ; ifconfig {ifdev} up ; udhcpc -i {ifdev} ; cd /tmp
+
+  #service sshd stop
+  #. /etc/os-release ; export MIRRORHOST=dl-cdn.alpinelinux.org/alpine
+  #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories
+  #apk update
+  #apk add e2fsprogs dosfstools sgdisk util-linux multipath-tools [lvm2]
+  #setup-udev
+
+  #------------ if using ZFS ---------------
+  #apk add zfs
+
+  #modprobe zfs ; zpool version ; sleep 5
+  #-----------------------------------------
+}
+
+suse() {
+  variant=${variant:-suse} ; GUEST=${1:-opensuse-Stable-lvm}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live -name 'openSUSE-Leap-*-Live-x86_64-*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/opensuse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-x86_64-*.iso.sha256)
+  sleep 5
+
+  ##!! login user/passwd: linux/-
+
+  #sudo su ; . /etc/os-release ; export MIRRORHOST=download.opensuse.org
+  #zypper --non-interactive refresh
+
+  #zypper install ca-certificates-cacert ca-certificates-mozilla efibootmgr [lvm2]
+  #zypper --gpg-auto-import-keys refresh
+  #update-ca-certificates
+
+  #------------ if using ZFS ---------------
+  #zypper --non-interactive install gptfdisk dkms kernel-devel
+  #zypper --gpg-auto-import-keys addrepo http://${MIRRORHOST}/repositories/filesystems/$(echo ${PRETTY_NAME} | tr ' ' _)/filesystems.repo
+  #zypper --gpg-auto-import-keys refresh
+  #zypper --non-interactive install zfs
+
+  #modprobe zfs ; zpool version ; sleep 5
+  #-----------------------------------------
+}
+
 #----------------------------------------
 ${@:-freebsd freebsd-Release-zfs}
 
@@ -172,6 +259,16 @@ sleep 30
 #void linux: (MIRROR: mirror.clarkson.edu/voidlinux)
   ## dnld: http://${MIRROR}/static/xbps-static-latest.x86_64-musl.tar.xz
   #  package(s): xbps-install.static (download xbps-static tarball)
+
+#arch linux variants(arch, artix):
+  #  package(s): pacman, ? libffi
+
+#alpine linux: (MIRROR: dl-cdn.alpinelinux.org/alpine)
+  ## dnld: http://${MIRROR}/latest-stable/main/x86_64/apk-tools-static-*.apk
+  #  package(s): apk[-tools][.static] (download apk[-tools][-static])
+
+#suse variants(opensuse): (MIRROR: download.opensuse.org)
+  #  package(s): zypper, rpm, ? rinse
 
 #----------------------------------------
 ## (Linux distro) install via chroot
