@@ -1,0 +1,4 @@
+---
+# Non-default OS based (using family, distribution, ...) vars file
+
+pkgupgd_params: {"state": 'latest', "name": "*"}

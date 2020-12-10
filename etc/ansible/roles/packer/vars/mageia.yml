@@ -1,0 +1,5 @@
+---
+# Non-default OS based (using family, distribution, ...) vars file
+
+pkg_mgr: "dnf"
+pkgupgd_params: {"update_cache": yes, "state": "latest", "use": "{{pkg_mgr}}"}

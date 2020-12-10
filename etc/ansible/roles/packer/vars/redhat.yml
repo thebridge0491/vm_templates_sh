@@ -1,0 +1,6 @@
+---
+# Non-default OS based (using family, distribution, ...) vars file
+
+variant: "{{ansible_facts.get('os_family', 'redhat')|lower}}"
+pkg_mgr: "{{ansible_facts.get('pkg_mgr') or 'dnf'}}"
+pkgupgd_params: {"update_cache": yes, "state": "latest", "use": "{{pkg_mgr}}"}

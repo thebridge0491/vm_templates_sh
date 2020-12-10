@@ -128,6 +128,90 @@ suse() {
   ## NOTE, yast2 clone_system -> auto install config: /root/autoinst.xml
 }
 
+redhat() {
+  VOL_MGR=${VOL_MGR:-lvm} ; RELEASE=${RELEASE:-8-stream} ; variant=redhat
+  init_hostname=${init_hostname:-centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')-boxv0000}
+  # [centos/8[-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
+  repo_host=${repo_host:-mirror.centos.org/centos} ; repo_directory=${repo_directory:-/${RELEASE}/BaseOS/x86_64/os}
+  GUEST=${1:-centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')-Release-${VOL_MGR}}
+
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|') -name 'CentOS-*-x86_64*-boot.iso' | tail -n1)}
+  if [ ! "" = "$ISO_PATH" ] ; then
+    (cd ${ISOS_PARDIR}/centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|') ; sha256sum --ignore-missing -c CHECKSUM) ;
+    sleep 5 ;
+  fi
+
+  #INST_SRC_OPTS=${INST_SRC_OPTS:---location="${ISO_PATH}"}
+  INST_SRC_OPTS=${INST_SRC_OPTS:---location="http://${repo_host}${repo_directory}"}
+  INITRD_INJECT_OPTS=${INITRD_INJECT_OPTS:---initrd-inject="/tmp/anaconda-ks.cfg" --initrd-inject="/tmp/init.tar"}
+  EXTRA_ARGS_OPTS=${EXTRA_ARGS_OPTS:---extra-args="inst.ks=file:///anaconda-ks.cfg inst.repo=http://${repo_host}${repo_directory} ip=::::${init_hostname}::dhcp hostname=${init_hostname} nomodeset video=1024x768 selinux=1 enforcing=0 text inst.text"}
+  # systemd.unit=multi-user.target
+  cp init/redhat/${VOL_MGR}-anaconda-ks.cfg /tmp/anaconda-ks.cfg
+  tar -cf /tmp/init.tar init/common init/redhat
+
+  ## NOTE, in kickstart failure to find ks.cfg:
+  ##  Alt-Tab to cmdline
+  ##  anaconda --kickstart <path>/anaconda-ks.cfg
+
+  ## NOTE, saved auto install config: /root/anaconda-ks.cfg
+}
+
+mageia() {
+  VOL_MGR=${VOL_MGR:-lvm} ; RELEASE=${RELEASE:-7.1} ; variant=mageia
+  init_hostname=${init_hostname:-mageia-boxv0000}
+  repo_host=${repo_host:-mirrors.kernel.org/mageia} ; repo_directory=${repo_directory:-/distrib/${RELEASE}/x86_64}
+  GUEST=${1:-mageia-Release-${VOL_MGR}}
+
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia -maxdepth 1 -name 'Mageia-*-x86_64*.iso' | tail -n1)}
+  if [ ! "" = "$ISO_PATH" ] ; then
+  	(cd ${ISOS_PARDIR}/mageia ; sha512sum --ignore-missing -c Mageia-*-x86_64*.iso.sha512) ;
+    sleep 5 ;
+  fi
+
+  #INST_SRC_OPTS=${INST_SRC_OPTS:---location="${ISO_PATH}"}
+  INST_SRC_OPTS=${INST_SRC_OPTS:---location="http://${repo_host}${repo_directory}"}
+  INITRD_INJECT_OPTS=${INITRD_INJECT_OPTS:---initrd-inject="/tmp/auto_inst.cfg.pl" --initrd-inject="/tmp/init.tar"}
+  EXTRA_ARGS_OPTS=${EXTRA_ARGS_OPTS:---extra-args="automatic=method:http,server:${repo_host},directory:${repo_directory},network:dhcp auto_install=auto_inst.cfg.pl nomodeset text"}
+  # systemd.unit=multi-user.target
+  cp init/mageia/${VOL_MGR}-auto_inst.cfg.pl /tmp/auto_inst.cfg.pl
+  tar -cf /tmp/init.tar init/common init/mageia
+
+  ## NOTE, saved auto install config: /root/drakx/auto_inst_cfg.pl
+}
+
+openbsd() {
+  VOL_MGR=${VOL_MGR:-std} ; variant=openbsd
+  init_hostname=${init_hostname:-openbsd-boxv0000}
+  GUEST=${1:-openbsd-Release-${VOL_MGR}}
+
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd -name 'install*.img' | tail -n1)}
+  (cd ${ISOS_PARDIR}/openbsd ; sha256sum --ignore-missing -c SHA256)
+  sleep 5
+
+  INST_SRC_OPTS=${INST_SRC_OPTS:---import --disk="${ISO_PATH}"}
+  tar -cf /tmp/init.tar init/common init/openbsd
+
+  ## ?? --boot uefi NOT WORKING for iso ??
+  #QUEFI_OPTS=" "
+  #VUEFI_OPTS=" "
+  echo "### Once network connected, transfer needed file(s) ###" ; sleep 5
+
+  ##NOTE, enter shell: S
+  ##!! login user/passwd: root/-
+
+  #ifconfig
+  #dhclient {ifdev} ; cd /tmp ; (cd /dev ; sh MAKEDEV sd0)
+  #fdisk -iy -g -b 960 sd0 ; sync ; fdisk sd0
+
+  ## NOTE, transfer [dir(s) | file(s)]: init/common, init/openbsd
+
+  #export MIRROR=ftp4.usa.openbsd.org/pub/OpenBSD
+  #cp init/openbsd/custom.disklabel init/openbsd/install.conf /tmp/
+  #sh init/openbsd/autoinstall.sh [$PLAIN_PASSWD]
+
+  ## NOTE, saved install response file: /tmp/i/install.resp
+}
+
 #----------------------------------------
 ${@:-freebsd}
 

@@ -1,0 +1,5 @@
+---
+# Non-default OS based (using family, distribution, ...) vars file
+
+pkg_mgr: "apt_rpm"
+#pkgupgd_params: {"update_cache": yes, "use": "{{pkg_mgr}}"}

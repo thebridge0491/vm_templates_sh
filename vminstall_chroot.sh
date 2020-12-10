@@ -184,6 +184,109 @@ suse() {
   #-----------------------------------------
 }
 
+## obsolete/non-existent CentOS [Stream] Live iso
+#redhat() {
+#  RELEASE=${RELEASE:-8-stream} ; variant=${variant:-redhat}
+#  GUEST=${1:-centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')-Release-lvm}
+#  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')/live -name 'CentOS-*-x86_64-Live*.iso' | tail -n1)}
+#  (cd ${ISOS_PARDIR}/centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')/live ; sha256sum --ignore-missing -c CHECKSUM)
+#  sleep 5
+#
+#  ##!! login user/passwd: liveuser/-
+#
+#  #. /etc/os-release ; export MIRRORHOST=mirror.centos.org/centos
+#  #[dnf | yum] -y check-update ; sestatus ; sleep 5
+#  #[dnf | yum] -y install nmap-ncat
+#
+#  #------------ if using ZFS ---------------
+#  #[dnf | yum] -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-[8 | 7].noarch.rpm
+#  #[dnf | yum] -y install kernel-headers kernel-devel dkms
+#  #[dnf | yum] -y install http://download.zfsonlinux.org/epel/zfs-release.el[8_3 | 7_9].noarch.rpm
+#  #[dnf | yum] --enablerepo=zfs -y install zfs zfs-dracut
+#  #echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
+#
+#  #dkms status ; modprobe zfs ; zpool version ; sleep 5
+#  #-----------------------------------------
+#}
+
+mageia() {
+  variant=${variant:-mageia} ; GUEST=${1:-mageia-Release-lvm}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia/live -name 'Mageia-*-Live-*-x86_64.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/mageia/live ; sha512sum --ignore-missing -c Mageia-*-Live-*-x86_64.iso.sha512)
+  sleep 5
+
+  ##!! login user/passwd: live/-
+
+  #su - ; export MIRRORHOST=mirrors.kernel.org/mageia
+  #dnf -y check-update ; sleep 5
+}
+
+pclinuxos() {
+  variant=${variant:-pclinuxos} ; GUEST=${1:-pclinuxos-Rolling-lvm}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/pclinuxos -name 'pclinuxos64-*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/pclinuxos ; md5sum --ignore-missing -c pclinuxos64-*.md5sum)
+  sleep 5
+  ##append to boot parameters: nokmsboot 3 text textmode=1 nomodeset keyb=us
+
+  ##!! login user/passwd: guest/-
+
+  #su - ; export MIRRORHOST=spout.ussg.indiana.edu/linux/pclinuxos
+  #sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list
+  #sed -i "/${MIRRORHOST}/ s|^.*rpm|rpm|" /etc/apt/sources.list
+  #apt-get -y update ; sleep 5
+  #apt-get -y install netcat gdisk efibootmgr [lvm2]
+  #apt-get -y --fix-broken install
+}
+
+netbsd() {
+  variant=${variant:-netbsd} ; GUEST=${1:-netbsd-Release-std}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-amd64.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512) ; sleep 5
+
+  # ?? QEMU boot uefi kernel page fault for iso (need : -machine pc,accel=kvm)
+  # add options: -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1
+
+  ##!! (chrootsh) navigate thru installer to shell: 1 ; a ; a ; e ; a
+
+  #ksh
+  #mount_mfs -s 100m md1 /tmp ; cd /tmp
+  #ifconfig ; dhcpcd {ifdev}
+
+  ## (NetBSD) install via chroot
+  ## NOTE, transfer [dir(s) | file(s)]: init/common, init/netbsd
+
+  #gpt show -l sd0
+  #sh init/netbsd/gpt_setup_vmnetbsd.sh part_format_vmdisk [std]
+  #sh init/netbsd/gpt_setup_vmnetbsd.sh mount_filesystems
+
+  #sh init/netbsd/std-install.sh [hostname [$PLAIN_PASSWD]]
+}
+
+openbsd() {
+  variant=${variant:-openbsd} ; GUEST=${1:-openbsd-Release-std}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd -name 'install*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/openbsd ; sha256sum --ignore-missing -c SHA256) ; sleep 5
+
+  ## ?? boot uefi NOT WORKING for iso ??
+  QUEFI_OPTS=" "
+  VUEFI_OPTS=" "
+
+  ##!! login user/passwd: root/-
+  ##!! (chrootsh) enter shell: S
+
+  #mount -t mfs -s 100m md1 /tmp ; cd /tmp [; mount -t mfs -s 100m md2 /mnt]
+  #ifconfig ; dhclient -L /tmp/dhclient.lease.{ifdev} {ifdev}
+
+  ## (OpenBSD) install via chroot
+  ## NOTE, transfer [dir(s) | file(s)]: init/common, init/openbsd
+
+  #fdisk sd0
+  #sh init/openbsd/disklabel_setup_vmopenbsd.sh part_format_vmdisk [std]
+  #sh init/openbsd/disklabel_setup_vmopenbsd.sh mount_filesystems
+
+  #sh init/openbsd/std-install.sh [hostname [$PLAIN_PASSWD]]
+}
+
 #----------------------------------------
 ${@:-freebsd freebsd-Release-zfs}
 
@@ -269,6 +372,16 @@ sleep 30
 
 #suse variants(opensuse): (MIRROR: download.opensuse.org)
   #  package(s): zypper, rpm, ? rinse
+
+#redhat variants(centos[-stream]):
+  # (centos[-stream] MIRROR: mirror.centos.org/centos)
+  #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm, ? rinse
+
+#mageia: (MIRROR: mirrors.kernel.org/mageia)
+  #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm
+
+#pclinuxos: (MIRROR: spout.ussg.indiana.edu/linux/pclinuxos)
+  #  package(s): ?
 
 #----------------------------------------
 ## (Linux distro) install via chroot
