@@ -1,0 +1,73 @@
+
+# OS family based variables dictionary
+{% set variant = {'artix': 'archlinux', 'arch': 'archlinux',
+     'centos stream': 'redhat'}.get(grains['os_family']|lower,
+     grains['os_family'])|lower %}
+{% load_yaml as defaultdict %}
+  default: # Debian
+    #pkgs_cmdln_tools = {{salt['cmd.shell']('. /root/init/'+variant+'/distro_pkgs.ini ; echo $pkgs_cmdln_tools', shell='/bin/sh')}}
+    distro_pkgs: {{salt['ini.get_ini']('/root/init/'+variant+'/distro_pkgs.ini')}}
+    {% if salt['file.file_exists']('/var/lib/dbus/machine-id') %}
+    {#hostname_last4: {{salt['cmd.shell']('cat /var/lib/dbus/machine-id | cut -b29-32')}}#}
+    hostname_last4: {{(salt['file.read']('/var/lib/dbus/machine-id')|trim)[-4:]}}
+    {% endif %}
+    hostname_chgfiles: [/etc/hosts, /etc/hostname]
+    firewall_chgfiles: [/etc/nftables.conf,
+      /etc/nftables/outallow_nftables.conf,
+      /etc/nftables/outdeny_nftables.conf]
+    services_enabled: [ntp, ufw, udev, eudev, dbus, avahi-daemon, nfs-common,
+      cups, cups-browsed]
+    services_disabled: [ipset, ip6tables, iptables, clamav-freshclam]
+    skeldir_par: /etc/skel
+    skel_dirs: [/etc/skel/.gnupg, /etc/skel/.pki, /etc/skel/.ssh]
+    skelmaps_srcdest: [{'srcskel': '_gnupg/*', 'destskel': '.gnupg/'},
+      {'srcskel': '_pki/*', 'destskel': '.pki/'},
+      {'srcskel': '_ssh/*', 'destskel': '.ssh/'},
+      {'srcskel': '_gitconfig', 'destskel': '.gitconfig'},
+      {'srcskel': '_hgrc', 'destskel': '.hgrc'}]
+    sudoers_file: /etc/sudoers
+    sudoers_group: sudo
+    skeldir_ssh: /etc/skel/.ssh
+    skel_shellrc: /etc/skel/.bashrc
+    sharednode: {{salt['environ.get']('SHARED_NODE',
+      default=salt['grains.get']('sharednode', default='localhost.local'))}}
+    printname: {{salt['environ.get']('PRINT_NAME',
+      default=salt['grains.get']('printname', default='printer1'))}}
+    etcdir_cups: /etc/cups
+    #cupsdir_ppd: /usr/share/cups/model
+    cupsdir_ppd: /usr/share/ppd/cups-pdf
+  FreeBSD:
+    {% if variant in ['freebsd'] %}
+    {#hostname_last4: {{salt['cmd.shell']('sysctl -n kern.hostuuid | cut -b33-36 || echo 0000')}}#}
+    hostname_last4: {{(salt['sysctl.get']('kern.hostuuid'))[-4:]}}
+    {% endif %}
+    hostname_chgfiles: [/etc/hosts, /etc/rc.conf]
+    firewall_chgfiles: [/etc/pf/outallow_in_allow.rules]
+    services_enabled: [pf, pflog, devd, dbus, avahi-daemon, nfsclient, cupsd]
+    services_disabled: [clamav-freshclam, clamav-clamd, lpd]
+    skeldir_par: /usr/share/skel
+    skel_dirs: [/usr/share/skel/dot.gnupg, /usr/share/skel/dot.pki,
+      /usr/share/skel/dot.ssh]
+    skelmaps_srcdest: [{'srcskel': '_gnupg/*', 'destskel': 'dot.gnupg/'},
+      {'srcskel': '_pki/*', 'destskel': 'dot.pki/'},
+      {'srcskel': '_ssh/*', 'destskel': 'dot.ssh/'},
+      {'srcskel': '_gitconfig', 'destskel': 'dot.gitconfig'},
+      {'srcskel': '_hgrc', 'destskel': 'dot.hgrc'}]
+    sudoers_file: /usr/local/etc/sudoers
+    sudoers_group: wheel
+    skeldir_ssh: /usr/share/skel/dot.ssh
+    skel_shellrc: /usr/share/skel/dot.cshrc
+    etcdir_cups: /usr/local/etc/cups
+    cupsdir_ppd: /usr/local/share/cups/model
+  Void:
+    services_enabled: [ntpd, nftables, udevd, dbus, avahi-daemon, rpcbind,
+      cupsd]
+    services_disabled: [ipset, ip6tables, iptables, clamd]
+    sudoers_group: wheel
+    cupsdir_ppd: /usr/share/cups/model
+{% endload %}
+
+{#{% set varsdict = salt['grains.filter_by'](defaultdict, base='default',
+  merge=pillar.get(tpldot ~ ':lookup', pillar.get(tpldot))) %}#}
+{% set varsdict = salt['grains.filter_by'](defaultdict, base='default',
+  merge=salt['pillar.get'](tpldot ~ ':lookup', salt['pillar.get'](tpldot))) %}

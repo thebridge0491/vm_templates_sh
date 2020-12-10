@@ -2,3 +2,10 @@
 # Non-default OS based (using family, distribution, ...) vars file
 
 pkgupgd_params: {"update_cache": yes, "upgrade": "dist", "autoclean": yes}
+
+idsuffix_cmd: cat /var/lib/dbus/machine-id | cut -b29-32
+services_enabled: [ntp, ufw, udev, eudev, dbus, avahi-daemon, nfs-common, cups, cups-browsed]
+services_disabled: [ipset, ip6tables, iptables, clamav-freshclam]
+
+sudoers_group: sudo
+cupsdir_ppd: /usr/share/ppd/cups-pdf

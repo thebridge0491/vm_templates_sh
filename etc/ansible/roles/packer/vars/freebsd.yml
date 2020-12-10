@@ -2,3 +2,23 @@
 # Non-default OS based (using family, distribution, ...) vars file
 
 #pkgupgd_params: {"state": 'latest'}
+
+idsuffix_cmd: sysctl -n kern.hostuuid | cut -b33-36
+services_enabled: [pf, pflog, devd, dbus, avahi-daemon, nfsclient, cupsd]
+services_disabled: [clamav-freshclam, clamav-clamd, lpd]
+
+hostname_chgfiles: [/etc/hosts, /etc/rc.conf]
+firewall_chgfiles: [/etc/pf/outallow_in_allow.rules]
+skeldir_par: /usr/share/skel
+skel_dirs: [/usr/share/skel/dot.gnupg, /usr/share/skel/dot.pki, /usr/share/skel/dot.ssh]
+skelmaps_srcdest: [{'srcskel': '_gnupg/*', 'destskel': 'dot.gnupg/'},
+  {'srcskel': '_pki/*', 'destskel': 'dot.pki/'},
+  {'srcskel': '_ssh/*', 'destskel': 'dot.ssh/'},
+  {'srcskel': '_gitconfig', 'destskel': 'dot.gitconfig'},
+  {'srcskel': '_hgrc', 'destskel': 'dot.hgrc'}]
+sudoers_file: /usr/local/etc/sudoers
+sudoers_group: wheel
+skeldir_ssh: /usr/share/skel/dot.ssh
+skel_shellrc: /usr/share/skel/dot.cshrc
+etcdir_cups: /usr/local/etc/cups
+cupsdir_ppd: /usr/local/share/cups/model

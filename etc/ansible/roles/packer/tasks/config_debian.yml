@@ -1,0 +1,54 @@
+---
+
+- shell: |
+    apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
+      tee /etc/apt/apt.conf.d/999norecommends
+  ignore_errors: true
+
+- lineinfile:
+    path: /etc/bash.bashrc
+    state: present
+    regexp: '^export JAVA_HOME.*'
+    line: 'export JAVA_HOME={{distro_pkgs.default_java_home}}'
+  ignore_errors: true
+
+- file:
+    path: '{{distro_pkgs.default_java_home}}'
+    state: directory
+
+- lineinfile:
+    path: '{{distro_pkgs.default_java_home}}/release'
+    state: present
+    regexp: '^JAVA_VERSION.*'
+    line: 'JAVA_VERSION={{distro_pkgs.default_java_version}}'
+  ignore_errors: true
+
+# #NOTE, nftables lacking sysvinit support
+- lineinfile:
+    path: /etc/network/if-pre-up.d/nftables
+    create: yes
+    mode: '+x'
+    regexp: '{{item.rexp}}'
+    line: '{{item.line}}'
+  ignore_errors: true
+  loop: [{rexp: '^#!/bin/sh.*', line: '#!/bin/sh'}
+    , {rexp: '.*/sbin/nft.*', line: '/sbin/nft -f /etc/nftables.conf'}
+    ]
+
+- name: "Config misc services(firewall)"
+  shell: |
+    #ntpd -u ntp:ntp ; ntpq -p ; sleep 3
+    ##cp /usr/share/doc/nftables/examples/sysvinit/nftables.init /etc/init.d/nftables ; chmod +x /etc/init.d/nftables
+    ##ufw disable
+    #sh /root/init/common/linux/firewall/ufw/config_ufw.sh cmds_ufw allow
+    sh /root/init/common/linux/firewall/nftables/config_nftables.sh config_nftables allow
+    ##ufw allow in svc MDNS
+  ignore_errors: true
+
+- lineinfile:
+    path: /etc/sudoers
+    state: present
+    insertafter: 'Defaults.*env_reset.*'
+    regexp: 'Defaults.*secure_path=.*'
+    line: 'Defaults    secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
+  ignore_errors: true

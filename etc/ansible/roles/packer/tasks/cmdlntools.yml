@@ -1,0 +1,245 @@
+---
+
+- block:
+  - name: "Cmdline-tools packages (variant: {{variant}})"
+    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo $pkgs_cmdln_tools
+    #ignore_errors: true
+    debug: var=distro_pkgs.pkgs_cmdln_tools
+
+  - package:
+      use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
+      name: '{{distro_pkgs.pkgs_cmdln_tools.split(" ")}}'
+      state: present
+    when: not variant in ['pclinuxos', 'mageia']
+  - package:
+      use: '{{pkg_mgr}}'
+      name: '{{item}}'
+      state: present
+    loop: '{{distro_pkgs.pkgs_cmdln_tools.split(" ")}}'
+    when: variant in ['pclinuxos', 'mageia']
+
+#- shell: hostname | sed -n 's|\(.*box.\)0000|\1|p'
+#  ignore_errors: true
+#  register: sed_result
+- shell: '{{idsuffix_cmd}}'
+  ignore_errors: true
+  register: idsuffix_result
+
+- block:
+  - name: "Fix hostname regexp box.0000"
+    replace:
+      path: "{{item}}"
+      regexp: '{{hostname_0000_if}}0000'
+      replace: '{{hostname_0000_if}}{{hostname_last4}}'
+    ignore_errors: true
+    loop: '{{hostname_chgfiles}}'
+
+  - hostname: name={{hostname_0000_if}}{{hostname_last4}}
+    ignore_errors: true
+  - shell: hostname `cat /etc/hostname`
+    ignore_errors: true
+  when: ansible_facts.get("hostname") is match(".*box.0000")
+  vars:
+    #hostname_0000_if: sed_result.stdout
+    hostname_0000_if: '{{ansible_facts.get("hostname")|regex_search("(.*box.)")}}'
+    hostname_last4: '{{idsuffix_result.stdout}}'
+
+- include_tasks: '{{cfgfile}}'
+  with_first_found:
+    - files:
+      - 'config_{{variant}}.yml'
+      skip: True
+  loop_control: {"loop_var": "cfgfile"}
+
+- block:
+  - name: "Enable service(s)"
+    service: name={{item}} enabled=yes
+    ignore_errors: true
+    loop: '{{services_enabled}}'
+
+  - name: "Disable service(s)"
+    service: name={{item}} enabled=no
+    ignore_errors: true
+    loop: '{{services_disabled}}'
+
+  - replace:
+      path: /etc/nsswitch.conf
+      regexp: 'files dns'
+      replace: 'files mdns_minimal [NOTFOUND=return] dns'
+    ignore_errors: true
+
+  - replace:
+      path: '{{item}}'
+      regexp: 'domain'
+      replace: 'domain, mdns'
+    ignore_errors: true
+    loop: '{{firewall_chgfiles}}'
+
+#  - name: Check clamav
+#    shell: |
+#      if command -v wget > /dev/null ; then
+#    	  (cd /tmp ; wget --no-check-certificate https://secure.eicar.org/eicar.com.txt)
+#	    elif command -v curl > /dev/null ; then
+#    	  (cd /tmp ; curl --insecure --location https://secure.eicar.org/eicar.com.txt)
+#	    elif command -v aria2c > /dev/null ; then
+#    	  (cd /tmp ; aria2c --check-certificate=false -d . https://secure.eicar.org/eicar.com.txt)
+#	    elif command -v fetch > /dev/null ; then
+#    	  (cd /tmp ; fetch --retry --mirror --no-verify-peer https://secure.eicar.org/eicar.com.txt)
+#	    elif command -v ftp > /dev/null ; then
+#    	  (cd /tmp ; ftp -S dont https://secure.eicar.org/eicar.com.txt || ftp https://secure.eicar.org/eicar.com.txt)
+#	    else
+#    	  echo "Cannot download clamav eicar.com.txt" ;
+#    	  exit 1 ;
+#	    fi
+#      freshclam --verbose ; freshclam --list-mirrors
+#      clamscan --verbose /tmp/eicar.com.txt
+#      clamscan --recursive /tmp ; rm /tmp/eicar.com.txt
+#    ignore_errors: true
+
+  - name: "Setup skeleton paths"
+    file:
+      path: '{{item}}'
+      state: directory
+    loop: '{{skel_dirs}}'
+
+  - shell: "cp -R /root/init/common/skel/{{item.srcskel}} {{skeldir_par}}/{{item.destskel}}"
+    ignore_errors: true
+    loop: '{{skelmaps_srcdest}}'
+
+  - lineinfile:
+      path: '{{sudoers_file}}'
+      state: present
+      regexp: '{{item.rexp}}'
+      line: '{{item.line}}'
+    ignore_errors: true
+    loop: [{rexp: '^.*%{{sudoers_group}}.*ALL.*NOPASSWD.*', line: '%{{sudoers_group}} ALL=(ALL) NOPASSWD: ALL'},
+      {rexp: '^[^#].*requiretty', line: '# Defaults requiretty'}
+      ]
+
+  - lineinfile:
+      path: /etc/ssh/sshd_config
+      state: present
+      regexp: '{{item.rexp}}'
+      line: '{{item.line}}'
+    ignore_errors: true
+    loop: [{rexp: '^.*PermitRootLogin.*', line: 'PermitRootLogin no'},
+      {rexp: '^.*UseDNS.*', line: 'UseDNS no'},
+      {rexp: '^.*GSSAPIAuthentication.*', line: 'GSSAPIAuthentication no'}
+      ]
+
+  - stat: path='{{skeldir_ssh}}/publish_krls/sshca-id_rsa.pub'
+    ignore_errors: true
+    register: sshca_pubkey_st
+
+  - block:
+    - shell: cat {{sshca_pubkey_st.stat.path}}
+      ignore_errors: true
+      register: sshca_pubkey
+
+    - lineinfile:
+        path: '{{skeldir_ssh}}/known_hosts'
+        state: present
+        regexp: '{{item.rexp}}'
+        line: '{{item.linepfx}} {{sshca_pubkey.stdout}}'
+      ignore_errors: true
+      loop: [{rexp: '^@cert-authority 192.168.*', linepfx: '@cert-authority 192.168.0.0/16'}
+        #, {rexp: '^@cert-authority 172.16.*', linepfx: '@cert-authority 172.16.0.0/12'}
+        #, {rexp: '^@cert-authority 10.0.*', linepfx: '@cert-authority 10.0.0.0/8'}
+        #, {rexp: '^@cert-authority fd00.*', linepfx: '@cert-authority fd00::/8'}
+        ]
+
+    - shell: cp {{skeldir_ssh}}/publish_krls/krl.krl {{sshca_pubkey_st.stat.path}} /etc/ssh/
+      ignore_errors: true
+    when: sshca_pubkey_st.stat.exists
+
+  - blockinfile:
+      path: /etc/ssh/sshd_config
+      state: present
+      marker: '#-- {mark} managed zone --'
+      marker_begin: 'start'
+      marker_end: 'end'
+      block: |
+        HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+        PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+
+        HostKey /etc/ssh/ssh_host_ed25519_key
+        HostKey /etc/ssh/ssh_host_rsa_key
+
+        TrustedUserCAKeys /etc/ssh/sshca-id_rsa.pub
+        RevokedKeys /etc/ssh/krl.krl
+        #HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
+        #HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+    ignore_errors: true
+
+- blockinfile:
+    path: '{{skel_shellrc}}'
+    state: present
+    marker: '#-- {mark} managed zone --'
+    marker_begin: 'start'
+    marker_end: 'end'
+    block: |
+      eval `keychain --agents gpg,ssh --eval`
+      unsetenv SSH_AGENT_PID
+      setenv GPG_TTY `tty`
+      gpg-connect-agent updatestartuptty /bye > /dev/null
+      setenv SSH_AUTH_SOCK `gpgconf --list-dirs agent-ssh-socket`
+  ignore_errors: true
+  #when: ansible_facts.get("user_shell") is search("csh")
+  when: ansible_facts.get("env")["SHELL"] is search("csh")
+
+- blockinfile:
+    path: '{{skel_shellrc}}'
+    state: present
+    marker: '#-- {mark} managed zone --'
+    marker_begin: 'start'
+    marker_end: 'end'
+    block: |
+      eval `keychain --agents gpg,ssh --eval`
+      unset SSH_AGENT_PID
+      export GPG_TTY=`tty`
+      gpg-connect-agent updatestartuptty /bye > /dev/null
+      export SSH_AUTH_SOCK=`gpgconf --list-dirs agent-ssh-socket`
+  ignore_errors: true
+  when: ansible_facts.get("env")["SHELL"] is not search("csh")
+
+- block:
+  - lineinfile:
+      path: /etc/fstab
+      state: present
+      regexp: '^.*/mnt/Data0.*'
+      line: '{{sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto  0  0'
+    when: variant in ['freebsd', 'netbsd', 'openbsd']
+
+  - lineinfile:
+      path: /etc/fstab
+      state: present
+      regexp: '^.*/mnt/Data0.*'
+      line: '{{sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0'
+    when: not variant in ['freebsd', 'netbsd', 'openbsd']
+
+  - file:
+      path: /media/nfs_Data0
+      state: directory
+
+- block:
+#  - lineinfile:
+#      path: '{{etcdir_cups}}/cups-pdf.conf'
+#      state: present
+#      regexp: '^Out .*'
+#      line: 'Out ${HOME}/Documents/PDF'
+#    ignore_errors: true
+
+  - shell: |
+      lpadmin -E -U root -p CUPS_PDF -v "cups-pdf:/" -i {{cupsdir_ppd}}/CUPS-PDF_opt.ppd
+      lpadmin -E -U root -d CUPS_PDF
+
+      ## Configure printer using CUPS web interface
+      # w3m http://localhost:631
+
+      ##lpadmin -E -U root -p {{printname}} -D "{{printname}}" -L localhost -v "ipp://{{sharednode}}/printers/{{printname}}"
+      ##lpadmin -E -U root -d {{printname}}
+      #lpadmin -E -U root -p {{printname}} -v "ipp://{{sharednode}}/printers/{{printname}}"
+      #lpadmin -E -U root -d {{printname}}
+
+      lpstat -t
+    ignore_errors: true

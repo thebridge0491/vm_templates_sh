@@ -54,3 +54,7 @@
   - block:
     - include_tasks: upgradepkgs.yml
     tags: upgradepkgs
+
+  - block:
+    - include_tasks: cmdlntools.yml
+    tags: never, cmdlntools
