@@ -65,6 +65,31 @@
     services_disabled: [ipset, ip6tables, iptables, clamd]
     sudoers_group: wheel
     cupsdir_ppd: /usr/share/cups/model
+  Artix:
+    services_enabled: [ntpd, nftables, udev, dbus, avahi-daemon,
+      nfsclient, cupsd, org.cups.cupsd, cups-browsed]
+    services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
+    sudoers_group: wheel
+    cupsdir_ppd: /usr/share/cups/model
+  Archlinux:
+    services_enabled: [ntpd, nftables, udev, dbus, avahi-daemon,
+      nfsclient, cupsd, org.cups.cupsd, cups-browsed]
+    services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
+    sudoers_group: wheel
+    cupsdir_ppd: /usr/share/cups/model
+  Alpine:
+    services_enabled: [openntpd, nftables, udev, dbus, avahi-daemon,
+      nfsclient, cupsd]
+    services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
+    sudoers_group: wheel
+    cupsdir_ppd: /usr/share/cups/model
+  Suse:
+    hostname_chgfiles: [/etc/hostname, /etc/hosts, /etc/sysconfig/network]
+    firewall_chgfiles: []
+    services_enabled: [ntpd, firewalld, dbus, avahi-daemon, cups, cups-browsed]
+    services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
+    sudoers_group: wheel
+    cupsdir_ppd: /usr/share/cups/model
 {% endload %}
 
 {#{% set varsdict = salt['grains.filter_by'](defaultdict, base='default',

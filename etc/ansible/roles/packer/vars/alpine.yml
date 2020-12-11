@@ -2,3 +2,10 @@
 # Non-default OS based (using family, distribution, ...) vars file
 
 #pkgupgd_params: {"update_cache": yes, "upgrade": yes}
+
+idsuffix_cmd: cat /var/lib/dbus/machine-id | cut -b29-32
+services_enabled: [openntpd, nftables, udev, dbus, avahi-daemon, nfsclient, cupsd]
+services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
+
+sudoers_group: wheel
+cupsdir_ppd: /usr/share/cups/model
