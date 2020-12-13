@@ -2,3 +2,16 @@
 # Non-default OS based (using family, distribution, ...) vars file
 
 pkgupgd_params: {"update_cache": yes, "upgrade": yes, "full_upgrade": yes, "clean": yes}
+
+idsuffix_cmd: /sbin/sysctl -n machdep.dmi.system-uuid | cut -b33-36
+services_enabled: [pf, pflogd, dbus, avahidaemon, nfsd, rpcbind, mountd,
+  cupsd]
+services_disabled: [freshclamd, clamd, lpd]
+
+hostname_chgfiles: [/etc/hosts, /etc/rc.conf]
+firewall_chgfiles: [/etc/pf/outallow_in_allow.rules]
+sudoers_file: /usr/pkg/etc/sudoers
+sudoers_group: wheel
+skel_shellrc: /etc/skel/.cshrc
+etcdir_cups: /usr/pkg/etc/cups
+cupsdir_ppd: /usr/pkg/share/cups/model

@@ -2,3 +2,14 @@
 # Non-default OS based (using family, distribution, ...) vars file
 
 pkgupgd_params: {"state": 'latest', "name": "*"}
+
+idsuffix_cmd: sysctl -n hw.uuid | cut -b33-36
+services_enabled: [pf, pflogd, messagebus, avahi_daemon, nfsd, rpcbind,
+  mountd, cupsd, cups_browsed]
+services_disabled: [freshclam, clamd, lpd]
+
+hostname_chgfiles: [/etc/hosts, /etc/myname]
+firewall_chgfiles: [/etc/pf/outallow_in_allow.rules]
+sudoers_group: wheel
+skel_shellrc: /etc/skel/.cshrc
+cupsdir_ppd: /usr/local/share/cups/model

@@ -90,6 +90,60 @@
     services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
     sudoers_group: wheel
     cupsdir_ppd: /usr/share/cups/model
+  RedHat:
+    hostname_chgfiles: [/etc/hostname, /etc/hosts, /etc/sysconfig/network]
+    firewall_chgfiles: []
+    services_enabled: [chronyd, firewalld, systemd-udevd, dbus, avahi-daemon,
+      nfs-utils, cups, cups-browsed]
+    services_disabled: [ipset, ip6tables, iptables, clamav-freshclam, clamd@]
+    sudoers_group: wheel
+    cupsdir_ppd: /usr/share/cups/model
+  'CentOS Stream':
+    hostname_chgfiles: [/etc/hostname, /etc/hosts, /etc/sysconfig/network]
+    firewall_chgfiles: []
+    services_enabled: [chronyd, firewalld, systemd-udevd, dbus, avahi-daemon,
+      nfs-utils, cups, cups-browsed]
+    services_disabled: [ipset, ip6tables, iptables, clamav-freshclam, clamd@]
+    sudoers_group: wheel
+    cupsdir_ppd: /usr/share/cups/model
+  PCLinuxOS:
+    hostname_chgfiles: [/etc/hostname, /etc/hosts, /etc/sysconfig/network]
+    firewall_chgfiles: []
+    services_enabled: [ntpd, shorewall, shorewall6, messagebus, avahi-daemon,
+      nfs-common, cups, cups-browsed]
+    services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
+    sudoers_group: wheel
+    cupsdir_ppd: /usr/share/cups/model
+  Mageia:
+    hostname_chgfiles: [/etc/hostname, /etc/hosts, /etc/sysconfig/network]
+    firewall_chgfiles: []
+    services_enabled: [ntpd, shorewall, shorewall6, dbus, avahi-daemon,
+      nfs-utils, cups, cups-browsed]
+    services_disabled: [ipset, ip6tables, iptables, clamav-freshclam,
+      clamav-daemon]
+    sudoers_group: wheel
+    cupsdir_ppd: /usr/share/cups/model
+  NetBSD:
+    hostname_last4: {{salt['sysctl.get']('machdep.dmi.system-uuid')[-4:]}}
+    hostname_chgfiles: [/etc/hosts, /etc/rc.conf]
+    firewall_chgfiles: [/etc/pf/outallow_in_allow.rules]
+    services_enabled: [pf, pflogd, dbus, avahidaemon, nfsd, rpcbind, mountd,
+      cupsd]
+    services_disabled: [freshclamd, clamd, lpd]
+    sudoers_file: /usr/pkg/etc/sudoers
+    sudoers_group: wheel
+    skel_shellrc: /etc/skel/.cshrc
+    etcdir_cups: /usr/pkg/etc/cups
+    cupsdir_ppd: /usr/pkg/share/cups/model
+  OpenBSD:
+    hostname_last4: {{salt['sysctl.get']('hw.uuid')[-4:]}}
+    hostname_chgfiles: [/etc/hosts, /etc/myname]
+    firewall_chgfiles: [/etc/pf/outallow_in_allow.rules]
+    services_enabled: [pf, pflogd, messagebus, avahi_daemon, nfsd, rpcbind,
+      mountd, cupsd, cups_browsed]
+    services_disabled: [freshclam, clamd, lpd]
+    sudoers_group: wheel
+    skel_shellrc: /etc/skel/.cshrc
 {% endload %}
 
 {#{% set varsdict = salt['grains.filter_by'](defaultdict, base='default',

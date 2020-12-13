@@ -3,3 +3,12 @@
 
 pkg_mgr: "apt_rpm"
 #pkgupgd_params: {"update_cache": yes, "use": "{{pkg_mgr}}"}
+
+idsuffix_cmd: cat /var/lib/dbus/machine-id | cut -b29-32
+services_enabled: [ntpd, shorewall, shorewall6, messagebus, avahi-daemon, nfs-common, cups, cups-browsed]
+services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
+
+hostname_chgfiles: [/etc/hostname, /etc/hosts, /etc/sysconfig/network]
+firewall_chgfiles: []
+sudoers_group: wheel
+cupsdir_ppd: /usr/share/cups/model

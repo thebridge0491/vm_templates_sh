@@ -1,0 +1,65 @@
+---
+
+- name: Fetch missing distribution sets (xbase)
+  shell: |
+    arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
+    cd /tmp
+    for setX in xbase ; do
+      ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/${setX}.tar.xz ;
+      tar -C / -xpJf ${setX}.tar.xz ;
+    done
+
+- shell: "cp -R /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}"
+  ignore_errors: true
+  loop: [ntpd, dbus, freshclamd, clamd, avahidaemon, cupsd]
+
+- file:
+    path: /var/run/dbus
+    state: directory
+
+- lineinfile:
+    path: /etc/rc.conf
+    state: present
+    regexp: '^{{item}}=.*'
+    line: '{{item}}=YES'
+  ignore_errors: true
+  loop: [ntpd, pf, pflogd, dbus, avahidaemon, rpcbind, nfsd, mountd, cupsd, lpd]
+
+- lineinfile:
+    path: /etc/csh.cshrc
+    state: present
+    regexp: '^export JAVA_HOME.*'
+    line: 'export JAVA_HOME={{distro_pkgs.default_java_home}}'
+  ignore_errors: true
+
+- lineinfile:
+    path: /etc/fstab
+    state: present
+    regexp: '^fdesc.*'
+    line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
+  ignore_errors: true
+
+- name: "Config misc services(ntp, firewall)"
+  shell: |
+    #/usr/sbin/ntpd -u ntp:ntp ; /usr/sbin/ntpq -p
+    /usr/sbin/ntpdate -v -u -b us.pool.ntp.org
+
+    /sbin/pfctl -d
+    env sed_inplace="sed -i" sh /root/init/common/bsd/firewall/pf/pfconf.sh config_pf allow > /etc/pf.conf.new
+    if [ ! -e /etc/pf.conf ] ; then cp /etc/pf.conf.new /etc/pf.conf ; fi
+    sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outallow_in_allow.rules
+    sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outdeny_out_allow.rules
+    /sbin/pfctl -vf /etc/pf.conf ; /sbin/pfctl -s info ; /sbin/pfctl -s rules -a '*'
+
+    #cd /usr/bin
+    #for file1 in lp lpq lpr lprm ; do
+    #  if [ -e $file1 ] ; then
+    #    mv $file1 $file1.old ;
+    #  fi ;
+    #  ln -s /usr/local/bin/$file1 $file1 ;
+    #done
+  ignore_errors: true
+
+#- user: name={{item}} groups=cups append=yes
+#  ignore_errors: true
+#  loop: [root]
