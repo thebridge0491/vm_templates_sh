@@ -9,3 +9,5 @@ services_disabled: [ipset, ip6tables, iptables, clamav-freshclam]
 
 sudoers_group: sudo
 cupsdir_ppd: /usr/share/ppd/cups-pdf
+
+uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]

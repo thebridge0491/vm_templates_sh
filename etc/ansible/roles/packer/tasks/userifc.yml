@@ -1,0 +1,47 @@
+---
+
+- block:
+  - name: "User interface packages (variant: {{variant}})"
+    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo $pkgs_displaysvr_xorg
+    #ignore_errors: true
+    debug: msg={{(distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}
+
+  - package:
+      use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
+      name: '{{(distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}'
+      state: present
+    when: not variant in ['redhat', 'pclinuxos', 'mageia']
+  - shell: dnf -y install {{distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")}}
+    when: variant in ['redhat']
+  - package:
+      use: '{{pkg_mgr}}'
+      name: '{{item}}'
+      state: present
+    loop: '{{(distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}'
+    when: variant in ['pclinuxos', 'mageia']
+
+- include_tasks: '{{uicfgfile}}'
+  with_first_found:
+    - files:
+      - 'uiconfig_{{variant}}.yml'
+      skip: True
+  loop_control: {"loop_var": "uicfgfile"}
+
+- lineinfile:
+    path: '{{xdguserdirs_file}}'
+    state: present
+    create: yes
+    regexp: '^BIN=.*'
+    line: 'BIN=bin'
+  ignore_errors: true
+
+- name: Update XDG user dir config
+  shell: |
+    export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
+    xdg-user-dirs-update ; chmod 1777 /tmp
+  ignore_errors: true
+
+- name: "Enable user interface related service(s) (desktop: {{desktop}})"
+  service: name={{item}} enabled=yes
+  ignore_errors: true
+  loop: '{{uiservices_enabled}}'

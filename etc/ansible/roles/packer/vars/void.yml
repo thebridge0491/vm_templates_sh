@@ -8,3 +8,5 @@ pkgupgd_params: {"update_cache": yes, "upgrade": yes, "use": "{{pkg_mgr}}"}
 idsuffix_cmd: cat /var/lib/dbus/machine-id | cut -b29-32
 services_enabled: [ntpd, nftables, udevd, dbus, avahi-daemon, rpcbind, cupsd]
 services_disabled: [ipset, ip6tables, iptables, clamd]
+
+uiservices_enabled: [dbus, polkitd, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]

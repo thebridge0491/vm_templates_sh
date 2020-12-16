@@ -22,3 +22,6 @@ skeldir_ssh: /usr/share/skel/dot.ssh
 skel_shellrc: /usr/share/skel/dot.cshrc
 etcdir_cups: /usr/local/etc/cups
 cupsdir_ppd: /usr/local/share/cups/model
+
+xdguserdirs_file: /usr/local/etc/xdg/user-dirs.defaults
+uiservices_enabled: [dbus, hald, moused, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]

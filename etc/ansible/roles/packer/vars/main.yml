@@ -22,3 +22,6 @@ sharednode: "{{lookup('env', 'SHARED_NODE') or 'localhost.local'}}"
 printname: "{{lookup('env', 'PRINT_NAME') or 'printer1'}}"
 etcdir_cups: /etc/cups
 cupsdir_ppd: /usr/share/cups/model
+
+desktop: xfce
+xdguserdirs_file: /etc/xdg/user-dirs.defaults

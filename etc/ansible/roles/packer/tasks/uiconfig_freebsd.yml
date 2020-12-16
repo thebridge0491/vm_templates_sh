@@ -1,0 +1,20 @@
+---
+
+- lineinfile:
+    path: /boot/loader.conf
+    state: present
+    regexp: '{{item.rexp}}'
+    line: '{{item.line}}'
+  ignore_errors: true
+  loop: [{rexp: '^kern.vty=.*', line: 'kern.vty=vt'},
+    {rexp: '^hw.psm.synaptics_support=.*', line: 'hw.psm.synaptics_support="1"'}]
+
+- lineinfile:
+    path: /etc/profile.conf
+    state: present
+    create: yes
+    regexp: '{{item.rexp}}'
+    line: '{{item.line}}'
+  ignore_errors: true
+  loop: [{rexp: '^LANG=.*', line: 'LANG=en_US.UTF-8 ; export LANG'},
+    {rexp: '^CHARSET=.*', line: 'CHARSET=UTF-8 ; export CHARSET'}]

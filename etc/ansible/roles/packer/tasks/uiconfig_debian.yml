@@ -1,0 +1,13 @@
+---
+
+- shell: |
+    apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
+      tee /etc/apt/apt.conf.d/999norecommends
+  ignore_errors: true
+
+- name: "Fix text mode only grub config"
+  shell: |
+    sed -i 's|nomodeset | |' /etc/default/grub
+    sed -i 's|text | |' /etc/default/grub
+    grub-mkconfig -o /boot/grub/grub.cfg
+  ignore_errors: true

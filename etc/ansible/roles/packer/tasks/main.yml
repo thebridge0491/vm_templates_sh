@@ -58,3 +58,7 @@
   - block:
     - include_tasks: cmdlntools.yml
     tags: never, cmdlntools
+
+  - block:
+    - include_tasks: userifc.yml
+    tags: never, userifc
