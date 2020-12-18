@@ -11,3 +11,5 @@ services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
 
 sudoers_group: wheel
 cupsdir_ppd: /usr/share/cups/model
+
+uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]

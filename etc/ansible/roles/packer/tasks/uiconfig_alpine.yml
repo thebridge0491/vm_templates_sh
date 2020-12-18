@@ -1,0 +1,9 @@
+---
+
+- name: "Fix text mode only grub config ; {{variant}} setup-xorg-base"
+  shell: |
+    setup-xorg-base
+    sed -i 's|nomodeset | |' /etc/default/grub
+    sed -i 's|text | |' /etc/default/grub
+    grub-mkconfig -o /boot/grub/grub.cfg
+  ignore_errors: true

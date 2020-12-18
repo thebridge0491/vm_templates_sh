@@ -1,0 +1,15 @@
+---
+
+- shell: |
+    sed -i 's|.*solver.onlyRequires.*=.*|solver.onlyRequires = true|' \
+      /etc/zypp/zypp.conf
+    sed -i 's|.*installRecommends.*=.*|installRecommends = no|' \
+      /etc/zypp/zypper.conf
+  ignore_errors: true
+
+- name: "Fix text mode only grub config"
+  shell: |
+    sed -i 's|nomodeset | |' /etc/default/grub
+    sed -i 's|text | |' /etc/default/grub
+    grub2-mkconfig -o /boot/grub2/grub.cfg
+  ignore_errors: true

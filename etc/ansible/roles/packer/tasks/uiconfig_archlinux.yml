@@ -1,0 +1,32 @@
+---
+
+- name: "Fix text mode only grub config"
+  shell: |
+    sed -i 's|nomodeset | |' /etc/default/grub
+    sed -i 's|text | |' /etc/default/grub
+    grub-mkconfig -o /boot/grub/grub.cfg
+  ignore_errors: true
+
+- block:
+  - package:
+      use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
+      name: '{{item}}-openrc'
+      state: present
+    loop: ['displaymanager']
+
+  - lineinfile:
+      path: /etc/conf.d/xdm
+      state: present
+      regexp: '^DISPLAYMANAGER=.*'
+      line: 'DISPLAYMANAGER="sddm"'
+    ignore_errors: true
+    when: desktop in ['lxqt']
+
+  - lineinfile:
+      path: /etc/conf.d/xdm
+      state: present
+      regexp: '^DISPLAYMANAGER=.*'
+      line: 'DISPLAYMANAGER="lightdm"'
+    ignore_errors: true
+    when: not desktop in ['lxqt']
+  when: ansible_facts.get('lsb', {}).get('id', None)|lower in ['artix']

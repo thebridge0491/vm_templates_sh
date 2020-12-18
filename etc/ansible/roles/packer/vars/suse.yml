@@ -11,3 +11,5 @@ hostname_chgfiles: [/etc/hosts, /etc/hostname, /etc/sysconfig/network]
 firewall_chgfiles: []
 sudoers_group: wheel
 cupsdir_ppd: /usr/share/cups/model
+
+uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]

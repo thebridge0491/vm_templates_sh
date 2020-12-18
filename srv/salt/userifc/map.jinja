@@ -16,6 +16,14 @@
     uiservices_enabled: [dbus, hald, moused, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
   Void:
     uiservices_enabled: [dbus, polkitd, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
+  Artix:
+    uiservices_enabled: [dbus, xdm]
+  Archlinux:
+    uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]
+  Alpine:
+    uiservices_enabled: [dbus, polkit, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
+  Suse:
+    uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]
 {% endload %}
 
 {#{% set varsdict = salt['grains.filter_by'](defaultdict, base='default',
