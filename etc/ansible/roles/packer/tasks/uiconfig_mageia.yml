@@ -1,0 +1,15 @@
+---
+
+- shell: |
+    dnf --setopt=install_weak_deps=False config-manager --save
+    dnf config-manager --dump | grep -we install_weak_deps
+  ignore_errors: true
+
+- name: "Fix text mode only grub config ; systemd set default graphical.target"
+  shell: |
+    systemctl set-default graphical.target
+
+    sed -i 's|nomodeset | |' /etc/default/grub
+    sed -i 's|text | |' /etc/default/grub
+    grub2-mkconfig -o /boot/grub2/grub.cfg
+  ignore_errors: true

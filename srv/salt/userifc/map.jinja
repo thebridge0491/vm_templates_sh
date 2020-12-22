@@ -24,6 +24,20 @@
     uiservices_enabled: [dbus, polkit, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
   Suse:
     uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]
+  RedHat:
+    uiservices_enabled: [dbus, display-manager]
+  'CentOS Stream':
+    uiservices_enabled: [dbus, display-manager]
+  PCLinuxOS:
+    uiservices_enabled: [messagebus, dm]
+  Mageia:
+    uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]
+  NetBSD:
+    #xdguserdirs_file: /etc/xdg/user-dirs.defaults
+    uiservices_enabled: [dbus, wsmoused, xdm]
+  OpenBSD:
+    #xdguserdirs_file: /etc/xdg/user-dirs.defaults
+    uiservices_enabled: [messagebus, xenodm]
 {% endload %}
 
 {#{% set varsdict = salt['grains.filter_by'](defaultdict, base='default',

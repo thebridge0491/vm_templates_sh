@@ -13,3 +13,6 @@ firewall_chgfiles: [/etc/pf/outallow_in_allow.rules]
 sudoers_group: wheel
 skel_shellrc: /etc/skel/.cshrc
 cupsdir_ppd: /usr/local/share/cups/model
+
+#xdguserdirs_file: /etc/xdg/user-dirs.defaults
+uiservices_enabled: [messagebus, xenodm]

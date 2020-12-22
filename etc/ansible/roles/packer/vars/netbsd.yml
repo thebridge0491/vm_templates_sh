@@ -15,3 +15,6 @@ sudoers_group: wheel
 skel_shellrc: /etc/skel/.cshrc
 etcdir_cups: /usr/pkg/etc/cups
 cupsdir_ppd: /usr/pkg/share/cups/model
+
+#xdguserdirs_file: /usr/pkg/etc/xdg/user-dirs.defaults
+uiservices_enabled: [dbus, wsmoused, xdm]

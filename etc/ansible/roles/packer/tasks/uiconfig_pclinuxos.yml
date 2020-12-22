@@ -1,0 +1,23 @@
+---
+
+- package:
+    use: '{{pkg_mgr}}'
+    name: '{{item}}'
+    state: present
+  loop: '{{(distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}'
+
+- name: "Fix text mode only grub config ; drakconf user interface"
+  shell: |
+    apt-get -y --fix-broken install
+    XFdrake --auto
+    #drakx11 ; sleep 5 ; drakdm ; sleep 5 ; drakboot ; sleep 5
+    mv /etc/X11/xorg.conf /etc/X11/xorg.conf.bak || true
+    #chkconfig --add dm ; chkconfig dm on
+
+    sed -i 's|nomodeset | |' /etc/default/grub
+    sed -i 's|text | |' /etc/default/grub
+    sed -i 's|noacpi | |' /etc/default/grub
+    sed -i 's|xdriver=vesa | |' /etc/default/grub
+    touch /etc/system-release
+    grub2-mkconfig -o /boot/grub2/grub.cfg
+  ignore_errors: true

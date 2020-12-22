@@ -1,0 +1,53 @@
+---
+
+- name: Fetch missing distribution sets (xbase*, xserv*, xfont*, xshare*) & sysmerge updates
+  shell: |
+    arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
+    setVer=$(echo $rel | tr '.' '\0')
+    cd /tmp
+    for setX in xbase xserv xfont xshare ; do
+      ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/${setX}${setVer}.tgz ;
+      tar -C / -xpzf ${setX}${setVer}.tgz ;
+    done
+    sysmerge
+
+- lineinfile:
+    path: /etc/rc.local
+    state: present
+    create: yes
+    regexp: '^export XDG_CONFIG_HOME=.*'
+    line: 'export XDG_CONFIG_HOME=/etc/xdg'
+  ignore_errors: true
+
+- lineinfile:
+    path: /etc/sysctl.conf
+    state: present
+    create: yes
+    regexp: '^machdep.allowaperture=.*'
+    line: 'machdep.allowaperture=2'
+  ignore_errors: true
+
+- lineinfile:
+    path: /root/.xinitrc
+    state: present
+    create: yes
+    regexp: '^ck-launch-session.*'
+    line: 'ck-launch-session dbus-launch --exit-with-session startlxqt'
+  ignore_errors: true
+  when: desktop in ['lxqt']
+
+- lineinfile:
+    path: /root/.xinitrc
+    state: present
+    create: yes
+    regexp: '^ck-launch-session.*'
+    line: 'ck-launch-session dbus-launch --exit-with-session startxfce4'
+  ignore_errors: true
+  when: desktop in ['xfce']
+
+- shell: |
+    ln -s /root/.xinitrc /root/.xsession
+    cp /root/.xinitrc /home/packer/.xinitrc
+    chown packer:$(id -gn packer) /home/packer/.xinitrc
+    (cd /home/packer ; ln -s /home/packer/.xinitrc .xsession)
+  ignore_errors: true

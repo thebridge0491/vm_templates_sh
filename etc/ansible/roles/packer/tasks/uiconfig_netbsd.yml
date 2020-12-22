@@ -1,0 +1,84 @@
+---
+
+- name: Fetch missing distribution sets (xbase, xserver, xfont, xetc)
+  shell: |
+    arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
+    cd /tmp
+    for setX in xbase xserver xfont xetc ; do
+      ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/${setX}.tar.xz ;
+      tar -C / -xpJf ${setX}.tar.xz ;
+    done
+
+- shell: "cp -R /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}"
+  ignore_errors: true
+  loop: [dbus, xdm]
+
+- file:
+    path: '/var/run/{{item}}'
+    state: directory
+  loop: [dbus, xdm]
+
+#- lineinfile:
+#    path: /etc/rc.conf
+#    state: present
+#    regexp: '^{{item}}=.*'
+#    line: '{{item}}=YES'
+#  ignore_errors: true
+#  loop: [dbus, wsmoused, xdm]
+
+- blockinfile:
+    path: /etc/X11/xorg.conf
+    state: present
+    create: yes
+    marker: '#-- {mark} managed zone --'
+    marker_begin: 'start'
+    marker_end: 'end'
+    block: |
+      Section "Device"
+        Identifier "Card0"
+        Driver "wsfb"
+      EndSection
+  ignore_errors: true
+
+- lineinfile:
+    path: /root/.xinitrc
+    state: present
+    regexp: '{{item.rexp}}'
+    line: '{{item.line}}'
+    create: yes
+  ignore_errors: true
+  loop: [{rexp: '^export XDG_DATA_DIRS=.*', line: 'export XDG_DATA_DIRS=/usr/pkg/share'},
+    {rexp: '^export XDG_CONFIG_DIRS=.*', line: 'export XDG_CONFIG_DIRS=/usr/pkg/etc/xdg'}]
+
+- lineinfile:
+    path: /root/.xinitrc
+    state: present
+    regexp: '^ck-launch-session.*'
+    line: 'ck-launch-session dbus-launch --exit-with-session startxfce4'
+  ignore_errors: true
+  when: desktop in ['xfce']
+
+- lineinfile:
+    path: /root/.xinitrc
+    state: present
+    regexp: '^ck-launch-session.*'
+    line: 'ck-launch-session dbus-launch --exit-with-session startlxqt'
+  ignore_errors: true
+  when: desktop in ['lxqt']
+
+- shell: |
+    /usr/sbin/groupadd -g 81 dbus || true
+    /usr/sbin/useradd -c 'System message bus' -u 81 -g dbus -d '/' -s /usr/bin/false dbus || true
+    mkdir -p /var/db/dbus /var/lib/xdm /usr/pkg/etc/xdm /usr/pkg/etc/xdg
+    cp -R /usr/pkg/share/examples/xdm /usr/pkg/etc/
+    cp -R /usr/pkg/share/examples/xfce4 /usr/pkg/etc/xdg/ || true
+    cp -R /usr/pkg/share/examples/lxqt /usr/pkg/etc/xdg/ || true
+
+    ln -s /root/.xinitrc /root/.xsession
+    cp /root/.xinitrc /home/packer/.xinitrc
+    chown packer:$(id -gn packer) /home/packer/.xinitrc
+    (cd /home/packer ; ln -s /home/packer/.xinitrc .xsession)
+
+    # set video resolution ? gop 6: 1024x768x32
+    sed -i 's|;boot|;gop 6;boot|g' /boot.cfg
+  ignore_errors: true
