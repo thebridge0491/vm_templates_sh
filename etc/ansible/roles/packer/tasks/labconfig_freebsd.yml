@@ -1,0 +1,15 @@
+---
+
+- lineinfile:
+    path: /etc/csh.cshrc
+    state: present
+    regexp: '^setenv JAVA_HOME.*'
+    line: 'setenv JAVA_HOME {{distro_pkgs.default_java_home}}'
+  ignore_errors: true
+
+- lineinfile:
+    path: /etc/fstab
+    state: present
+    regexp: '^fdesc'
+    line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
+  ignore_errors: true

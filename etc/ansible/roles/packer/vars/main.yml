@@ -25,3 +25,5 @@ cupsdir_ppd: /usr/share/cups/model
 
 desktop: xfce
 xdguserdirs_file: /etc/xdg/user-dirs.defaults
+
+langs: py c java

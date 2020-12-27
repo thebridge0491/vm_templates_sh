@@ -1,0 +1,19 @@
+---
+
+- lineinfile:
+    path: /etc/bash.bashrc
+    state: present
+    regexp: '^export JAVA_HOME.*'
+    line: 'export JAVA_HOME={{distro_pkgs.default_java_home}}'
+  ignore_errors: true
+
+- file:
+    path: '{{distro_pkgs.default_java_home}}'
+    state: directory
+
+- lineinfile:
+    path: '{{distro_pkgs.default_java_home}}/release'
+    state: present
+    regexp: '^JAVA_VERSION.*'
+    line: 'JAVA_VERSION={{distro_pkgs.default_java_version}}'
+  ignore_errors: true

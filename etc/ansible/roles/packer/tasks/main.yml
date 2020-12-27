@@ -62,3 +62,7 @@
   - block:
     - include_tasks: userifc.yml
     tags: never, userifc
+
+  - block:
+    - include_tasks: codelab.yml
+    tags: never, codelab

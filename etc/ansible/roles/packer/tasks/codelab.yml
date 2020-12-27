@@ -1,0 +1,28 @@
+---
+
+- block:
+  - name: "(lang: {{item}}) Coding lab packages (variant: {{variant}})"
+    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo $pkgs_lang_py
+    #ignore_errors: true
+    debug: msg={{distro_pkgs.get("pkgs_lang_"+item, "").split(" ")}}
+    loop: '{{langs.split(" ")}}'
+
+  - package:
+      use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
+      name: '{{distro_pkgs.get("pkgs_lang_"+item, "").split(" ")}}'
+      state: present
+    loop: '{{langs.split(" ")}}'
+    when: not variant in ['pclinuxos', 'mageia']
+  - package:
+      use: '{{pkg_mgr}}'
+      name: '{{distro_pkgs.get("pkgs_lang_"+item, "").split(" ")}}'
+      state: present
+    loop: '{{langs.split(" ")}}'
+    when: variant in ['pclinuxos', 'mageia']
+
+- include_tasks: '{{cfgfile}}'
+  with_first_found:
+    - files:
+      - 'labconfig_{{variant}}.yml'
+      skip: True
+  loop_control: {"loop_var": "cfgfile"}
