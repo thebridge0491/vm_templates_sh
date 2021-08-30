@@ -21,17 +21,19 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
-# [centos/8[-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
-# mirror: mirror.centos.org/centos
+# [rocky/8|almalinux/8|centos/8-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
+# (rocky) mirror: dl.rockylinux.org/pub/rocky
+# (almalinux) mirror: repo.almalinux.org/almalinux
+# (centos[-stream]) mirror: mirror.centos.org/centos
 export MIRROR=${MIRROR:-mirror.centos.org/centos}
-BASEARCH=${BASEARCH:-x86_64} ; RELEASE=${RELEASE:-8-stream}
+BASEARCH=${BASEARCH:-x86_64} ; RELEASE=${RELEASE:-8}
 if [ "7" = "${RELEASE}" ] ; then
   REPO_DIRECTORY="/${RELEASE}/os/x86_64" ;
 else
   REPO_DIRECTORY="/${RELEASE}/BaseOS/x86_64/os" ;
 fi
 
-export INIT_HOSTNAME=${1:-centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')-boxv0000}
+export INIT_HOSTNAME=${1:-centos-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
 export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
@@ -69,7 +71,7 @@ elif command -v yum-config-manager > /dev/null ; then
   mkdir -p /mnt/var/lib/rpm /mnt/var/cache/dnf ;
   rpm -v --root /mnt --initdb ;
   # [wget -O file url | curl -L -o file url]
-  #wget -O /tmp/repos.rpm http://${MIRROR}${REPO_DIRECTORY}/Packages/centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')-repos-8-2.el8.noarch.rpm ;
+  #wget -O /tmp/repos.rpm http://${MIRROR}${REPO_DIRECTORY}/Packages/centos-stream-repos-8-2.el8.noarch.rpm ;
   #rpm -v -qip /tmp/repos.rpm ; sleep 5 ;
   #rpm -v --root /mnt --nodeps -i /tmp/repos.rpm ;
   yum-config-manager --releasever=${RELEASE} --nogpgcheck -y --installroot=/mnt --add-repo http://${MIRROR}${REPO_DIRECTORY} ;
@@ -134,7 +136,7 @@ dnf repolist ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
 ${DNFCMD} -y install @core linux-firmware microcode_ctl sudo tar kbd openssl grub2-pc grub2-efi-x64 grub2 efibootmgr
-${DNFCMD} -y install network-scripts
+${DNFCMD} -y install network-scripts dhcp-client
 # Use EL release kernel packages (avoid dkms build errors)
 if [ "7" = "\${VERSION_MAJOR}" ] ; then
 dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${BASEARCH} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel
@@ -158,12 +160,7 @@ ${DNFCMD} -y install dracut-tools dracut-config-generic dracut-config-rescue
 # @^minimal @minimal-environment redhat-lsb-core dracut-tools dracut-config-generic dracut-config-rescue
 
 
-#os_ver=\$(rpm -q --qf "%{VERSION}" \$(rpm -q --whatprovides redhat-release) | sed 's|\.|_|g')
-os_ver=8_3
-if [ "7" = "\${VERSION_MAJOR}" ] ; then
-  os_ver=7_9 ;
-fi
-dnf --releasever=\${VERSION_MAJOR} -y install http://download.zfsonlinux.org/epel/zfs-release.el\$os_ver.noarch.rpm
+dnf --releasever=\${VERSION_MAJOR} -y install http://download.zfsonlinux.org/epel/zfs-release.el\${VERSION_ID/./_}.noarch.rpm
 dnf repolist ; sleep 5
 #dnf config-manager --set-disabled zfs
 dnf --releasever=\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular --enablerepo=zfs -y install zfs zfs-dracut ; sleep 3

@@ -43,9 +43,10 @@ pkg upgrade -y
 pkg install -y sudo
 
 pkg clean -y
-if command -v zpool-ng > /dev/null ; then
+if command -v zpool > /dev/null ; then
   ZPOOLNM=${ZPOOLNM:-fspool0} ;
-  zpool-ng trim ${ZPOOLNM} ; zpool-ng set autotrim=on ${ZPOOLNM} ;
+  #zpool-ng trim ${ZPOOLNM} ; zpool-ng set autotrim=on ${ZPOOLNM} ;
+  zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
 else
   GRP_NM=${GRP_NM:-bsd0} ;
   fsck_ffs -E -Z /dev/gpt/${GRP_NM}-fsRoot ;

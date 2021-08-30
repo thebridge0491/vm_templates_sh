@@ -70,7 +70,7 @@ cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirrorlist
 #rankmirrors -vn 10 /etc/pacman.d/mirrorlist-arch.bak | tee /etc/pacman.d/mirrorlist-arch
 
 sleep 5 ; cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.old
-cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirror-arch /mnt/etc/pacman.d/
+cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirror-arch /mnt/etc/pacman.d/
 for libname in multilib lib32 ; do
   MULTILIB_LINENO=$(grep -n "\[$libname\]" /mnt/etc/pacman.conf | cut -f1 -d:) ;
   if [ "" = "${MULTILIB_LINENO}" ] ; then continue ; fi ;
@@ -155,9 +155,9 @@ elif [ "artix" = "\${ID}" ] ; then
   pacman --noconfirm -Sy artix-keyring ;
 fi
 if [ "arch" = "\${ID}" ] ; then
-  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup device-mapper mdadm lvm2 dhcpcd openssh ;
+  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup device-mapper mdadm dhcpcd openssh ;
 elif [ "artix" = "\${ID}" ] ; then
-  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup-openrc device-mapper-openrc mdadm-openrc lvm2-openrc dhcpcd-openrc openssh-openrc ;
+  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup-openrc device-mapper-openrc mdadm-openrc dhcpcd-openrc openssh-openrc ;
 fi
 #pacman --noconfirm --needed -S xfce4
 

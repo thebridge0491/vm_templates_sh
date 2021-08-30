@@ -14,8 +14,8 @@
 ##  (client) tools:
 ##    [curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file
 
-# usage: sh vminstall_chroot.sh [oshost [GUEST]]
-#   (default) sh vminstall_chroot.sh [freebsd [freebsd-Release-zfs]]
+# usage: [env variant=oshost] sh vminstall_chroot.sh [oshost [GUEST]]
+#   (default) [env variant=freebsd] sh vminstall_chroot.sh [freebsd [freebsd-Release-zfs]]
 
 USE_VIRTINST=${USE_VIRTINST:-0} ; STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros}
@@ -110,11 +110,12 @@ archlinux() {
 
   #sudo su
   #(arch) mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5
-  #(arch) pacman-key --init ; pacman-key --populate archlinux
   #(arch) pacman -Sy archlinux-keyring
+  #(arch) pacman-key --init ; pacman-key --populate archlinux
   #(artix) mount -o remount,size=1G /run/artix/cowspace ; df -h ; sleep 5
+  #(artix) pacman -Sy artix-keyring
   #(artix) pacman-key --init ; pacman-key --populate artix
-  #(artix) pacman -Sy artix-keyring gnu-netcat parted dosfstools gptfdisk [lvm2]
+  #(artix) pacman -Sy gnu-netcat parted dosfstools gptfdisk [lvm2]
   #pacman -Sy
 
   #------------ if using ZFS ---------------
@@ -186,10 +187,10 @@ suse() {
 
 ## obsolete/non-existent CentOS [Stream] Live iso
 #redhat() {
-#  RELEASE=${RELEASE:-8-stream} ; variant=${variant:-redhat}
-#  GUEST=${1:-centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')-Release-lvm}
-#  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')/live -name 'CentOS-*-x86_64-Live*.iso' | tail -n1)}
-#  (cd ${ISOS_PARDIR}/centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')/live ; sha256sum --ignore-missing -c CHECKSUM)
+#  RELEASE=${RELEASE:-8} ; variant=${variant:-redhat}
+#  GUEST=${1:-centos-Release-lvm}
+#  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos/live -name 'CentOS-*-x86_64-Live*.iso' | tail -n1)}
+#  (cd ${ISOS_PARDIR}/centos/live ; sha256sum --ignore-missing -c CHECKSUM)
 #  sleep 5
 #
 #  ##!! login user/passwd: liveuser/-
@@ -364,7 +365,16 @@ sleep 30
   #  package(s): xbps-install.static (download xbps-static tarball)
 
 #arch linux variants(arch, artix):
-  #  package(s): pacman, ? libffi
+  #  package(s): libffi, curl, pacman
+  #  mkdir /etc/pacman.d ; mv /etc/pacman.conf /etc/pacman.conf.old
+  #(arch) cp init/archlinux/etc_pacman.conf-arch > /etc/pacman.conf
+  #(arch) curl -s "https://archlinux.org/mirrorlist/?country=${LOCALE_COUNTRY:-US}&use_mirror_status=on" | sed -e 's|^#Server|Server|' -e '/^#/d' | tee /etc/pacman.d/mirrorlist
+  #(arch) pacman -Sy archlinux-keyring [; pacman -U /var/cache/.../archlinux-keyring...]
+  #(arch) pacman-key --init ; pacman-key --populate archlinux
+  #(artix) curl -s "https://gitea.artixlinux.org/packagesP/pacman/raw/branch/master/trunk/pacman.conf" | tee /etc/pacman.conf
+  #(artix) curl -s "https://gitea.artixlinux.org/packagesA/artix-mirrorlist/raw/branch/master/trunk/mirrorlist" | tee /etc/pacman.d/mirrorlist
+  #(artix) pacman -Sy artix-keyring [; pacman -U /var/cache/.../artix-keyring...]
+  #(artix) pacman-key --init ; pacman-key --populate artix
 
 #alpine linux: (MIRROR: dl-cdn.alpinelinux.org/alpine)
   ## dnld: http://${MIRROR}/latest-stable/main/x86_64/apk-tools-static-*.apk
@@ -373,7 +383,9 @@ sleep 30
 #suse variants(opensuse): (MIRROR: download.opensuse.org)
   #  package(s): zypper, rpm, ? rinse
 
-#redhat variants(centos[-stream]):
+#redhat variants(rocky, almalinux, centos[-stream]):
+  # (rocky MIRROR: dl.rockylinux.org/pub/rocky)
+  # (almalinux MIRROR: repo.almalinux.org/almalinux)
   # (centos[-stream] MIRROR: mirror.centos.org/centos)
   #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm, ? rinse
 

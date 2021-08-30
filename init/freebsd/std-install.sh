@@ -178,6 +178,7 @@ sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
 FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
+	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/FreeBSD:13:amd64/quarterly"
 	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI}/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
@@ -203,10 +204,10 @@ EOFchroot
 efibootmgr -v ; sleep 3
 #read -p "Activate EFI BootOrder XXXX (or blank line to skip): " bootorder
 #if [ ! -z "$bootorder" ] ; then
-#  efibootmgr -a $bootorder ;
+#  efibootmgr -a -b $bootorder ;
 #fi
 for bootorder in $(efibootmgr | sed -n 's|.*Boot\([0-9][0-9]*\).*|\1|p') ; do
-  efibootmgr -a $bootorder ;
+  efibootmgr -a -b $bootorder ;
 done
 
 

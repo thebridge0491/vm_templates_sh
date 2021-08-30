@@ -152,11 +152,11 @@ sysrc sshd_enable="YES"
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
 #pkg install -y nano sudo xfce
 pkg install -y nano sudo
-pkg install -y openzfs
+#pkg install -y openzfs
 
 ## Differentiate names: /usr/local/sbin/({zpool,zfs} -> {zpool,zfs}-ng)
-ln -s /usr/local/sbin/zpool /usr/local/sbin/zpool-ng
-ln -s /usr/local/sbin/zfs /usr/local/sbin/zfs-ng
+#ln -s /usr/local/sbin/zpool /usr/local/sbin/zpool-ng
+#ln -s /usr/local/sbin/zfs /usr/local/sbin/zfs-ng
 
 ## FreeBSD 12.2-RELEASE KLD openzfs.ko - unsupported file type error
 #sysrc -f /boot/loader.conf openzfs_load="YES"
@@ -208,6 +208,7 @@ cat << EOF >> /usr/local/etc/pkg/repos/FreeBSD.conf
 FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
+	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/FreeBSD:13:amd64/quarterly"
 	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI}/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
@@ -219,7 +220,8 @@ EOF
 
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
 ASSUME_ALWAYS_YES=yes pkg clean -y
-zpool-ng trim ${ZPOOLNM} ; zpool-ng set autotrim=on ${ZPOOLNM}
+#zpool-ng trim ${ZPOOLNM} ; zpool-ng set autotrim=on ${ZPOOLNM}
+zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM}
 sync
 
 exit
@@ -232,10 +234,10 @@ EOFchroot
 efibootmgr -v ; sleep 3
 #read -p "Activate EFI BootOrder XXXX (or blank line to skip): " bootorder
 #if [ ! -z "$bootorder" ] ; then
-#  efibootmgr -a $bootorder ;
+#  efibootmgr -a -b $bootorder ;
 #fi
 for bootorder in $(efibootmgr | sed -n 's|.*Boot\([0-9][0-9]*\).*|\1|p') ; do
-  efibootmgr -a $bootorder ;
+  efibootmgr -a -b $bootorder ;
 done
 
 

@@ -129,15 +129,22 @@ suse() {
 }
 
 redhat() {
-  VOL_MGR=${VOL_MGR:-lvm} ; RELEASE=${RELEASE:-8-stream} ; variant=redhat
-  init_hostname=${init_hostname:-centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')-boxv0000}
-  # [centos/8[-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
-  repo_host=${repo_host:-mirror.centos.org/centos} ; repo_directory=${repo_directory:-/${RELEASE}/BaseOS/x86_64/os}
-  GUEST=${1:-centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|')-Release-${VOL_MGR}}
+  VOL_MGR=${VOL_MGR:-lvm} ; RELEASE=${RELEASE:-8} ; variant=redhat
+  init_hostname=${init_hostname:-centos-boxv0000}
+  #repo_host=${repo_host:-dl.rockylinux.org/pub/rocky}
+  #repo_host=${repo_host:-repo.almalinux.org/almalinux}
+  repo_host=${repo_host:-mirror.centos.org/centos}
+  # [rocky/8|almalinux/8|centos/8-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
+  repo_directory=${repo_directory:-/${RELEASE}/BaseOS/x86_64/os}
+  GUEST=${1:-centos-Release-${VOL_MGR}}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|') -name 'CentOS-*-x86_64*-boot.iso' | tail -n1)}
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/rocky -name 'Rocky-*-x86_64*-boot.iso' | tail -n1)}
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/almalinux -name 'AlmaLinux-*-x86_64*-boot.iso' | tail -n1)}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos -name 'CentOS-*-x86_64*-boot.iso' | tail -n1)}
   if [ ! "" = "$ISO_PATH" ] ; then
-    (cd ${ISOS_PARDIR}/centos$(echo ${RELEASE} | sed 's|[0-9]*\(.*\)|\1|') ; sha256sum --ignore-missing -c CHECKSUM) ;
+    #(cd ${ISOS_PARDIR}/rocky ; sha256sum --ignore-missing -c CHECKSUM) ;
+    #(cd ${ISOS_PARDIR}/almalinux ; sha256sum --ignore-missing -c CHECKSUM) ;
+    (cd ${ISOS_PARDIR}/centos ; sha256sum --ignore-missing -c CHECKSUM) ;
     sleep 5 ;
   fi
 

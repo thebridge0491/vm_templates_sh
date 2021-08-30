@@ -72,7 +72,7 @@ cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirrorlist
 #rankmirrors -vn 10 /etc/pacman.d/mirrorlist-arch.bak | tee /etc/pacman.d/mirrorlist-arch
 
 sleep 5 ; cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.old
-cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirror-arch /mnt/etc/pacman.d/
+cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirror-arch /mnt/etc/pacman.d/
 for libname in multilib lib32 ; do
   MULTILIB_LINENO=$(grep -n "\[$libname\]" /mnt/etc/pacman.conf | cut -f1 -d:) ;
   if [ "" = "${MULTILIB_LINENO}" ] ; then continue ; fi ;
