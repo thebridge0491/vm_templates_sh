@@ -10,7 +10,7 @@
 - block:
   - package:
       use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
-      name: '{{item}}-openrc'
+      name: '{{item}}-{{ansible_facts.get("service_mgr") or "openrc"}}'
       state: present
     loop: ['displaymanager']
 

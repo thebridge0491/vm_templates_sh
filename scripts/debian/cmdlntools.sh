@@ -9,6 +9,10 @@ svc_enable() {
     systemctl enable $svc ;
   elif command -v update-rc.d > /dev/null ; then
   	update-rc.d $svc defaults ;
+  elif command -v sv > /dev/null ; then
+    ln -s /etc/sv/$svc /var/service ;
+  elif command -v rc-update > /dev/null ; then
+    rc-update add $svc default ;
   fi
 }
 
@@ -56,6 +60,10 @@ for unit in ipset iptables ip6tables ; do
     systemctl stop $unit ; systemctl disable $unit ;
   elif command -v update-rc.d > /dev/null ; then
     service $unit stop ; update-rc.d $unit remove ;
+  elif command -v sv > /dev/null ; then
+    sv stop $unit ; rm /var/service/$unit ;
+  elif command -v rc-update > /dev/null ; then
+    rc-service $unit stop ; rc-update del $unit default ;
   fi ;
   if command -v systemctl > /dev/null ; then
     systemctl mask $unit ;

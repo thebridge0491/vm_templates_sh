@@ -9,9 +9,9 @@ Fix text mode only grub config:
 
 {% if grains['os_family']|lower in ['artix'] %}
 {% for item in ['displaymanager'] %}
-'{{item}}-openrc package (variant: {{grains['os_family']|lower}})':
+'{{item}}-{{grains["init"]}} package (variant: {{grains["os_family"]|lower}})':
   cmd.run:
-    - name: 'pacman -Sy --noconfirm --needed {{item}}-openrc'
+    - name: 'pacman -Sy --noconfirm --needed {{item}}-{{grains["init"]}}'
 {% endfor%}
 
 {% if varsdict.desktop in ['lxqt'] %}

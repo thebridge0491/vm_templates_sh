@@ -35,11 +35,16 @@ sh -c 'cat > /mnt/etc/fstab' << EOF
 LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
 LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
 LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
-LABEL=ESP      /boot/efi   vfat    umask=0077  0   2
+PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
+
+#9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
+
+#PARTLABEL=data0    /mnt/Data0   exfat   auto,failok,rw,gid=sudo,uid=0   0    0
+#PARTLABEL=data0    /mnt/Data0   exfat   auto,failok,rw,dmask=0000,fmask=0111   0    0
 
 EOF
 
@@ -118,6 +123,12 @@ if command -v systemctl > /dev/null ; then
 elif command -v update-rc.d > /dev/null ; then
   update-rc.d lvm2-lvmpolld defaults ;
   update-rc.d eudev defaults ;
+elif command -v sv > /dev/null ; then
+  ln -s /etc/sv/lvm2-lvmpolld /var/service ;
+  ln -s /etc/sv/eudev /var/service ;
+elif command -v rc-update > /dev/null ; then
+  rc-update add lvm2-lvmpolld default ;
+  rc-update add eudev default ;
 fi
 
 

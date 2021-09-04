@@ -32,7 +32,7 @@ gpt_hddisk() {
   echo "Partitioning disk" ; sleep 3
   gpt destroy $DEVX
   gpt create -f $DEVX
-  gpt add -b 40 -a 1M -s 512K -t bios -l gptboot0 $DEVX
+  gpt add -b 40 -a 1M -s 512K -t bios -l bios_boot $DEVX
   gpt add -a 1M -s 200M -t efi -l ESP $DEVX
 
   gpt add -a 1M -s 1G -t linux-data -l "pvol0-osBoot" $DEVX
@@ -66,10 +66,10 @@ gpt_hddisk() {
   sync ; sleep 3
   #newfs_msdos -L ESP /dev/${DEVX}b
   newfs_msdos -F 16 -L ESP $(dkctl $DEVX listwedges | grep -e ESP | cut -d: -f1)
-  #gpt label -l ESP -i 2 $DEVX ; gpt label -l gptboot0 -i 1 $DEVX
+  #gpt label -l ESP -i 2 $DEVX ; gpt label -l bios_boot -i 1 $DEVX
 
   if [ "zfs" = "$VOL_MGR" ] ; then
-    PARTNM_LABELNMS="gptboot0:gptboot0 ESP:ESP ${GRP_NM}-fsSwap:${GRP_NM}-fsSwap ${GRP_NM}-fsPool:${GRP_NM}-fsPool" ;
+    PARTNM_LABELNMS="bios_boot:bios_boot ESP:ESP ${GRP_NM}-fsSwap:${GRP_NM}-fsSwap ${GRP_NM}-fsPool:${GRP_NM}-fsPool" ;
     for partnm_labelnm in ${PARTNM_LABELNMS} ; do
       partnm=$(echo $partnm_labelnm | cut -d: -f1) ;
       labelnm=$(echo $partnm_labelnm | cut -d: -f2) ;
@@ -77,7 +77,7 @@ gpt_hddisk() {
       gpt label -l "$labelnm" -i $idx $DEVX ;
     done ;
   else
-    PARTNM_LABELNMS="gptboot0:gptboot0 ESP:ESP ${GRP_NM}-fsSwap:${GRP_NM}-fsSwap ${GRP_NM}-fsRoot:${GRP_NM}-fsRoot ${GRP_NM}-fsVar:${GRP_NM}-fsVar ${GRP_NM}-fsHome:${GRP_NM}-fsHome" ;
+    PARTNM_LABELNMS="bios_boot:bios_boot ESP:ESP ${GRP_NM}-fsSwap:${GRP_NM}-fsSwap ${GRP_NM}-fsRoot:${GRP_NM}-fsRoot ${GRP_NM}-fsVar:${GRP_NM}-fsVar ${GRP_NM}-fsHome:${GRP_NM}-fsHome" ;
     for partnm_labelnm in ${PARTNM_LABELNMS} ; do
       partnm=$(echo $partnm_labelnm | cut -d: -f1) ;
       labelnm=$(echo $partnm_labelnm | cut -d: -f2) ;

@@ -149,6 +149,9 @@ sh -c 'cat >> /etc/fstab' << EOF
 procfs              /proc       procfs  rw      0   0
 linprocfs           /compat/linux/proc  linprocfs   rw  0   0
 
+#/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,gid=wheel,uid=0,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
+#/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,dmask=0000,fmask=0111,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
+
 EOF
 
 
@@ -176,8 +179,8 @@ EOF
 sysrc zfs_enable="YES"
 
 zfs set dedup=off $ZFSBOOT_POOL_NAME
-zfs set quota=8G $ZFSBOOT_POOL_NAME/usr/home
-zfs set quota=6G $ZFSBOOT_POOL_NAME/var
+zfs set quota=32G $ZFSBOOT_POOL_NAME/usr/home
+zfs set quota=8G $ZFSBOOT_POOL_NAME/var
 zfs set quota=2G $ZFSBOOT_POOL_NAME/tmp
 
 
@@ -283,8 +286,7 @@ sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
 FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
-	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/FreeBSD:13:amd64/quarterly"
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI}/quarterly",
+	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI:-FreeBSD:13:amd64}/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
 	fingerprints: "/usr/share/keys/pkg",

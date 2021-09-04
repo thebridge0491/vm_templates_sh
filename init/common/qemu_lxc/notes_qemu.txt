@@ -1,4 +1,4 @@
-# NOTE, Linux|BSD config for qemu network(s) - nat br0 & ethernet bridged br1
+# NOTE, Linux|BSD config for qemu network(s) - ethernet bridged br0 & nat br1
 # (Linux)                              (BSD)
 # /etc/sysctl.d/99-sysctl.conf ..      /etc/sysctl.conf ..
 # ----------------------------------   ------------------------
@@ -12,46 +12,47 @@
 # --------------------------  --------------------  -------------------
 # allow-hotplug eth0          if_bridge_load="YES"  own   tap*  :operator
 # iface eth0 inet manual      if_tap_load="YES"     perm  tap*  0660
-# iface br0 inet dhcp
-#   bridge_ports none         /etc/rc.conf ..
-#   bridge_stp off            ----------------------
-#   bridge_maxwait 0          ifconfig_alc0="up"
-#   bridge_fd 0               cloned_interfaces="bridge0 bridge1"
+# auto br1
+# iface br1 inet static       /etc/rc.conf ..
+#   bridge_ports none         ----------------------
+#   bridge_stp off            ifconfig_alc0="up"
+#   bridge_maxwait 0          cloned_interfaces="bridge1 bridge0"
+#   bridge_fd 0               ifconfig_bridge1_name="br1"
 #   address 192.168.1.161     ifconfig_bridge0_name="br0"
-# auto br1                    ifconfig_bridge1_name="br1"
-# iface br1 inet dhcp         autobridge_interfaces="br0 br1"
-#   bridge_ports regex eth.*  #autobridge_br0=""
-#   bridge_stp off            ifconfig_br0="inet 192.168.1.161/27 up"
-#   bridge_maxwait 0          autobridge_br1="alc0"
-#   bridge_fd 0               ifconfig_br1="SYNCDHCP"
-# iface br1 inet6 auto        ifconfig_br1_ipv6="inet6 accept_rtadv"
+# auto br0                    autobridge_interfaces="br1 br0"
+# iface br0 inet dhcp
+#   bridge_ports regex eth.*  #autobridge_br1=""
+#   bridge_stp off            ifconfig_br1="inet 192.168.1.161/27 up"
+#   bridge_maxwait 0          autobridge_br0="alc0"
+#   bridge_fd 0               ifconfig_br0="SYNCDHCP"
+# iface br0 inet6 auto        ifconfig_br0_ipv6="inet6 accept_rtadv"
 
 # (Void Linux)                    (Linux)
 # /etc/rc.local                   /etc/qemu/bridge.conf
 # ------------------------------  ---------------------
-# ip link add br0 type bridge     allow br0
-# ip addr add 192.168.1.161/27 \  allow br1
-#   dev br0
-# ip link set dev br0 up          $ chown root:kvm /etc/qemu/bridge.conf
+# ip link add br1 type bridge     allow br1
+# ip addr add 192.168.1.161/27 \  allow br0
+#   dev br1
+# ip link set dev br1 up          $ chown root:kvm /etc/qemu/bridge.conf
 #                                 $ chmod 0640 /etc/qemu/bridge.conf
-# ip link add br1 type bridge     $ chmod u+s /usr/lib/qemu/qemu-bridge-helper
-# ip link set dev br1 up            or
+# ip link add br0 type bridge     $ chmod u+s /usr/lib/qemu/qemu-bridge-helper
+# ip link set dev br0 up            or
 # ip link set dev enp3s0 up       $ chmod u+s /usr/libexec/qemu-bridge-helper
 # ip addr flush dev enp3s0
-# ip link set enp3s0 master br1
+# ip link set enp3s0 master br0
 #
 # ip[6]tables -t nat -X
 
 
-# NOTE, Linux|BSD dnsmasq config for qemu network - nat br0
+# NOTE, Linux|BSD dnsmasq config for qemu network - nat br1
 # (Linux|BSD)                     (FreeBSD)
 # [/usr/local]/etc/dnsmasq.conf   /etc/rc.conf ..
 # -----------------------------   ---------------
 # except-interface=lo[0]          dnsmasq_conf="/usr/local/etc/dnsmasq.conf"
-# interface=br0                   dnsmasq_enable="YES"
+# interface=b1                    dnsmasq_enable="YES"
 # bind-dynamic                    gateway_enable="YES"
 # dhcp-range=192.168.1.162, \     #ipv6_gateway_enable="YES"
-#   192.168.190,12h
+#   192.168.1.190,12h
 # strict-order
 
 
@@ -96,16 +97,16 @@
 # (FreeBSD) auto create|destroy tap interfaces - tap0 on br0 & tap1 on br1
 # /etc/rc.local ..
 # --------------------------------------------
-# /usr/local/etc/qemu-ifup tap0
 # env switch=br1 /usr/local/etc/qemu-ifup tap1
+# /usr/local/etc/qemu-ifup tap0
 #
 # /etc/rc.shutdown ..
 # --------------------------------------------
-# /usr/local/etc/qemu-ifdown tap0
 # env switch=br1 /usr/local/etc/qemu-ifdown tap1
+# /usr/local/etc/qemu-ifdown tap0
 
 
-# NOTE, Linux|BSD modify firewall rules|services for qemu network - nat br0
+# NOTE, Linux|BSD modify firewall rules|services for qemu network - nat br1
 # ### natip_cidr=192.168.1.160/27 ###
 # (Linux - firewalld|iptables|nftables)
 # #?firewall-offline-cmd [--zone=external] --add-source=$natip_cidr \
@@ -118,29 +119,29 @@
 #
 # #?firewall-offline-cmd [--zone=external] --add-rich-rule='rule family=ipv4 \
 # #?  source address=$natip_cidr accept'
-# #iptables -I FORWARD -s $natip_cidr -i br0 -j ACCEPT
-# #nft insert rule inet filter forward ip saddr $natip_cidr iifname "br0" \
+# #iptables -I FORWARD -s $natip_cidr -i br1 -j ACCEPT
+# #nft insert rule inet filter forward ip saddr $natip_cidr iifname "br1" \
 # #  counter accept
-# #iptables -I FORWARD -i br0 -o wlan0 -j ACCEPT
-# nft insert rule inet filter forward iifname "br0" oifname "wlan0" counter \
+# #iptables -I FORWARD -i br1 -o wlan0 -j ACCEPT
+# nft insert rule inet filter forward iifname "br1" oifname "wlan0" counter \
 #   accept
 #
 # #?firewall-offline-cmd [--zone=external] --add-rich-rule='rule family=ipv4 \
 # #?  destination address=$natip_cidr accept'
-# #iptables -I FORWARD -d $natip_cidr -o br0 -m conntrack --ctstate \
+# #iptables -I FORWARD -d $natip_cidr -o br1 -m conntrack --ctstate \
 # #  RELATED,ESTABLISHED -j ACCEPT
-# #nft insert rule inet filter forward ip daddr $natip_cidr oifname "br0" \
+# #nft insert rule inet filter forward ip daddr $natip_cidr oifname "br1" \
 # #  ct state related,established counter accept
-# #iptables -I FORWARD -i wlan0 -o br0 -m conntrack --ctstate RELATED, \
+# #iptables -I FORWARD -i wlan0 -o br1 -m conntrack --ctstate RELATED, \
 # #  ESTABLISHED -j ACCEPT
-# nft insert rule inet filter forward iifname "wlan0" oifname "br0" \
+# nft insert rule inet filter forward iifname "wlan0" oifname "br1" \
 #   ct state related,established counter accept
 
 # (BSD - pf)
-# nat on wlan0 inet from br0:network to any -> (wlan0)
-# #pass from br0:network to any keep state
-# pass on br0 from br0:network to any
-# pass on wlan0 from br0:network to any keep state
+# nat on wlan0 inet from br1:network to any -> (wlan0)
+# #pass from br1:network to any keep state
+# pass on br1 from br1:network to any
+# pass on wlan0 from br1:network to any keep state
 
 # (Linux) $ sed -i 's|domain|domain, bootps, bootpc, mdns|g' /etc/nftables.conf
 # (Linux) $ sed -i 's|domain|domain, bootps, bootpc, mdns|g' /etc/nftables/*.conf

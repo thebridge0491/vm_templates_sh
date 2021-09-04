@@ -8,6 +8,10 @@ svc_enable() {
     systemctl enable $svc ;
   elif command -v rc-update > /dev/null ; then
   	rc-update add $svc default ;
+  elif command -v sv > /dev/null ; then
+    ln -s /etc/runit/sv/$svc /run/runit/service ;
+  elif command -v s6-rc > /dev/null ; then
+    s6-rc-bundle-update add default $svc ;
   fi
 }
 
@@ -16,6 +20,10 @@ if command -v systemctl > /dev/null ; then
   systemctl stop pamac.service ;
 elif command -v rc-update > /dev/null ; then
   rc-service pamac stop ;
+elif command -v sv > /dev/null ; then
+  sv down pamac ;
+elif command -v s6-rc > /dev/null ; then
+  s6-rc -d change pamac ;
 fi
 rm /var/lib/pacman/db.lck
 #set -e
@@ -24,9 +32,22 @@ pacman --noconfirm -Syy ; pacman --noconfirm -Syu
 . /root/init/archlinux/distro_pkgs.ini
 pacman --noconfirm --needed -S $pkgs_cmdln_tools
 
+if [ -f /etc/os-release ] ; then
+  . /etc/os-release ;
+elif [ -f /usr/lib/os-release ] ; then
+  . /usr/lib/os-release ;
+fi
 if command -v rc-update > /dev/null ; then
+  pkg_svcextsn=openrc ;
+elif command -v sv > /dev/null ; then
+  pkg_svcextsn=runit ;
+elif command -v s6-rc > /dev/null ; then
+  pkg_svcextsn=s6 ;
+fi
+
+if [ "artix" = "${ID}" ] ; then
   for pkgX in ntp nftables avahi nfs-utils cups ; do
-    pacman --noconfirm --needed -S ${pkgX}-openrc ;
+    pacman --noconfirm --needed -S ${pkgX}-${pkg_svcextsn} ;
   done ;
 fi
 
@@ -62,6 +83,10 @@ for unit in ipset iptables ip6tables ; do
     systemctl stop $unit ; systemctl disable $unit ;
   elif command -v rc-update > /dev/null ; then
     rc-service stop $unit ; rc-update del $unit default ;
+  elif command -v sv > /dev/null ; then
+    sv stop $unit ; rm /run/runit/service/$unit ;
+  elif command -v s6-rc > /dev/null ; then
+    s6-rc -d change $unit ; s6-rc-bundle-update delete default $unit ;
   fi ;
   if command -v systemctl > /dev/null ; then
     systemctl mask $unit ;

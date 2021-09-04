@@ -2,7 +2,7 @@
 
 - package:
     use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
-    name: '{{item}}-openrc'
+    name: '{{item}}-{{ansible_facts.get("service_mgr") or "openrc"}}'
     state: present
   loop: ['ntp', 'nftables', 'avahi', 'nfs-utils', 'cups']
   when: ansible_facts.get('lsb', {}).get('id', None)|lower in ['artix']

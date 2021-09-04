@@ -7,6 +7,10 @@ if command -v systemctl > /dev/null ; then
   systemctl stop pamac.service ;
 elif command -v rc-update > /dev/null ; then
   rc-service pamac stop ;
+elif command -v sv > /dev/null ; then
+  sv down pamac ;
+elif command -v s6-rc > /dev/null ; then
+  s6-rc -d change pamac ;
 fi
 rm /var/lib/pacman/db.lck
 #set -e

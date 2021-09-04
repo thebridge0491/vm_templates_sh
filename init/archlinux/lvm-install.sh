@@ -37,11 +37,16 @@ cat << EOF > /mnt/etc/fstab
 LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
 LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
 LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
-LABEL=ESP      /boot/efi   vfat    umask=0077  0   2
+PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
+
+#9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
+
+#PARTLABEL=data0    /mnt/Data0   exfat   auto,failok,rw,gid=wheel,uid=0   0    0
+#PARTLABEL=data0    /mnt/Data0   exfat   auto,failok,rw,dmask=0000,fmask=0111   0    0
 
 EOF
 
@@ -157,7 +162,14 @@ fi
 if [ "arch" = "\${ID}" ] ; then
   pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup device-mapper mdadm lvm2 dhcpcd openssh ;
 elif [ "artix" = "\${ID}" ] ; then
-  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup-openrc device-mapper-openrc mdadm-openrc lvm2-openrc dhcpcd-openrc openssh-openrc ;
+  if command -v rc-update > /dev/null ; then
+    pkg_svcextsn=openrc ;
+  elif command -v sv > /dev/null ; then
+    pkg_svcextsn=runit ;
+  elif command -v s6-rc > /dev/null ; then
+    pkg_svcextsn=s6 ;
+  fi ;
+  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup-${pkg_svcextsn} device-mapper-${pkg_svcextsn} mdadm-${pkg_svcextsn} lvm2-${pkg_svcextsn} dhcpcd-${pkg_svcextsn} openssh-${pkg_svcextsn} ;
 fi
 #pacman --noconfirm --needed -S xfce4
 
@@ -213,6 +225,22 @@ elif command -v rc-update > /dev/null ; then
   #rc-service dhclient start ;
 
   rc-update add sshd default ;
+elif command -v sv > /dev/null ; then
+  ## IP address config options: dhcpcd, dhclient
+  ln -s /etc/runit/sv/dhcpcd /run/runit/service ;
+
+  #ln -s /etc/runit/sv/dhclient /run/runit/service ;
+  #sv up dhclient ;
+
+  ln -s /etc/runit/sv/sshd /run/runit/service ;
+elif command -v s6-rc > /dev/null ; then
+  ## IP address config options: dhcpcd, dhclient
+  s6-rc-bundle-update add default dhcpcd ;
+
+  #s6-rc-bundle-update add default dhclient ;
+  #s6-rc -u change dhclient ;
+
+  s6-rc-bundle-update add default sshd ;
 fi
 
 echo "Set root passwd ; add user" ; sleep 3

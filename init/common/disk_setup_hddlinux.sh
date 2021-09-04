@@ -58,7 +58,7 @@ _sgdisk_hdpartzfs() {
 
   sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
   DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
   sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
@@ -95,7 +95,7 @@ _sfdisk_hdpartzfs() {
 
   sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
   DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
   sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
@@ -152,7 +152,7 @@ _parted_hdpartzfs() {
   sync ; parted -s /dev/${DEVX} unit GiB print ; sleep 3
   parted -s /dev/${DEVX} align-check optimal 1 ; sleep 3
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
   DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
   sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
@@ -185,7 +185,7 @@ _sgdisk_hdpartlvm() {
 
   sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${PV_NM0}-osBoot" | cut -d' ' -f1)
   DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${PV_NM1}-osBoot" | cut -d' ' -f1)
   sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
@@ -221,7 +221,7 @@ _sfdisk_hdpartlvm() {
 
   sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
   DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
   sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
@@ -275,7 +275,7 @@ _parted_hdpartlvm() {
   sync ; parted -s /dev/${DEVX} unit GiB print ; sleep 3
   parted -s /dev/${DEVX} align-check optimal 1 ; sleep 3
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
   DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
   sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
@@ -316,7 +316,7 @@ _sgdisk_hdpartstd() {
 
   sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
   DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
   sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
@@ -359,7 +359,7 @@ _sfdisk_hdpartstd() {
 
   sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
   DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
   sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
@@ -434,7 +434,7 @@ _parted_hdpartstd() {
   sync ; parted -s /dev/${DEVX} unit GiB print ; sleep 3
   parted -s /dev/${DEVX} align-check optimal 1 ; sleep 3
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
   DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
   sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
@@ -444,7 +444,7 @@ _parted_hdpartstd() {
 
 
 part_hddisk() {
-  TOOL=${1:-sgdisk} ; VOL_TYPE=${2:-lvm} ; GRP_NM0=${3:-vg0}
+  TOOL=${1:-sgdisk} ; VOL_MGR=${2:-lvm} ; GRP_NM0=${3:-vg0}
   GRP_NM1=${4:-vg1} ; PV_NM0=${5:-pvol0} ; PV_NM1=${6:-pvol1}
 
   echo "Partitioning disk" ; sleep 3
@@ -583,11 +583,17 @@ format_partitions() {
 
 part_format_hddisk() {
   MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:16G osVar:8G osHome:32G}
+  PARTS_NM_SZ0=${PARTS_NM_SZ0:-osSwap:4G osRoot:16G osVar:8G osHome:32G}
+  PARTS_NM_SZ1=${PARTS_NM_SZ1:-osRoot:16G osVar:8G osHome:32G}
+  TOOL=${1:-sgdisk} ; VOL_MGR=${2:-lvm} ; GRP_NM0=${3:-vg0}
+  GRP_NM1=${4:-vg1} ; PV_NM0=${5:-pvol0} ; PV_NM1=${6:-pvol1}
   TOOL=${1:-sgdisk} ; VOL_MGR=${2:-lvm} ; GRP_NM=${3:-vg0} ; PV_NM=${4:-pvol0}
 
-  part_hddisk $TOOL $VOL_MGR $GRP_NM $PV_NM
-  format_partitions $VOL_MGR $GRP_NM $PV_NM
+  part_hddisk $TOOL $VOL_MGR $GRP_NM0 $GRP_NM1 $PV_NM0 $PV_NM1
+  PARTS_NM_SZ=$PARTS_NM_SZ0
+  format_partitions $VOL_MGR $GRP_NM0 $PV_NM0
+  PARTS_NM_SZ=$PARTS_NM_SZ1
+  format_partitions $VOL_MGR $GRP_NM1 $PV_NM1
 }
 
 mount_filesystems() {
@@ -607,8 +613,8 @@ mount_filesystems() {
   swapon ${DEV_SWAP}
 
   mkdir -p /mnt/boot ; mount ${DEV_BOOT} /mnt/boot
-  #DEV_ESP=$(blkid | grep -e ESP | cut -d: -f1)
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
+  #DEV_ESP=$(blkid | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d: -f1)
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   mkdir -p /mnt/boot/efi ; mount ${DEV_ESP} /mnt/boot/efi
   sync ; lsblk -l ; sleep 3
 }

@@ -38,6 +38,9 @@ cat << EOF > /mnt/etc/fstab
 procfs             /proc       procfs  rw      0   0
 linprocfs          /compat/linux/proc  linprocfs   rw  0   0
 
+#/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,gid=wheel,uid=0,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
+#/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,dmask=0000,fmask=0111,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
+
 EOF
 
 
@@ -208,8 +211,7 @@ cat << EOF >> /usr/local/etc/pkg/repos/FreeBSD.conf
 FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
-	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/FreeBSD:13:amd64/quarterly"
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI}/quarterly",
+	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI:-FreeBSD:13:amd64}/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
 	fingerprints: "/usr/share/keys/pkg",

@@ -11,6 +11,10 @@ svc_enable() {
     systemctl enable $svc ;
   elif command -v update-rc.d > /dev/null ; then
   	update-rc.d $svc defaults ;
+  elif command -v sv > /dev/null ; then
+    ln -s /etc/sv/$svc /var/service ;
+  elif command -v rc-update > /dev/null ; then
+    rc-update add $svc default ;
   fi
 }
 

@@ -65,20 +65,24 @@ EOF
   qemu-img convert -f qcow2 -O qcow2 ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img
   (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${datestamp}.libvirt.box metadata.json info.json Vagrantfile `ls vmrun*` OVMF_CODE.fd box.img)
 
-  #pystache ${STORAGE_DIR}/catalog.json.mustache "{
-  #  \"author\":\"${author}\",
-  #  \"guest\":\"${GUEST}\",
-  #  \"datestamp\":\"${datestamp}\"
-  #}" > ${STORAGE_DIR}/${GUEST}_catalog.json
-#  cat << EOF >> mustache - ${STORAGE_DIR}/catalog.json.mustache > ${STORAGE_DIR}/${GUEST}_catalog.json
-#---
-#author: ${author}
-#guest: ${GUEST}
-#datestamp: ${datestamp}
-#---
-#EOF
-  erb author=${author} guest=${GUEST} datestamp=${datestamp} \
-    ${STORAGE_DIR}/catalog.json.erb > ${STORAGE_DIR}/${GUEST}_catalog.json
+  if command -v erb > /dev/null ; then
+    erb author=${author} guest=${GUEST} datestamp=${datestamp} \
+      ${STORAGE_DIR}/catalog.json.erb > ${STORAGE_DIR}/${GUEST}_catalog.json ;
+  elif command -v pystache > /dev/null ; then
+    pystache ${STORAGE_DIR}/catalog.json.mustache "{
+      \"author\":\"${author}\",
+      \"guest\":\"${GUEST}\",
+      \"datestamp\":\"${datestamp}\"
+    }" > ${STORAGE_DIR}/${GUEST}_catalog.json ;
+  elif command -v mustache > /dev/null ; then
+    cat << EOF >> mustache - ${STORAGE_DIR}/catalog.json.mustache > ${STORAGE_DIR}/${GUEST}_catalog.json ;
+---
+author: ${author}
+guest: ${GUEST}
+datestamp: ${datestamp}
+---
+EOF
+  fi
 }
 
 diff_boximage() {

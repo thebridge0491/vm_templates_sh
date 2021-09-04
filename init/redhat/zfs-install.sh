@@ -48,12 +48,14 @@ mount ${DEV_ESP} /mnt/boot/efi
 echo "Create /etc/fstab" ; sleep 3
 mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
 sh -c 'cat > /mnt/etc/fstab' << EOF
-LABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
-LABEL=ESP      /boot/efi   vfat    umask=0077  0   2
-LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
+PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
+PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
+PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
+
+#9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
 
 EOF
 

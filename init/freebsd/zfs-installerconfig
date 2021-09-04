@@ -283,8 +283,7 @@ sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
 FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
-	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/FreeBSD:13:amd64/quarterly"
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI}/quarterly",
+	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI:-FreeBSD:13:amd64}/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
 	fingerprints: "/usr/share/keys/pkg",
