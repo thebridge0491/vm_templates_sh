@@ -45,6 +45,12 @@ sysrc hald_enable="YES"
 #sysrc mixer_enable="YES"
 sysrc moused_enable="YES"
 
+# enable touchpad tapping
+sed -i '' '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /usr/local/share/X11/xorg.conf.d/10-evdev.conf
+sed -i '' '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /usr/local/share/X11/xorg.conf.d/40-libinput.conf
+
 # update XDG user dir config
 export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
 sh -c "echo 'BIN=bin' >> /usr/local/etc/xdg/user-dirs.defaults"

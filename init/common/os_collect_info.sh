@@ -224,7 +224,15 @@ EOF
   elif sudo -i command -v rc-status > /dev/null ; then # openrc
     concat_sep 'sudo rc-status --all' ;
   elif sudo -i command -v sv > /dev/null ; then # runit
-    concat_sep 'sudo sv status /var/service/*' ;
+    if [ -d /var/service ] ; then
+      concat_sep 'sudo sv status /var/service/*' ;
+    elif [ -d /run/runit/service ] ; then
+      concat_sep 'sudo sv status /run/runit/service/*' ;
+    elif [ -d /etc/service ] ; then
+      concat_sep 'sudo sv status /etc/service/*' ;
+    fi ;
+  elif sudo -i command -v s6-rc > /dev/null ; then # s6
+    concat_sep 'sudo s6-rc -a list' ;
   else # sysvinit
     concat_sep 'sudo service --status-all' ;
   fi

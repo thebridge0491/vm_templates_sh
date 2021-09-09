@@ -2,7 +2,7 @@ qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg -smp cpus=2 -m size=2048 \
   -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
   -display default,show-cursor=on -boot order=cd,menu=on -usb \
   -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-  ${NET_OPTS:--net bridge,br=br0} \
+  ${NET_OPTS:--net user,hostfwd=tcp::4022-:22} \
   -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
   -drive file=${OUT_DIR:-build/${GUEST:-freebsd-Release-zfs}}/${GUEST:-freebsd-Release-zfs}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
   -cdrom ${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)} \

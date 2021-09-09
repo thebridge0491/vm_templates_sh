@@ -37,7 +37,7 @@
     "boot_command": [
       "<wait>c<wait>linux /live/vmlinuz {{user `boot_cmdln_options`}} boot=live components username=devuan text 3<enter>initrd /live/initrd.img<enter>boot<enter>",
       "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><enter>devuan<enter>devuan<enter>sudo su<enter>export MIRROR={{user `repo_host`}}{{user `repo_directory`}} ; . /etc/os-release ; sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list ; echo \"deb http://$MIRROR $VERSION_CODENAME-backports main contrib non-free\" >> /etc/apt/sources.list ; sleep 3 ; apt-get --yes update --allow-releaseinfo-change ; apt-get --yes install lvm2 gdisk ; ",
-      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; env service_mgr={{user `service_mgr`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
     ]
   },
   {
@@ -154,6 +154,7 @@
   "variables": {
     "vm_name": "devuan-Stable-lvm",
     "variant": "debian",
+    "service_mgr": "sysvinit",
     "init_hostname": "devuan-boxv0000",
     "vol_mgr": "lvm",
     "boot_cmdln_options": " apparmor=0 ",

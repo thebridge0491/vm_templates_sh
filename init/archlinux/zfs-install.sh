@@ -86,9 +86,9 @@ done
 
 
 ## init [artix | archlinux] pacman keyring
-pacman-key --init ; pacman-key --populate artix
+pacman-key --init ; pacman -Sy --noconfirm artix-keyring
+pacman-key --populate artix
 pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
-pacman -Sy --noconfirm artix-keyring
 
 
 echo "Bootstrap base pkgs" ; sleep 3
@@ -163,13 +163,13 @@ if [ "arch" = "\${ID}" ] ; then
   pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup device-mapper mdadm dhcpcd openssh ;
 elif [ "artix" = "\${ID}" ] ; then
   if command -v rc-update > /dev/null ; then
-    pkg_svcextsn=openrc ;
+    service_mgr=openrc ;
   elif command -v sv > /dev/null ; then
-    pkg_svcextsn=runit ;
+    service_mgr=runit ;
   elif command -v s6-rc > /dev/null ; then
-    pkg_svcextsn=s6 ;
+    service_mgr=s6 ;
   fi ;
-  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup-${pkg_svcextsn} device-mapper-${pkg_svcextsn} mdadm-${pkg_svcextsn} dhcpcd-${pkg_svcextsn} openssh-${pkg_svcextsn} ;
+  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup-\${service_mgr} device-mapper-\${service_mgr} mdadm-\${service_mgr} dhcpcd-\${service_mgr} openssh-\${service_mgr} ;
 fi
 #pacman --noconfirm --needed -S xfce4
 
@@ -237,6 +237,25 @@ if command -v systemctl > /dev/null ; then
 
   systemctl enable zfs-import-cache ; systemctl enable zfs-import.target ;
   systemctl enable zfs-mount ; systemctl enable zfs.target ;
+elif command -v s6-rc > /dev/null ; then
+  ## IP address config options: dhcpcd, dhclient
+  s6-rc-bundle-update add default dhcpcd ;
+  s6-rc-bundle -c /etc/s6/rc/compiled add default dhcpcd ;
+
+  #s6-rc-bundle-update add default dhclient ;
+  s6-rc-bundle -c /etc/s6/rc/compiled add default dhclient ;
+  #s6-rc -u change dhclient ;
+
+  s6-rc-bundle-update add default sshd ;
+  s6-rc-bundle -c /etc/s6/rc/compiled add default sshd ;
+elif command -v sv > /dev/null ; then
+  ## IP address config options: dhcpcd, dhclient
+  ln -s /etc/runit/sv/dhcpcd /run/runit/service ;
+
+  #ln -s /etc/runit/sv/dhclient /run/runit/service ;
+  #sv up dhclient ;
+
+  ln -s /etc/runit/sv/sshd /run/runit/service ;
 elif command -v rc-update > /dev/null ; then
   ## IP address config options: dhcpcd, dhclient
   rc-update add dhcpcd default ;
@@ -255,22 +274,6 @@ EOF
 
   chmod +x /etc/init.d/zfs ;
   rc-update add zfs default ;
-elif command -v sv > /dev/null ; then
-  ## IP address config options: dhcpcd, dhclient
-  ln -s /etc/runit/sv/dhcpcd /run/runit/service ;
-
-  #ln -s /etc/runit/sv/dhclient /run/runit/service ;
-  #sv up dhclient ;
-
-  ln -s /etc/runit/sv/sshd /run/runit/service ;
-elif command -v s6-rc > /dev/null ; then
-  ## IP address config options: dhcpcd, dhclient
-  s6-rc-bundle-update add default dhcpcd ;
-
-  #s6-rc-bundle-update add default dhclient ;
-  #s6-rc -u change dhclient ;
-
-  s6-rc-bundle-update add default sshd ;
 fi
 
 

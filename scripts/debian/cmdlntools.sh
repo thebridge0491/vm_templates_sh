@@ -7,12 +7,12 @@ svc_enable() {
   svc=${1}
   if command -v systemctl > /dev/null ; then
     systemctl enable $svc ;
-  elif command -v update-rc.d > /dev/null ; then
-  	update-rc.d $svc defaults ;
   elif command -v sv > /dev/null ; then
     ln -s /etc/sv/$svc /var/service ;
   elif command -v rc-update > /dev/null ; then
     rc-update add $svc default ;
+  elif command -v update-rc.d > /dev/null ; then
+  	update-rc.d $svc defaults ;
   fi
 }
 
@@ -58,12 +58,12 @@ sh /root/init/common/linux/firewall/nftables/config_nftables.sh config_nftables 
 for unit in ipset iptables ip6tables ; do
   if command -v systemctl > /dev/null ; then
     systemctl stop $unit ; systemctl disable $unit ;
-  elif command -v update-rc.d > /dev/null ; then
-    service $unit stop ; update-rc.d $unit remove ;
   elif command -v sv > /dev/null ; then
     sv stop $unit ; rm /var/service/$unit ;
   elif command -v rc-update > /dev/null ; then
     rc-service $unit stop ; rc-update del $unit default ;
+  elif command -v update-rc.d > /dev/null ; then
+    service $unit stop ; update-rc.d $unit remove ;
   fi ;
   if command -v systemctl > /dev/null ; then
     systemctl mask $unit ;
@@ -72,7 +72,14 @@ done
 if command -v systemctl > /dev/null ; then
   systemctl unmask nftables ;
 fi
+if command -v update-rc.d > /dev/null ; then
+  cat > /etc/network/if-pre-up.d/nftables << EOF ;
+#!/bin/sh
+/usr/bin/env nft -f /etc/nftables.conf
 
+EOF
+  chmod +x /etc/network/if-pre-up.d/nftables ;
+fi
 #sh /root/init/common/misc_config.sh check_clamav
 
 

@@ -23,6 +23,7 @@ fi
 export GRP_NM=${GRP_NM:-vg0}
 # [deb.devuan.org/merged | deb.debian.org/debian]
 export MIRROR=${MIRROR:-deb.devuan.org/merged}
+service_mgr=${service_mgr:-sysvinit} # sysvinit | runit | openrc
 
 export INIT_HOSTNAME=${1:-devuan-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -109,27 +110,11 @@ sed -i '/^#[ ]*deb/ s|^#||' /etc/apt/sources.list
 sed -i '/^[ ]*deb cdrom:/ s|^|#|' /etc/apt/sources.list
 cat /etc/apt/sources.list ; sleep 5
 
-
 echo "Add software package selection(s)" ; sleep 3
 apt-get --yes update
 apt-get --yes install --no-install-recommends linux-image-amd64 grub-efi-amd64 efibootmgr grub-pc-bin sudo linux-headers-amd64 lvm2
 # xfce4
 tasksel install standard
-
-if command -v systemctl > /dev/null ; then
-  systemctl enable lvmetad ;
-  systemctl enable lvm2-lvmpolld ;
-  systemctl enable udev ;
-elif command -v update-rc.d > /dev/null ; then
-  update-rc.d lvm2-lvmpolld defaults ;
-  update-rc.d eudev defaults ;
-elif command -v sv > /dev/null ; then
-  ln -s /etc/sv/lvm2-lvmpolld /var/service ;
-  ln -s /etc/sv/eudev /var/service ;
-elif command -v rc-update > /dev/null ; then
-  rc-update add lvm2-lvmpolld default ;
-  rc-update add eudev default ;
-fi
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -205,6 +190,32 @@ sed -i "/^%sudo.*(ALL)\s*ALL/ s|%sudo|# %sudo|" /etc/sudoers
 #sed -i "/^#.*%sudo.*NOPASSWD.*/ s|^#.*%sudo|%sudo|" /etc/sudoers
 echo '%sudo ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
+
+
+if [ "devuan" = "\${ID}" ] ; then
+  if [ "sysvinit" = "${service_mgr}" ] ; then
+    service_pkgs="sysvinit-core" ;
+  elif [ "runit" = "${service_mgr}" ] ; then
+    service_pkgs="runit-init" ;
+  elif [ "openrc" = "${service_mgr}" ] ; then
+    service_pkgs="openrc" ;
+  fi ;
+  apt-get --yes install --no-install-recommends \${service_pkgs} ;
+fi
+if command -v systemctl > /dev/null ; then
+  systemctl enable lvmetad ;
+  systemctl enable lvm2-lvmpolld ;
+  systemctl enable udev ;
+elif command -v sv > /dev/null ; then
+  ln -s /etc/sv/lvm2-lvmpolld /etc/service ;
+  ln -s /etc/sv/eudev /etc/service ;
+elif command -v rc-update > /dev/null ; then
+  rc-update add lvm2-lvmpolld default ;
+  rc-update add eudev default ;
+elif command -v update-rc.d > /dev/null ; then
+  update-rc.d lvm2-lvmpolld defaults ;
+  update-rc.d eudev defaults ;
+fi
 
 
 echo "Bootloader installation & config" ; sleep 3

@@ -38,6 +38,12 @@ sleep 3
 
 rcctl enable messagebus ; rcctl enable xenodm
 
+# enable touchpad tapping
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /etc/X11/xorg.conf.d/10-evdev.conf
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /etc/X11/xorg.conf.d/40-libinput.conf
+
 # update XDG user dir config
 export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
 sh -c "echo 'BIN=bin' >> /etc/xdg/user-dirs.defaults"

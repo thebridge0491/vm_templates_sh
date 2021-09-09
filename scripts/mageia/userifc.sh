@@ -27,6 +27,12 @@ sleep 3
 systemctl enable display-manager
 systemctl set-default graphical.target ; sleep 3
 
+# enable touchpad tapping
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /usr/share/X11/xorg.conf.d/10-evdev.conf
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /usr/share/X11/xorg.conf.d/40-libinput.conf
+
 # update XDG user dir config
 export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
 echo 'BIN=bin' >> /etc/xdg/user-dirs.defaults

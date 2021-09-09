@@ -33,7 +33,7 @@ freebsd() {
   ##!! (chrootsh) navigate to single user: 2
   ##!! if late, Live CD -> root/-
 
-  #mdmfs -s 100m md1 /tmp ; mdmfs -s 100m md2 /mnt ; cd /tmp ; ifconfig
+  #mdmfs -s 100m md1 /mnt ; cd /tmp ; ifconfig
   #dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev} {ifdev}
 
   ## (FreeBSD) install via chroot
@@ -47,7 +47,8 @@ freebsd() {
 }
 
 debian() {
-  variant=${variant:-debian} ; GUEST=${1:-devuan-Stable-lvm}
+  variant=${variant:-debian} ; service_mgr=${service_mgr:-sysvinit}
+  GUEST=${1:-devuan-Stable-lvm}
   #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/live -name 'debian-live-*-amd64*.iso' | tail -n1)}
   #(cd ${ISOS_PARDIR}/debian/live ; sha256sum --ignore-missing -c SHA256SUMS)
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/devuan/live -name 'devuan_*_amd64_desktop-live.iso' | tail -n1)}
@@ -110,11 +111,11 @@ archlinux() {
 
   #sudo su
   #(arch) mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5
-  #(arch) pacman -Sy archlinux-keyring
-  #(arch) pacman-key --init ; pacman-key --populate archlinux
+  #(arch) pacman-key --init ; pacman -Sy archlinux-keyring
+  #(arch) pacman-key --populate archlinux
   #(artix) mount -o remount,size=1G /run/artix/cowspace ; df -h ; sleep 5
-  #(artix) pacman -Sy artix-keyring
-  #(artix) pacman-key --init ; pacman-key --populate artix
+  #(artix) pacman-key --init ; pacman -Sy artix-keyring
+  #(artix) pacman-key --populate artix
   #(artix) pacman -Sy gnu-netcat parted dosfstools gptfdisk [lvm2]
   #pacman -Sy
 
@@ -356,7 +357,7 @@ sleep 30
 ## package manager tools & config needed to install from existing Linux
 
 #debian variants(debian, devuan):
-  # (devuan MIRROR: deb.devuan.org/merged)
+  # (devuan MIRROR: deb.devuan.org/merged, service_mgr: sysvinit)
   # (debian MIRROR: deb.debian.org/debian)
   #  package(s): debootstrap
 
@@ -369,12 +370,14 @@ sleep 30
   #  mkdir /etc/pacman.d ; mv /etc/pacman.conf /etc/pacman.conf.old
   #(arch) cp init/archlinux/etc_pacman.conf-arch > /etc/pacman.conf
   #(arch) curl -s "https://archlinux.org/mirrorlist/?country=${LOCALE_COUNTRY:-US}&use_mirror_status=on" | sed -e 's|^#Server|Server|' -e '/^#/d' | tee /etc/pacman.d/mirrorlist
-  #(arch) pacman -Sy archlinux-keyring [; pacman -U /var/cache/.../archlinux-keyring...]
-  #(arch) pacman-key --init ; pacman-key --populate archlinux
+  #(arch) pacman-key --init ; pacman -Sy archlinux-keyring
+  #(arch) [; pacman -U /var/cache/.../archlinux-keyring...]
+  #(arch) pacman-key --populate archlinux
   #(artix) curl -s "https://gitea.artixlinux.org/packagesP/pacman/raw/branch/master/trunk/pacman.conf" | tee /etc/pacman.conf
   #(artix) curl -s "https://gitea.artixlinux.org/packagesA/artix-mirrorlist/raw/branch/master/trunk/mirrorlist" | tee /etc/pacman.d/mirrorlist
-  #(artix) pacman -Sy artix-keyring [; pacman -U /var/cache/.../artix-keyring...]
-  #(artix) pacman-key --init ; pacman-key --populate artix
+  #(artix) pacman-key --init ; pacman -Sy artix-keyring
+  #(artix) [; pacman -U /var/cache/.../artix-keyring...]
+  #(artix) pacman-key --populate artix
 
 #alpine linux: (MIRROR: dl-cdn.alpinelinux.org/alpine)
   ## dnld: http://${MIRROR}/latest-stable/main/x86_64/apk-tools-static-*.apk

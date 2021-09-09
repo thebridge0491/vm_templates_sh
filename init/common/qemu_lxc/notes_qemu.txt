@@ -11,21 +11,40 @@
 # /etc/network/interfaces ..  /boot/loader.conf ..  /etc/devfs.conf ..
 # --------------------------  --------------------  -------------------
 # allow-hotplug eth0          if_bridge_load="YES"  own   tap*  :operator
-# iface eth0 inet manual      if_tap_load="YES"     perm  tap*  0660
-# auto br1
-# iface br1 inet static       /etc/rc.conf ..
-#   bridge_ports none         ----------------------
-#   bridge_stp off            ifconfig_alc0="up"
-#   bridge_maxwait 0          cloned_interfaces="bridge1 bridge0"
-#   bridge_fd 0               ifconfig_bridge1_name="br1"
-#   address 192.168.1.161     ifconfig_bridge0_name="br0"
-# auto br0                    autobridge_interfaces="br1 br0"
-# iface br0 inet dhcp
-#   bridge_ports regex eth.*  #autobridge_br1=""
-#   bridge_stp off            ifconfig_br1="inet 192.168.1.161/27 up"
-#   bridge_maxwait 0          autobridge_br0="alc0"
-#   bridge_fd 0               ifconfig_br0="SYNCDHCP"
-# iface br0 inet6 auto        ifconfig_br0_ipv6="inet6 accept_rtadv"
+# #iface eth0 inet dhcp       if_tap_load="YES"     perm  tap*  0660
+# #iface eth0 inet6 auto
+# iface eth0 inet manual      /etc/devfs.rules ..
+#                             -------------------
+# auto br1                    [devfsrules_system=10]
+# iface br1 inet static       add   path   'tap*'   mode 0660  group operator
+#   bridge_ports none
+#   bridge_stp off            /etc/rc.conf ..
+#   bridge_maxwait 0          ----------------------
+#   bridge_fd 0               ifconfig_alc0="SYNCDHCP"
+#   address 192.168.1.161     ifconfig_alc0_ipv6="inet6 accept_rtadv"
+#   #netmask 255.255.255.224  #ifconfig_alc0="up"
+#   #gateway 192.168.0.1
+# auto br0                    wlans_ath0="wlan0"
+# iface br0 inet dhcp         create_args_wlan0="country US regdomain FCC"
+#   bridge_ports regex eth.*  ifconfig_wlan0="WPA SYNCDHCP"
+#   bridge_stp off            ifconfig_wlan0_ipv6="inet6 accept_rtadv"
+#   bridge_maxwait 0          #create_args_wlan0="wlanaddr ??:??:??:??:??:?? country US \
+#   bridge_fd 0                 regdomain FCC"
+# iface br0 inet6 auto        #ifconfig_wlan0="WPA up"
+#
+#                             cloned_interfaces="bridge1 bridge0"
+#                             #cloned_interfaces="lagg0 bridge1 bridge0"
+#                             #ifconfig_lagg0="laggproto failover laggport alc0 \
+#                               laggport wlan0 SYNCDHCP"
+#                             #ifconfig_lagg0_ipv6="inet6 accept_rtadv"
+#
+#                             ifconfig_bridge1_name="br1"
+#                             ifconfig_bridge0_name="br0"
+#                             autobridge_interfaces="br1 br0"
+#                             #autobridge_br1=""
+#                             ifconfig_br1="inet 192.168.1.161/27 up"
+#                             autobridge_br0="alc0"
+#                             ifconfig_br0="up"
 
 # (Void Linux)                    (Linux)
 # /etc/rc.local                   /etc/qemu/bridge.conf
@@ -107,42 +126,57 @@
 
 
 # NOTE, Linux|BSD modify firewall rules|services for qemu network - nat br1
-# ### natip_cidr=192.168.1.160/27 ###
+# ### define nat_ifc = br1 ; define natip_cidr = 192.168.1.160/27 ###
 # (Linux - firewalld|iptables|nftables)
 # #?firewall-offline-cmd [--zone=external] --add-source=$natip_cidr \
 # #?  --add-masquerade
+# #iptables -t nat -I POSTROUTING -o $ext_ifc -j MASQUERADE
+# #nft insert rule ip nat postrouting oifname $ext_ifc counter masquerade
 # #iptables -t nat -I POSTROUTING -s $natip_cidr ! -d $natip_cidr -j MASQUERADE
-# #nft insert rule ip nat postrouting ip saddr $natip_cidr ip daddr != \
-# #  $natip_cidr counter masquerade
-# #iptables -t nat -I POSTROUTING -o wlan0 -j MASQUERADE
-# nft insert rule ip nat postrouting oifname "wlan0" counter masquerade
+# nft insert rule ip nat postrouting ip saddr $natip_cidr ip daddr != \
+#   $natip_cidr counter masquerade
 #
 # #?firewall-offline-cmd [--zone=external] --add-rich-rule='rule family=ipv4 \
 # #?  source address=$natip_cidr accept'
-# #iptables -I FORWARD -s $natip_cidr -i br1 -j ACCEPT
-# #nft insert rule inet filter forward ip saddr $natip_cidr iifname "br1" \
-# #  counter accept
-# #iptables -I FORWARD -i br1 -o wlan0 -j ACCEPT
-# nft insert rule inet filter forward iifname "br1" oifname "wlan0" counter \
-#   accept
+# #iptables -I FORWARD -i $nat_ifc -o $ext_ifc -j ACCEPT
+# #nft insert rule inet filter forward iifname $nat_ifc oifname $ext_ifc counter \
+# #  accept
+# #iptables -I FORWARD -s $natip_cidr -i $nat_ifc -j ACCEPT
+# nft insert rule inet filter forward ip saddr $natip_cidr iifname $nat_ifc \
+#   counter accept
 #
 # #?firewall-offline-cmd [--zone=external] --add-rich-rule='rule family=ipv4 \
 # #?  destination address=$natip_cidr accept'
-# #iptables -I FORWARD -d $natip_cidr -o br1 -m conntrack --ctstate \
-# #  RELATED,ESTABLISHED -j ACCEPT
-# #nft insert rule inet filter forward ip daddr $natip_cidr oifname "br1" \
-# #  ct state related,established counter accept
-# #iptables -I FORWARD -i wlan0 -o br1 -m conntrack --ctstate RELATED, \
+# #iptables -I FORWARD -i $ext_ifc -o $nat_ifc -m conntrack --ctstate RELATED, \
 # #  ESTABLISHED -j ACCEPT
-# nft insert rule inet filter forward iifname "wlan0" oifname "br1" \
+# #nft insert rule inet filter forward iifname $ext_ifc oifname $nat_ifc \
+# #  ct state related,established counter accept
+# #iptables -I FORWARD -d $natip_cidr -o $nat_ifc -m conntrack --ctstate \
+# #  RELATED,ESTABLISHED -j ACCEPT
+# nft insert rule inet filter forward ip daddr $natip_cidr oifname $nat_ifc \
 #   ct state related,established counter accept
 
+# ### ext_ifc = "alc0" ; nat_ifc = "br1" ###
 # (BSD - pf)
-# nat on wlan0 inet from br1:network to any -> (wlan0)
-# #pass from br1:network to any keep state
-# pass on br1 from br1:network to any
-# pass on wlan0 from br1:network to any keep state
+# ..
+# scrub in all fragment reassemble no-df max-mss 1440
+# nat on \$ext_ifc inet from \$nat_ifc:network to any -> (\$ext_ifc)
+# block all label 'policy deny incoming, deny outgoing'
+# ..
+# #pass from \$nat_ifc:network to any keep state
+# pass on \$nat_ifc from \$nat_ifc:network to any
+# pass on \$ext_ifc from \$nat_ifc:network to any keep state
+# ..
 
 # (Linux) $ sed -i 's|domain|domain, bootps, bootpc, mdns|g' /etc/nftables.conf
 # (Linux) $ sed -i 's|domain|domain, bootps, bootpc, mdns|g' /etc/nftables/*.conf
 # (BSD) $ sed -i '' 's|domain|domain, bootps, bootpc, mdns|g' /etc/pf/*.rules
+
+# QEMU net option examples
+# # nic with model and random MAC address
+#  -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | \
+#    sed 's|\(..\)|\1:|g; s|:$||') \
+# # then either below:
+#  ${NET_OPTS:--net bridge,br=br0}
+#  ${NET_OPTS:--net tap,ifname=tap0,script=no,downscript=no}
+#  ${NET_OPTS:--net user,hostfwd=tcp::4022-:22}

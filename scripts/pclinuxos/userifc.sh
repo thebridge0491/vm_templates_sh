@@ -23,6 +23,12 @@ XFdrake --auto
 #drakx11 ; sleep 5 ; drakdm ; sleep 5 ; drakboot ; sleep 5
 mv /etc/X11/xorg.conf /etc/X11/xorg.conf.bak || true
 
+# enable touchpad tapping
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /usr/share/X11/xorg.conf.d/10-evdev.conf
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /usr/share/X11/xorg.conf.d/40-libinput.conf
+
 # update XDG user dir config
 export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
 echo 'BIN=bin' >> /etc/xdg/user-dirs.defaults

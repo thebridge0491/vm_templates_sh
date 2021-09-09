@@ -81,6 +81,12 @@ chown packer:$(id -gn packer) /home/packer/.xinitrc
 # set video resolution ? gop 6: 1024x768x32
 sed -i 's|;boot|;gop 6;boot|g' /boot.cfg
 
+# enable touchpad tapping
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /etc/X11/xorg.conf.d/10-evdev.conf
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /etc/X11/xorg.conf.d/40-libinput.conf
+
 # update XDG user dir config
 export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
 #sh -c "echo 'BIN=bin' >> /usr/pkg/etc/xdg/user-dirs.defaults"

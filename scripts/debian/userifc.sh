@@ -9,12 +9,12 @@ svc_enable() {
   svc=${1}
   if command -v systemctl > /dev/null ; then
     systemctl enable $svc ;
-  elif command -v update-rc.d > /dev/null ; then
-  	update-rc.d $svc defaults ;
   elif command -v sv > /dev/null ; then
     ln -s /etc/sv/$svc /var/service ;
   elif command -v rc-update > /dev/null ; then
     rc-update add $svc default ;
+  elif command -v update-rc.d > /dev/null ; then
+  	update-rc.d $svc defaults ;
   fi
 }
 
@@ -42,6 +42,12 @@ svc_enable $(basename `cat /etc/X11/default-display-manager`)
 svc_enable display-manager
 #systemctl set-default graphical.target ; sleep 3
 chmod 1777 /tmp
+
+# enable touchpad tapping
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /usr/share/X11/xorg.conf.d/10-evdev.conf
+sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+  /usr/share/X11/xorg.conf.d/40-libinput.conf
 
 # update XDG user dir config
 export LANG=en_US.UTF-8 ; export CHARSET=UTF-8

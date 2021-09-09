@@ -35,7 +35,7 @@ parttbl_bkup() {
 }
 
 gpart_hddisk() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0}
 
   echo "Partitioning disk" ; sleep 3
   #gpart destroy -F $DEVX
@@ -148,7 +148,7 @@ zfspart_create() {
 }
 
 format_partitions() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
   MKFS_CMD=${MKFS_CMD:-newfs -U -t}
   BSD_PARTNMS=${BSD_PARTNMS:-${GRP_NM}-fsSwap ${GRP_NM}-fsRoot ${GRP_NM}-fsVar ${GRP_NM}-fsHome}
 
@@ -175,7 +175,7 @@ format_partitions() {
 }
 
 part_format_hddisk() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
 
   gpart_hddisk $VOL_MGR $GRP_NM
   format_partitions $VOL_MGR $GRP_NM $ZPARTNM_ZPOOLNM

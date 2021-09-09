@@ -35,7 +35,7 @@ parttbl_bkup() {
 }
 
 gpart_vmdisk() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0}
 
   echo "Partitioning disk" ; sleep 3
   #gpart destroy -F $DEVX
@@ -123,22 +123,24 @@ zfspart_create() {
   #zfs set mountpoint=/$zpoolnm $zpoolnm
 
   zpool set bootfs=$zpoolnm/ROOT/default $zpoolnm # ??
-  zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm ; sync
+  zpool set cachefile=/var/tmp/zpool.cache $zpoolnm ; sync
 
   zpool export $zpoolnm ; sync ; sleep 3
-  zpool import -R /mnt -N $zpoolnm
   zpool import -d /dev/${DEVX}p${idx} -R /mnt -N $zpoolnm
+  #zpool import -R /mnt -N $zpoolnm
   zfs mount $zpoolnm/ROOT/default ; zfs mount -a ; sync
-  zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm
-  sync ; cat /etc/zfs/zpool.cache ; sleep 3
-  mkdir -p /mnt/etc/zfs ; cp /etc/zfs/zpool.cache /mnt/etc/zfs/
+
+  zpool set cachefile=/var/tmp/zpool.cache $zpoolnm
+  sync ; cat /var/tmp/zpool.cache ; sleep 3
+  mkdir -p /mnt/boot/zfs ; cp /var/tmp/zpool.cache /mnt/boot/zfs/
 
   zpool list -v ; sleep 3 ; zfs list ; sleep 3
   zfs mount ; sleep 5
+  zpool set cachefile=/boot/zfs/zpool.cache $zpoolnm
 }
 
 format_partitions() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
   MKFS_CMD=${MKFS_CMD:-newfs -U -t}
   BSD_PARTNMS=${BSD_PARTNMS:-${GRP_NM}-fsSwap ${GRP_NM}-fsRoot ${GRP_NM}-fsVar ${GRP_NM}-fsHome}
 
@@ -165,7 +167,7 @@ format_partitions() {
 }
 
 part_format_vmdisk() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
 
   gpart_vmdisk $VOL_MGR $GRP_NM
   format_partitions $VOL_MGR $GRP_NM $ZPARTNM_ZPOOLNM

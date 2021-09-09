@@ -35,7 +35,7 @@
     "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
     "boot_command": [
       "<esc><wait5>boot -s<wait><enter><wait10><wait10>/bin/sh<enter><wait>",
-      "mdmfs -s 100m md1 /tmp ; mdmfs -s 100m md2 /mnt ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; geom -t ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "mdmfs -s 100m md1 /mnt ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; geom -t ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
     ]
   },
   {
@@ -73,7 +73,7 @@
     "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
     "boot_command": [
       "2<enter><wait10><wait10><enter><wait>",
-      "mdmfs -s 100m md1 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/installerconfig http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installerconfig ; export CRYPTED_PASSWD='{{user `crypted_passwd`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; geom -t ; sleep 3 ; bsdinstall script /tmp/installerconfig<enter>"
+      "mdmfs -s 100m md1 /mnt ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/installerconfig http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installerconfig ; export CRYPTED_PASSWD='{{user `crypted_passwd`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; geom -t ; sleep 3 ; bsdinstall script /tmp/installerconfig<enter>"
     ]
   }],
 

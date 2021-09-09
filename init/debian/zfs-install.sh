@@ -23,6 +23,7 @@ fi
 export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
 # [deb.devuan.org/merged | deb.debian.org/debian]
 export MIRROR=${MIRROR:-deb.devuan.org/merged}
+service_mgr=${service_mgr:-sysvinit} # sysvinit | runit | openrc
 
 export INIT_HOSTNAME=${1:-devuan-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -106,7 +107,6 @@ sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
 sed -i '/^#[ ]*deb/ s|^#||' /etc/apt/sources.list
 sed -i '/^[ ]*deb cdrom:/ s|^|#|' /etc/apt/sources.list
 cat /etc/apt/sources.list ; sleep 5
-
 
 echo "Add software package selection(s)" ; sleep 3
 apt-get --yes update
@@ -200,6 +200,18 @@ echo "Hold zfs & kernel package upgrades (require manual upgrade)"
 apt-mark hold zfs-dkms zfsutils-linux zfs-initramfs linux-image-amd64 linux-headers-amd64 linux-image-\$(uname -r) linux-headers-\$(uname -r)
 #dpkg -l | grep "^hi"
 apt-mark showhold ; sleep 3
+
+
+if [ "devuan" = "\${ID}" ] ; then
+  if [ "sysvinit" = "${service_mgr}" ] ; then
+    service_pkgs="sysvinit-core" ;
+  elif [ "runit" = "${service_mgr}" ] ; then
+    service_pkgs="runit-init" ;
+  elif [ "openrc" = "${service_mgr}" ] ; then
+    service_pkgs="openrc" ;
+  fi ;
+  apt-get --yes install --no-install-recommends \${service_pkgs} ;
+fi
 
 
 echo "Bootloader installation & config" ; sleep 3

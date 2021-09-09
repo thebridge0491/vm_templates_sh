@@ -112,10 +112,12 @@ EOF
 sysrc -f /boot/loader.conf linux_load="YES"
 sysrc -f /boot/loader.conf cuse4bsd_load="YES"
 sysrc -f /boot/loader.conf fuse_load="YES"
+sysrc -f /boot/loader.conf fusefs_load="YES"
 #sysrc -f /boot/loader.conf if_ath_load="YES"
 
-sysrc linux_enable="YES"
 sysrc fuse_enable="YES"
+sysrc fusefs_enable="YES"
+sysrc linux_enable="YES"
 
 cat << EOF >> /etc/sysctl.conf
 kern.geom.label.disk_ident.enable="0"
@@ -153,6 +155,7 @@ sysrc sshd_enable="YES"
 
 
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
+ABI=\$(pkg config abi)
 #pkg install -y nano sudo xfce
 pkg install -y nano sudo
 #pkg install -y openzfs
@@ -211,6 +214,7 @@ cat << EOF >> /usr/local/etc/pkg/repos/FreeBSD.conf
 FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
+	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
 	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI:-FreeBSD:13:amd64}/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",

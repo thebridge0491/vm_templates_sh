@@ -43,7 +43,7 @@ freebsd() {
   ##!! (bsdinstall) navigate to single user: 2
   ##!! if late, Live CD -> root/-
 
-  #mdmfs -s 100m md1 /tmp ; cd /tmp ; ifconfig
+  #mdmfs -s 100m md1 /mnt ; cd /tmp ; ifconfig
   #dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev} {ifdev}
 
   ## (FreeBSD) install with bsdinstall script

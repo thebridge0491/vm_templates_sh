@@ -310,7 +310,7 @@ zfspart_create() {
   zfs create -o mountpoint=none -o canmount=off $zpoolnm/ROOT
   zfs create -o canmount=noauto -o mountpoint=/ $zpoolnm/ROOT/default
   #zfs create -o mountpoint=/ $zpoolnm/ROOT/default
-  zfs mount -o exec $zpoolnm/ROOT/default
+  zfs mount -o exec,dev $zpoolnm/ROOT/default
 
   zfs create -o mountpoint=/tmp -o com.sun:auto-snapshot=false $zpoolnm/tmp
   zfs create -o mountpoint=/usr -o canmount=off $zpoolnm/usr
@@ -338,7 +338,7 @@ zfspart_create() {
   zpool export $zpoolnm ; sync ; sleep 3
   zpool import -d /dev/${DEVX}${idx} -R /mnt -N $zpoolnm
   zpool import -R /mnt -N $zpoolnm
-  zfs mount -o exec $zpoolnm/ROOT/default ; zfs mount -a ; sync
+  zfs mount -o exec,dev $zpoolnm/ROOT/default ; zfs mount -a ; sync
   zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm
   sync ; cat /etc/zfs/zpool.cache ; sleep 3
   mkdir -p /mnt/etc/zfs ; cp /etc/zfs/zpool.cache /mnt/etc/zfs/
