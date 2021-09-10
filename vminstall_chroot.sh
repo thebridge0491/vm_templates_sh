@@ -18,7 +18,7 @@
 #   (default) [env variant=freebsd] sh vminstall_chroot.sh [freebsd [freebsd-Release-zfs]]
 
 USE_VIRTINST=${USE_VIRTINST:-0} ; STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)}
-ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros}
+ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros} ; USE_BHYVE=${USE_BHYVE:-0}
 
 mkdir -p $HOME/.ssh/publish_krls $HOME/.pki/publish_crls
 cp -R $HOME/.ssh/publish_krls init/common/skel/_ssh/
@@ -26,6 +26,7 @@ cp -R $HOME/.pki/publish_crls init/common/skel/_pki/
 
 freebsd() {
   variant=${variant:-freebsd} ; GUEST=${1:-freebsd-Release-zfs}
+  FREEBSDGUEST=1
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE-amd64)
   sleep 5
@@ -294,59 +295,103 @@ ${@:-freebsd freebsd-Release-zfs}
 
 OUT_DIR=${OUT_DIR:-build/${GUEST}}
 mkdir -p ${OUT_DIR}
-qemu-img create -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M
-
-if [ "1" = "${USE_VIRTINST}" ] ; then
-	#-------------- using virtinst ------------------
-	CONNECT_OPT=${CONNECT_OPT:---connect qemu:///system}
-	VUEFI_OPTS=${VUEFI_OPTS:---boot uefi}
-
-	# NOTE, to convert qemu-system args to libvirt domain XML:
-	# eval "echo \"$(< vminstall_qemu.args)\"" > /tmp/install_qemu.args
-	# virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
-
-	virt-install ${CONNECT_OPT} --memory 2048 --vcpus 2 \
-  	--controller usb,model=ehci --controller virtio-serial \
-  	--console pty,target_type=virtio --graphics vnc,port=-1 \
-  	--network network=default,model=virtio-net,mac=RANDOM \
-  	--boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
-  	--disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
-  	--cdrom=${ISO_PATH} ${VUEFI_OPTS} -n ${GUEST} &
-
-	echo "### Once network connected, transfer needed file(s) ###"
-	sleep 30 ; virsh ${CONNECT_OPT} vncdisplay ${GUEST}
-	#sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml
+if [ "1" = "${USE_BHYVE}" ] ; then
+  truncate -s 30720M ${OUT_DIR}/${GUEST}.raw ;
 else
-	#------------ using qemu-system-* ---------------
-	QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${STORAGE_DIR}/OVMF/OVMF_CODE.fd"}
-	echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3
-	cat /etc/qemu/bridge.conf ; sleep 5
-	echo "(if needed) Quickly catch boot menu to add kernel boot parameters"
-	sleep 5
-
-	qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg -smp cpus=2 -m size=2048 \
-	  -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
-	  -display default,show-cursor=on -boot order=cdn,menu=on -usb \
-	  -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-	  ${NET_OPTS:--net bridge,br=br0} \
-	  -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
-	  -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-	  -cdrom ${ISO_PATH} ${QUEFI_OPTS} -name ${GUEST} &
-
-	echo "### Once network connected, transfer needed file(s) ###"
+  qemu-img create -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M ;
 fi
 
-if command -v erb > /dev/null ; then
-  erb variant=${variant} init/common/Vagrantfile.erb > ${OUT_DIR}/Vagrantfile ;
-elif command -v pystache > /dev/null ; then
-  pystache init/common/Vagrantfile.mustache "{\"variant\":\"${variant}\"}" \
-    > ${OUT_DIR}/Vagrantfile ;
-elif command -v mustache > /dev/null ; then
-	cat << EOF >> mustache - init/common/Vagrantfile.mustache > ${OUT_DIR}/Vagrantfile
+if [ "1" = "${USE_VIRTINST}" ] ; then
+  #-------------- using virtinst ------------------
+  CONNECT_OPT=${CONNECT_OPT:---connect qemu:///system}
+  VUEFI_OPTS=${VUEFI_OPTS:---boot uefi}
+
+  # NOTE, to convert qemu-system args to libvirt domain XML:
+  # eval "echo \"$(< vminstall_qemu.args)\"" > /tmp/install_qemu.args
+  # virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
+
+  virt-install ${CONNECT_OPT} --memory 2048 --vcpus 2 \
+	--controller usb,model=ehci --controller virtio-serial \
+    --console pty,target_type=virtio --graphics vnc,port=-1 \
+    --network network=default,model=virtio-net,mac=RANDOM \
+    --boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
+    --disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
+    --cdrom=${ISO_PATH} ${VUEFI_OPTS} -n ${GUEST} &
+
+  echo "### Once network connected, transfer needed file(s) ###"
+  sleep 30 ; virsh ${CONNECT_OPT} vncdisplay ${GUEST}
+  #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml
+elif [ "1" = "${USE_BHYVE}" ] ; then
+  #---------------- using bhyve -------------------
+  printf "%40s\n" | tr ' ' '#'
+  echo '### Warning: FreeBSD bhyve currently requires root/sudo permission ###'
+  printf "%40s\n\n" | tr ' ' '#' ; sleep 5
+  
+  BUEFI_OPTS=${BUEFI_OPTS:- -s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
+    -l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
+  
+  if [ "1" = "${FREEBSDGUEST:-0}" ] ; then
+    #bhyveload -m 2048M -d ${OUT_DIR}/${GUEST}.raw ${GUEST} ;
+  else
+    cat << EOF > ${OUT_DIR}/device.map ;
+(hd0) ${OUT_DIR}/${GUEST}.raw
+(cd0) ${ISO_PATH}
+EOF
+    grub-bhyve -m ${OUT_DIR}/device.map -r cd0 -M 2048M ${GUEST} ;
+  fi
+  
+  bhyve -A -H -P -c 2 -m 2048M -s 0,hostbridge -s 1,lpc \
+    -s 2,virtio-net,${NET_OPTS:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+    -s 3,ahci-hd,${OUT_DIR}/${GUEST}.raw -l com1,stdio \
+    ${BUEFI_OPTS} -s 31,ahci-cd,${ISO_PATH} ${GUEST} &
+  
+  vncviewer :${VNCPORT:-5901} &
+else
+  #------------ using qemu-system-* ---------------
+  QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${STORAGE_DIR}/OVMF/OVMF_CODE.fd"}
+  echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3
+  cat /etc/qemu/bridge.conf ; sleep 5
+  echo "(if needed) Quickly catch boot menu to add kernel boot parameters"
+  sleep 5
+
+  qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg -smp cpus=2 -m size=2048 \
+    -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
+    -display default,show-cursor=on -boot order=cdn,menu=on -usb \
+    -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+    ${NET_OPTS:--net bridge,br=br0} \
+    -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
+    -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+    -cdrom ${ISO_PATH} ${QUEFI_OPTS} -name ${GUEST} &
+
+  echo "### Once network connected, transfer needed file(s) ###"
+fi
+
+if [ "1" = "${USE_BHYVE}" ] ; then
+  if command -v erb > /dev/null ; then
+    erb variant=${variant} init/common/Vagrantfile_bhyve.erb > ${OUT_DIR}/Vagrantfile ;
+  elif command -v pystache > /dev/null ; then
+    pystache init/common/Vagrantfile_bhyve.mustache "{\"variant\":\"${variant}\"}" \
+      > ${OUT_DIR}/Vagrantfile ;
+  elif command -v mustache > /dev/null ; then
+	cat << EOF >> mustache - init/common/Vagrantfile_bhyve.mustache > ${OUT_DIR}/Vagrantfile
 ---
 variant: ${variant}
 ---
 EOF
+  fi ;
+else
+  if command -v erb > /dev/null ; then
+    erb variant=${variant} init/common/Vagrantfile_libvirt.erb > ${OUT_DIR}/Vagrantfile ;
+  elif command -v pystache > /dev/null ; then
+    pystache init/common/Vagrantfile_libvirt.mustache "{\"variant\":\"${variant}\"}" \
+      > ${OUT_DIR}/Vagrantfile ;
+  elif command -v mustache > /dev/null ; then
+	cat << EOF >> mustache - init/common/Vagrantfile_libvirt.mustache > ${OUT_DIR}/Vagrantfile
+---
+variant: ${variant}
+---
+EOF
+  fi ;
 fi
 
 cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun* OVMF/OVMF_CODE.fd ${OUT_DIR}/

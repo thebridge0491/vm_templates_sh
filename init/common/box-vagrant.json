@@ -1,24 +1,43 @@
 {
-  "_usage_build": "packer build [-var vm_name=freebsd-Release-zfs] [-var variant=freebsd] [-var author=thebridge0491] [-var datestamp=???] -only=[box-libvirt] box-vagrant.json",
+  "_usage_build": "packer build [-var vm_name=freebsd-Release-zfs] [-var variant=freebsd] [-var author=thebridge0491] [-var datestamp=???] -only=[box-libvirt|box-bhyve] box-vagrant.json",
 
   "builders": [{
     "type": "null",
     "name": "box-libvirt",
     "communicator": "none"
+  },
+  {
+    "type": "null",
+    "name": "box-bhyve",
+    "communicator": "none"
   }],
   "provisioners": [{
     "type": "shell-local",
     "inline": [
-      "cp -R init/common/info.json init/common/metadata.json init/common/qemu_lxc/vmrun* OVMF/OVMF_CODE.fd output-vms/{{user `vm_name`}}/",
+      "cp -R init/common/info.json init/common/metadata_libvirt.json init/common/qemu_lxc/vmrun* OVMF/OVMF_CODE.fd output-vms/{{user `vm_name`}}/",
       "if command -v erb > /dev/null ; then",
       "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
-      "erb variant={{user `variant`}} init/common/Vagrantfile.erb > output-vms/{{user `vm_name`}}/Vagrantfile",
+      "erb variant={{user `variant`}} init/common/Vagrantfile_libvirt.erb > output-vms/{{user `vm_name`}}/Vagrantfile",
       "fi",
       "cd output-vms/{{user `vm_name`}}",
       "qemu-img convert -f qcow2 -O qcow2 {{user `vm_name`}}.qcow2 box.img",
       "tar -cvzf {{user `vm_name`}}-{{user `datestamp`}}.libvirt.box metadata.json info.json Vagrantfile `ls vmrun*` OVMF_CODE.fd box.img"
     ],
     "only": ["box-libvirt"]
+  },
+  {
+    "type": "shell-local",
+    "inline": [
+      "cp -R init/common/info.json init/common/metadata_bhyve.json init/common/qemu_lxc/vmrun* /usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd output-vms/{{user `vm_name`}}/",
+      "if command -v erb > /dev/null ; then",
+      "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
+      "erb variant={{user `variant`}} init/common/Vagrantfile_bhyve.erb > output-vms/{{user `vm_name`}}/Vagrantfile",
+      "fi",
+      "cd output-vms/{{user `vm_name`}}",
+      "mv {{user `vm_name`}}.img box.img",
+      "tar -cvzf {{user `vm_name`}}-{{user `datestamp`}}.bhyve.box metadata.json info.json Vagrantfile `ls vmrun* device.map` BHYVE_UEFI_CODE.fd box.img"
+    ],
+    "only": ["box-bhyve"]
   }],
   "variables": {
     "vm_name": "freebsd-Release-zfs",

@@ -1,3 +1,6 @@
+#mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-Release-zfs}}
+#qemu-img create -f qcow2 ${OUT_DIR:-build/${GUEST:-freebsd-Release-zfs}}/${GUEST:-freebsd-Release-zfs}.qcow2 30720M
+  
 qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg -smp cpus=2 -m size=2048 \
   -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
   -display default,show-cursor=on -boot order=cd,menu=on -usb \

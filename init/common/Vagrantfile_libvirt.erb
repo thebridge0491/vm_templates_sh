@@ -1,3 +1,4 @@
+<%# usage: erb variant=freebsd <template> %>
 ## minimal contents
 #Vagrant.configure("2") do |config|
 #  config.vm.provider :libvirt do |p|
@@ -15,7 +16,7 @@
 #   env RUNSCRIPT_ARGS="upgradepkgs.sh" vagrant provision --provision-with runscript
 RUNSCRIPT_ARGS = ENV.fetch('RUNSCRIPT_ARGS', 'upgradepkgs.sh').split()
 
-variant = '#{ENV.fetch('variant', 'freebsd')}'
+variant = '<%=variant%>'
 repo_dir = "#{ENV.fetch('repo_dir', '/mnt/Data0/vm_templates_sh')}"
 
 Vagrant.configure(2) do |config|

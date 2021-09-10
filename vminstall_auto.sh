@@ -277,12 +277,12 @@ else
 fi
 
 if command -v erb > /dev/null ; then
-  erb variant=${variant} init/common/Vagrantfile.erb > ${OUT_DIR}/Vagrantfile ;
+  erb variant=${variant} init/common/Vagrantfile_libvirt.erb > ${OUT_DIR}/Vagrantfile ;
 elif command -v pystache > /dev/null ; then
-  pystache init/common/Vagrantfile.mustache "{\"variant\":\"${variant}\"}" \
+  pystache init/common/Vagrantfile_libvirt.mustache "{\"variant\":\"${variant}\"}" \
     > ${OUT_DIR}/Vagrantfile ;
 elif command -v mustache > /dev/null ; then
-	cat << EOF >> mustache - init/common/Vagrantfile.mustache > ${OUT_DIR}/Vagrantfile
+  cat << EOF >> mustache - init/common/Vagrantfile_libvirt.mustache > ${OUT_DIR}/Vagrantfile
 ---
 variant: ${variant}
 ---

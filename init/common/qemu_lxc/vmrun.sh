@@ -5,19 +5,26 @@
 #   sh vmrun.sh run_virsh [GUEST]
 #   or
 #   sh vmrun.sh run_qemu [GUEST]
+#   or
+#   sh vmrun.sh run_bhyve [GUEST]
 #
 # example ([defaults]):
 #   sh vmrun.sh run_qemu [freebsd-Release-zfs]
 
-STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)} ; IMGEXT=${IMGEXT:-.qcow2}
+STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)} ; IMGFMT=${IMGFMT:-qcow2}
 
 #-------- create Vagrant ; use box image --------
 box_vagrant() {
-  GUEST=${1:-freebsd-Release-zfs} ; IMGFILE=${IMGFILE:-${GUEST}${IMGEXT}}
+  GUEST=${1:-freebsd-Release-zfs} ; PROVIDER=${PROVIDER:-libvirt}
   author=${author:-thebridge0491} ; datestamp=${datestamp:-`date +"%Y.%m.%d"`}
   if [ ! -e ${STORAGE_DIR}/metadata.json ] ; then
-    echo '{"provider":"libvirt","virtual_size":30,"format":"qcow2"}' > \
-      ${STORAGE_DIR}/metadata.json ;
+    if [ "libvirt" = "${PROVIDER}" ] ; then
+      echo '{"provider":"libvirt","virtual_size":30,"format":"qcow2"}' > \
+        ${STORAGE_DIR}/metadata.json ;
+    elif [ "bhyve" = "${PROVIDER}" ] ; then
+      echo '{"provider":"bhyve","virtual_size":30,"format":"raw"}' > \
+        ${STORAGE_DIR}/metadata.json ;
+    fi ;
   fi
   if [ ! -e ${STORAGE_DIR}/info.json ] ; then
     cat << EOF > ${STORAGE_DIR}/info.json ;
@@ -29,12 +36,13 @@ box_vagrant() {
 EOF
   fi
   if [ ! -e ${STORAGE_DIR}/Vagrantfile ] ; then
-    cat << EOF > ${STORAGE_DIR}/Vagrantfile ;
+    if [ "libvirt" = "${PROVIDER}" ] ; then
+        cat << EOF > ${STORAGE_DIR}/Vagrantfile ;
 
 ## minimal contents
 #Vagrant.configure("2") do |config|
-#  config.vm.provider :libvirt do |libvirt|
-#    libvirt.driver = 'kvm'
+#  config.vm.provider :libvirt do |p|
+#    p.driver = 'kvm'
 #  end
 #end
 
@@ -60,10 +68,45 @@ Vagrant.configure(2) do |config|
   end
 end
 EOF
+    elif [ "bhyve" = "${PROVIDER}" ] ; then
+        cat << EOF > ${STORAGE_DIR}/Vagrantfile ;
+
+## minimal contents
+#Vagrant.configure("2") do |config|
+#  config.vm.provider :bhyve do |p|
+#    p.cpus = 1
+#    p.memory = 1024
+#  end
+#end
+
+# custom contents
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+
+  config.ssh.shell = 'sh'
+  config.vm.boot_timeout = 1800
+  config.vm.synced_folder '.', '/vagrant', disabled: true
+
+  config.vm.provider :bhyve do |p, override|
+    p.cpus = 2
+    p.memory = 2048
+  end
+end
+EOF
+    fi
   fi
-  #mv ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img
-  qemu-img convert -f qcow2 -O qcow2 ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img
-  (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${datestamp}.libvirt.box metadata.json info.json Vagrantfile `ls vmrun*` OVMF_CODE.fd box.img)
+  if [ "libvirt" = "${PROVIDER}" ] ; then
+    IMGFILE=${IMGFILE:-${GUEST}.${IMGFMT}} ;
+    #mv ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img ;
+    qemu-img convert -f qcow2 -O qcow2 ${STORAGE_DIR}/${IMGFILE} \
+      ${STORAGE_DIR}/box.img ;
+  elif [ "bhyve" = "${PROVIDER}" ] ; then
+    IMGFILE=${IMGFILE:-${GUEST}.raw}
+    mv ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img ;
+  fi
+  (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${datestamp}.${PROVIDER}.box metadata.json info.json Vagrantfile `ls vmrun* device.map` OVMF_CODE.fd box.img)
 
   if command -v erb > /dev/null ; then
     erb author=${author} guest=${GUEST} datestamp=${datestamp} \
@@ -85,24 +128,24 @@ EOF
   fi
 }
 
-diff_boximage() {
+diff_qemuimage() {
   GUEST=${1:-freebsd-Release-zfs} ; BOXPREFIX=${BOXPREFIX:-${GUEST}}
   qemu-img create -f qcow2 -o backing_file=$(cd ${STORAGE_DIR} ; find ${BOXPREFIX}*libvirt.box -name box.img | tail -n1) \
-    ${STORAGE_DIR}/${GUEST}${IMGEXT}
+    ${STORAGE_DIR}/${GUEST}.${IMGFMT}
   echo ''
-  qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}${IMGEXT} ; sleep 5
+  qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}.${IMGFMT} ; sleep 5
 }
 
 revert_backingimage() {
   GUEST=${1:-freebsd-Release-zfs} ; BOXPREFIX=${BOXPREFIX:-${GUEST}}
-  backing_file=$(cd ${STORAGE_DIR} ; qemu-img info --backing-chain ${GUEST}${IMGEXT} | sed -n 's|backing file:[ ]*\(.*\)$|\1|p')
-  mv ${STORAGE_DIR}/${GUEST}${IMGEXT} ${STORAGE_DIR}/${GUEST}${IMGEXT}.bak
-  sync ; (cd ${STORAGE_DIR} ; cp ${backing_file} ${GUEST}${IMGEXT}) ; sync
-  (cd ${STORAGE_DIR} ; qemu-img rebase -b ${GUEST}${IMGEXT} \
-    ${STORAGE_DIR}/${GUEST}${IMGEXT}.bak ; sync)
-  qemu-img commit ${STORAGE_DIR}/${GUEST}${IMGEXT}.bak ; sync
-  rm ${STORAGE_DIR}/${GUEST}${IMGEXT}.bak ; sync
-  qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}${IMGEXT} ; sleep 5
+  backing_file=$(cd ${STORAGE_DIR} ; qemu-img info --backing-chain ${GUEST}.${IMGFMT} | sed -n 's|backing file:[ ]*\(.*\)$|\1|p')
+  mv ${STORAGE_DIR}/${GUEST}.${IMGFMT} ${STORAGE_DIR}/${GUEST}.${IMGFMT}.bak
+  sync ; (cd ${STORAGE_DIR} ; cp ${backing_file} ${GUEST}.${IMGFMT}) ; sync
+  (cd ${STORAGE_DIR} ; qemu-img rebase -b ${GUEST}.${IMGFMT} \
+    ${STORAGE_DIR}/${GUEST}.${IMGFMT}.bak ; sync)
+  qemu-img commit ${STORAGE_DIR}/${GUEST}.${IMGFMT}.bak ; sync
+  rm ${STORAGE_DIR}/${GUEST}.${IMGFMT}.bak ; sync
+  qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}.${IMGFMT} ; sleep 5
 }
 #------------------------------------------------
 
@@ -122,7 +165,7 @@ import_lxc() {
 }
 
 import_qemu() {
-  GUEST=${1:-freebsd-Release-zfs} ; IMGFILE=${IMGFILE:-${GUEST}${IMGEXT}}
+  GUEST=${1:-freebsd-Release-zfs} ; IMGFILE=${IMGFILE:-${GUEST}.${IMGFMT}}
   CONNECT_OPT=${CONNECT_OPT:---connect qemu:///system}
   VUEFI_OPTS=${VUEFI_OPTS:---boot uefi}
 
@@ -153,9 +196,33 @@ run_virsh() {
 }
 #------------------------------------------------
 
+#---------------- using bhyve -------------------
+run_bhyve() {
+  printf "%40s\n" | tr ' ' '#'
+  echo '### Warning: FreeBSD bhyve currently requires root/sudo permission ###'
+  printf "%40s\n\n" | tr ' ' '#' ; sleep 5
+  
+  GUEST=${1:-freebsd-Release-zfs} ; IMGFILE=${IMGFILE:-${GUEST}.raw}
+  BUEFI_OPTS=${BUEFI_OPTS:--s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
+    -s 30,xhci,tablet \
+    -l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
+  
+  bhyve -A -H -P -c 2 -m 2048M -l com1,stdio -s 0,hostbridge -s 1,lpc \
+    -s 2,virtio-net,${NET_OPTS:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+    -s 3,virtio-blk,${STORAGE_DIR}/${IMGFILE} \
+    ${VIRTFS_OPTS:--s 4,virtio-9p,9p_Data0=/mnt/Data0} \
+    ${BUEFI_OPTS} ${GUEST} &
+  
+  vncviewer :${VNCPORT:-5901} &
+  
+  #ls -al /dev/vmm # list running VMs
+  #bhyvectl --destroy --vm=${GUEST}
+}
+#------------------------------------------------
+
 #------------ using qemu-system-* ---------------
 run_qemu() {
-  GUEST=${1:-freebsd-Release-zfs} ; IMGFILE=${IMGFILE:-${GUEST}${IMGEXT}}
+  GUEST=${1:-freebsd-Release-zfs} ; IMGFILE=${IMGFILE:-${GUEST}.${IMGFMT}}
   QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${STORAGE_DIR}/OVMF_CODE.fd"}
   qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg -smp cpus=2 -m size=2048 \
     -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \

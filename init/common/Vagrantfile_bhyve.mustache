@@ -1,7 +1,15 @@
+{{! usage: cat << EOF | mustache - <template>
+---
+variant: freebsd
+---
+EOF
+}}
+
 ## minimal contents
 #Vagrant.configure("2") do |config|
-#  config.vm.provider :libvirt do |p|
-#    p.driver = 'kvm'
+#  config.vm.provider :bhyve do |p|
+#    p.cpus = 1
+#    p.memory = 1024
 #  end
 #end
 
@@ -15,7 +23,7 @@
 #   env RUNSCRIPT_ARGS="upgradepkgs.sh" vagrant provision --provision-with runscript
 RUNSCRIPT_ARGS = ENV.fetch('RUNSCRIPT_ARGS', 'upgradepkgs.sh').split()
 
-variant = '#{ENV.fetch('variant', 'freebsd')}'
+variant = '{{variant}}{{^variant}}freebsd{{/variant}}'
 repo_dir = "#{ENV.fetch('repo_dir', '/mnt/Data0/vm_templates_sh')}"
 
 Vagrant.configure(2) do |config|
@@ -24,19 +32,9 @@ Vagrant.configure(2) do |config|
   config.vm.boot_timeout = 1800
   config.vm.synced_folder '.', '/vagrant', disabled: true
 
-  config.vm.provider :libvirt do |p, override|
-    p.driver = 'kvm'
+  config.vm.provider :bhyve do |p, override|
     p.cpus = 2
     p.memory = 2048
-    p.video_vram = 64
-    p.video_type = 'qxl'
-    p.disk_bus = 'virtio'
-    p.nic_model_type = 'virtio'
-    p.management_network_name = 'default'
-    p.management_network_address = '192.168.122.0/24'
-    p.storage_pool_name = 'vm_samples'
-    p.default_prefix = ''
-    p.loader = '/usr/share/OVMF/OVMF_CODE.fd'
   end
 
   config.vm.define ENV.fetch('vm_name', File.basename(Dir.pwd))
