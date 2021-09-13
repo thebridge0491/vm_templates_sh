@@ -14,28 +14,36 @@
   "provisioners": [{
     "type": "shell-local",
     "inline": [
-      "cp -R init/common/info.json init/common/metadata_libvirt.json init/common/qemu_lxc/vmrun* OVMF/OVMF_CODE.fd output-vms/{{user `vm_name`}}/",
+      "cp -R init/common/metadata_libvirt.json output-vms/{{user `vm_name`}}/metadata.json",
+      "cp -R init/common/info.json init/common/qemu_lxc/vmrun* {{user `qemu_uefi_amd64_path`}} output-vms/{{user `vm_name`}}/",
       "if command -v erb > /dev/null ; then",
       "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
       "erb variant={{user `variant`}} init/common/Vagrantfile_libvirt.erb > output-vms/{{user `vm_name`}}/Vagrantfile",
+      "elif command -v pystache > /dev/null ; then",
+      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `vm_name`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
+      "pystache init/common/Vagrantfile_libvirt.mustache '{\"variant\":\"{{user `variant`}}\"}' > output-vms/{{user `vm_name`}}/Vagrantfile",
       "fi",
       "cd output-vms/{{user `vm_name`}}",
       "qemu-img convert -f qcow2 -O qcow2 {{user `vm_name`}}.qcow2 box.img",
-      "tar -cvzf {{user `vm_name`}}-{{user `datestamp`}}.libvirt.box metadata.json info.json Vagrantfile `ls vmrun*` OVMF_CODE.fd box.img"
+      "tar -cvzf {{user `vm_name`}}-{{user `datestamp`}}.libvirt.box metadata.json info.json Vagrantfile `ls vmrun* *_CODE.fd` box.img"
     ],
     "only": ["box-libvirt"]
   },
   {
     "type": "shell-local",
     "inline": [
-      "cp -R init/common/info.json init/common/metadata_bhyve.json init/common/qemu_lxc/vmrun* /usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd output-vms/{{user `vm_name`}}/",
+      "cp -R init/common/metadata_bhyve.json output-vms/{{user `vm_name`}}/metadata.json",
+      "cp -R init/common/info.json init/common/qemu_lxc/vmrun* {{user `bhyve_uefi_amd64_path`}} output-vms/{{user `vm_name`}}/",
       "if command -v erb > /dev/null ; then",
       "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
       "erb variant={{user `variant`}} init/common/Vagrantfile_bhyve.erb > output-vms/{{user `vm_name`}}/Vagrantfile",
+      "elif command -v pystache > /dev/null ; then",
+      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `vm_name`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
+      "pystache init/common/Vagrantfile_bhyve.mustache '{\"variant\":\"{{user `variant`}}\"}' > output-vms/{{user `vm_name`}}/Vagrantfile",
       "fi",
       "cd output-vms/{{user `vm_name`}}",
-      "mv {{user `vm_name`}}.img box.img",
-      "tar -cvzf {{user `vm_name`}}-{{user `datestamp`}}.bhyve.box metadata.json info.json Vagrantfile `ls vmrun* device.map` BHYVE_UEFI_CODE.fd box.img"
+      "mv {{user `vm_name`}}.raw box.img",
+      "tar -cvzf {{user `vm_name`}}-{{user `datestamp`}}.bhyve.box metadata.json info.json Vagrantfile `ls vmrun* *_CODE.fd` box.img"
     ],
     "only": ["box-bhyve"]
   }],
@@ -43,6 +51,8 @@
     "vm_name": "freebsd-Release-zfs",
     "variant": "freebsd",
     "author": "thebridge0491",
+    "qemu_uefi_amd64_path": "/usr/share/OVMF/OVMF_CODE.fd",
+    "bhyve_uefi_amd64_path": "/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd",
     "datestamp": "{{isotime \"2006.01.02\"}}"
   }
 }

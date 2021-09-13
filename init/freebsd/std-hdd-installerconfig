@@ -149,7 +149,6 @@ sysrc sshd_enable="YES"
 
 
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
-ABI=\$(pkg config abi)
 #pkg install -y nano sudo xfce
 pkg install -y nano sudo
 

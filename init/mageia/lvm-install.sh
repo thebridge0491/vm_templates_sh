@@ -22,7 +22,7 @@ fi
 
 export GRP_NM=${GRP_NM:-vg0}
 export MIRROR=${MIRROR:-mirrors.kernel.org/mageia}
-BASEARCH=${BASEARCH:-x86_64} ; RELEASE=${RELEASE:-7.1}
+BASEARCH=${BASEARCH:-x86_64} ; RELEASE=${RELEASE:-8}
 
 export INIT_HOSTNAME=${1:-mageia-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}

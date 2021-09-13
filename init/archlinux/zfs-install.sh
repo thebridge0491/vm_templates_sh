@@ -60,8 +60,26 @@ if [ -f /etc/pacman.conf ] && [ -d /etc/pacman.d ] ; then
   cp /etc/pacman.conf /mnt/etc/pacman.conf ;
   cp /etc/pacman.d/mirrorlist* /mnt/etc/pacman.d/ ;
 else
-  mkdir -p /mnt/etc/pacman.d /mnt/var/lib/pacman ;
-  #(cd $(dirname $0) ; cat etc_pacman.conf-arch > /etc/pacman.conf) ;
+  mkdir -p /etc/pacman.d /mnt/etc/pacman.d /mnt/var/lib/pacman ;
+#  cat << EOF > /etc/pacman.conf ;
+#[options]
+#HoldPkg = pacman glibc
+#Architecture = auto
+#
+#CheckSpace
+#SigLevel = Required DatabaseOptional
+#LocalFileSigLevel = Optional
+#
+#[core]
+#Include = /etc/pacman.d/mirrorlist
+#[extra]
+#Include = /etc/pacman.d/mirrorlist
+#[community]
+#Include = /etc/pacman.d/mirrorlist
+#[multilib]
+#Include = /etc/pacman.d/mirrorlist
+#
+#EOF
   curl -s "https://gitea.artixlinux.org/packagesP/pacman/raw/branch/master/trunk/pacman.conf" | tee /etc/pacman.conf ;
   cp /etc/pacman.conf /mnt/etc/pacman.conf ;
 fi
@@ -75,7 +93,7 @@ cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirrorlist
 #rankmirrors -vn 10 /etc/pacman.d/mirrorlist-arch.bak | tee /etc/pacman.d/mirrorlist-arch
 
 sleep 5 ; cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.old
-cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirror-arch /mnt/etc/pacman.d/
+cp `ls /etc/pacman.d/mirrorlist*` /mnt/etc/pacman.d/
 for libname in multilib lib32 ; do
   MULTILIB_LINENO=$(grep -n "\[$libname\]" /mnt/etc/pacman.conf | cut -f1 -d:) ;
   if [ "" = "${MULTILIB_LINENO}" ] ; then continue ; fi ;
@@ -86,9 +104,20 @@ done
 
 
 ## init [artix | archlinux] pacman keyring
-pacman-key --init ; pacman -Sy --noconfirm artix-keyring
+pacman-key --init ; pacman -Sy artix-keyring
+pacman -U --noconfirm `ls /var/cache/pacman/pkg/artix-keyring*`
 pacman-key --populate artix
 pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
+#cat $(dirname $0)/repo_archzfs.cfg | tee -a /mnt/etc/pacman.conf
+cat << EOF >> /mnt/etc/pacman.conf
+[archzfs]
+Server = http://archzfs.com/\$repo/\$arch
+Server = http://mirror.sum7.eu/archlinux/archzfs/\$repo/\$arch
+Server = https://mirror.biocrafting.net/archlinux/archzfs/\$repo/\$arch
+Server = https://mirror.in.themindsmaze.com/archzfs/\$repo/\$arch
+Server = https://zxcvfdsa.com/archzfs/\$repo/\$arch
+
+EOF
 
 
 echo "Bootstrap base pkgs" ; sleep 3
@@ -97,11 +126,11 @@ pkg_list="base base-devel intel-ucode amd-ucode linux-firmware dosfstools e2fspr
 # ifplugd # wpa_actiond iw wireless_tools
 #pacman -Sg base | cut -d' ' -f2 | sed 's|^linux$|linux-lts|g' | pacstrap /mnt -
 if command -v pacstrap > /dev/null ; then
-  pacstrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list ;
+  pacstrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
 elif command -v basestrap > /dev/null ; then
-  basestrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list ;
+  basestrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
 else
-  pacman --root /mnt -Sy $pkg_list ;
+  pacman --root /mnt -Sy $pkg_list linux-lts ;
 fi
 
 echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
@@ -122,7 +151,8 @@ mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars/
 
 
 cp /etc/resolv.conf /mnt/etc/resolv.conf
-cp /tmp/archzfs.gpg /tmp/init/archlinux/repo_archzfs.cfg /mnt/tmp/
+curl -o /mnt/tmp/archzfs.gpg https://archzfs.com/archzfs.gpg
+cp /tmp/init/archlinux/repo_archzfs.cfg /mnt/tmp/
 cp /etc/zfs/zpool.cache /mnt/etc/zfs/
 
 
@@ -142,25 +172,22 @@ if [ -f /etc/os-release ] ; then
 elif [ -f /usr/lib/os-release ] ; then
   . /usr/lib/os-release ;
 fi
-if [ "arch" = "\${ID}" ] ; then
-  cp /etc/pacman.d/mirrorlist-arch /etc/pacman.d/mirrorlist ;
-elif [ "artix" = "\${ID}" ] ; then
-  cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirrorlist ;
-fi
 cat /etc/pacman.conf ; sleep 5
 
 pacman-key --init
 if [ "arch" = "\${ID}" ] ; then
+  pacman --needed -Sy --noconfirm archlinux-keyring ;
+  pacman -U --noconfirm \$(ls /var/cache/pacman/pkg/archlinux-keyring*) ;
   pacman-key --populate archlinux ;
-  pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE ;
-  pacman --noconfirm -Sy archlinux-keyring ;
 elif [ "artix" = "\${ID}" ] ; then
+  pacman --needed -Sy --noconfirm artix-keyring ;
+  pacman -U --noconfirm \$(ls /var/cache/pacman/pkg/artix-keyring*) ;
   pacman-key --populate artix ;
-  pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE ;
-  pacman --noconfirm -Sy artix-keyring ;
 fi
+pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
+pacman --noconfirm -S linux-lts-headers ; pacman --noconfirm --needed -S linux-lts
 if [ "arch" = "\${ID}" ] ; then
-  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup device-mapper mdadm dhcpcd openssh ;
+  pacman --noconfirm --needed -S cryptsetup device-mapper mdadm dhcpcd openssh ;
 elif [ "artix" = "\${ID}" ] ; then
   if command -v rc-update > /dev/null ; then
     service_mgr=openrc ;
@@ -169,15 +196,15 @@ elif [ "artix" = "\${ID}" ] ; then
   elif command -v s6-rc > /dev/null ; then
     service_mgr=s6 ;
   fi ;
-  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup-\${service_mgr} device-mapper-\${service_mgr} mdadm-\${service_mgr} dhcpcd-\${service_mgr} openssh-\${service_mgr} ;
+  pacman --noconfirm --needed -S cryptsetup-\${service_mgr} device-mapper-\${service_mgr} mdadm-\${service_mgr} dhcpcd-\${service_mgr} openssh-\${service_mgr} ;
 fi
 #pacman --noconfirm --needed -S xfce4
 
 
 curl -o /tmp/archzfs.gpg https://archzfs.com/archzfs.gpg
-cat /tmp/repo_archzfs.cfg >> /etc/pacman.conf
+#cat /tmp/repo_archzfs.cfg >> /etc/pacman.conf
 pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
-pacman -Sy
+pacman -Syu
 
 pacman --noconfirm -Sy zfs-dkms # archzfs-linux-lts
 echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf

@@ -19,6 +19,8 @@
 
 USE_VIRTINST=${USE_VIRTINST:-0} ; STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros} ; USE_BHYVE=${USE_BHYVE:-0}
+QEMU_UEFI_AMD64_PATH=${QEMU_UEFI_AMD64_PATH:-/usr/share/OVMF/OVMF_CODE.fd}
+BHYVE_UEFI_AMD64_PATH=${BHYVE_UEFI_AMD64_PATH:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
 
 mkdir -p $HOME/.ssh/publish_krls $HOME/.pki/publish_crls
 cp -R $HOME/.ssh/publish_krls init/common/skel/_ssh/
@@ -68,7 +70,7 @@ debian() {
   #------------ if using ZFS ---------------
   #apt-get --yes install --no-install-recommends linux-headers-$(uname -r)
 
-  #echo "deb http://$MIRRORHOST $VERSION_CODENAME-backports main" >> /etc/apt/sources.list
+  #grep -e '-security' /etc/apt/sources.list | sed 's|-security|-backports|g' >> /etc/apt/sources.list
   #sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
   #apt-get --yes update
   #apt-get --yes install -t $VERSION_CODENAME-backports --no-install-recommends zfs-dkms zfsutils-linux
@@ -91,10 +93,13 @@ void() {
 
   #[bash;] sv down sshd ; export MIRRORHOST=mirror.clarkson.edu/voidlinux
   #yes | xbps-install -Sy -R http://${MIRRORHOST}/current -u xbps ; sleep 3
-  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current netcat wget parted gptfdisk libffi gnupg2 [lvm2]
-  #cp /sbin/gpg2 /sbin/gpg
+  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current netcat wget parted gptfdisk libffi gnupg2 curl [lvm2]
 
   #------------ if using ZFS ---------------
+  ## install zfs, if needed ##
+  ##yes | xbps-install -Sy linux-lts-headers zfs
+  ##mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
+
   #modprobe zfs ; zpool version ; sleep 5
   #-----------------------------------------
 }
@@ -297,8 +302,10 @@ OUT_DIR=${OUT_DIR:-build/${GUEST}}
 mkdir -p ${OUT_DIR}
 if [ "1" = "${USE_BHYVE}" ] ; then
   truncate -s 30720M ${OUT_DIR}/${GUEST}.raw ;
+  cp ${BHYVE_UEFI_AMD64_PATH} ${OUT_DIR}/ ;
 else
   qemu-img create -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M ;
+  cp ${QEMU_UEFI_AMD64_PATH} ${OUT_DIR}/ ;
 fi
 
 if [ "1" = "${USE_VIRTINST}" ] ; then
@@ -328,10 +335,11 @@ elif [ "1" = "${USE_BHYVE}" ] ; then
   printf "%40s\n\n" | tr ' ' '#' ; sleep 5
   
   BUEFI_OPTS=${BUEFI_OPTS:- -s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
-    -l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
+    -l bootrom,${BHYVE_UEFI_AMD64_PATH}}
   
   if [ "1" = "${FREEBSDGUEST:-0}" ] ; then
     #bhyveload -m 2048M -d ${OUT_DIR}/${GUEST}.raw ${GUEST} ;
+    sleep 1 ;
   else
     cat << EOF > ${OUT_DIR}/device.map ;
 (hd0) ${OUT_DIR}/${GUEST}.raw
@@ -348,7 +356,7 @@ EOF
   vncviewer :${VNCPORT:-5901} &
 else
   #------------ using qemu-system-* ---------------
-  QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${STORAGE_DIR}/OVMF/OVMF_CODE.fd"}
+  QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_UEFI_AMD64_PATH}"}
   echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3
   cat /etc/qemu/bridge.conf ; sleep 5
   echo "(if needed) Quickly catch boot menu to add kernel boot parameters"
@@ -394,7 +402,7 @@ EOF
   fi ;
 fi
 
-cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun* OVMF/OVMF_CODE.fd ${OUT_DIR}/
+cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun* ${OUT_DIR}/
 sleep 30
 
 
@@ -412,17 +420,6 @@ sleep 30
 
 #arch linux variants(arch, artix):
   #  package(s): libffi, curl, pacman
-  #  mkdir /etc/pacman.d ; mv /etc/pacman.conf /etc/pacman.conf.old
-  #(arch) cp init/archlinux/etc_pacman.conf-arch > /etc/pacman.conf
-  #(arch) curl -s "https://archlinux.org/mirrorlist/?country=${LOCALE_COUNTRY:-US}&use_mirror_status=on" | sed -e 's|^#Server|Server|' -e '/^#/d' | tee /etc/pacman.d/mirrorlist
-  #(arch) pacman-key --init ; pacman -Sy archlinux-keyring
-  #(arch) [; pacman -U /var/cache/.../archlinux-keyring...]
-  #(arch) pacman-key --populate archlinux
-  #(artix) curl -s "https://gitea.artixlinux.org/packagesP/pacman/raw/branch/master/trunk/pacman.conf" | tee /etc/pacman.conf
-  #(artix) curl -s "https://gitea.artixlinux.org/packagesA/artix-mirrorlist/raw/branch/master/trunk/mirrorlist" | tee /etc/pacman.d/mirrorlist
-  #(artix) pacman-key --init ; pacman -Sy artix-keyring
-  #(artix) [; pacman -U /var/cache/.../artix-keyring...]
-  #(artix) pacman-key --populate artix
 
 #alpine linux: (MIRROR: dl-cdn.alpinelinux.org/alpine)
   ## dnld: http://${MIRROR}/latest-stable/main/x86_64/apk-tools-static-*.apk

@@ -1,6 +1,6 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c \"import crypt,getpass ; print(crypt.crypt(getpass.getpass(), '$6$16CHARACTERSSALT'))\") -only=[qemu|virtualbox-iso] template.json",
+  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu|virtualbox-iso] template.json",
 
   "builders": [{
     "type": "qemu",
@@ -12,7 +12,7 @@
     "qemuargs": [
       ["-name", "{{user `vm_name`}}"], ["-boot", "order=cdn,menu=on"],
       ["-smp", "cpus=2"], ["-m", "size=2048"], ["-smbios", "type=0,uefi=on"],
-      ["-bios", "{{user `qemu_uefi_firmware_path`}}"],
+      ["-bios", "{{user `qemu_uefi_amd64_path`}}"],
       ["-vga", "none"], ["-device", "virtio-net,netdev=user.0"],
       ["-display", "gtk,show-cursor=on"], ["-device", "qxl-vga,vgamem_mb=64"],
       ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
@@ -29,15 +29,13 @@
     "shutdown_command": "sudo shutdown -hP +3",
     "output_directory": "output-vms/{{user `vm_name`}}",
 
-    "iso_checksum": "",
-    "iso_checksum_type": "sha512",
-    "iso_checksum_url": "file://{{user `iso_directory`}}/live/{{user `isolive_name`}}.iso.sha512",
+    "iso_checksum": "file:file://{{user `iso_directory`}}/{{user `iso_name`}}.iso.sha512",
     "iso_url": "",
-    "iso_urls": "file://{{user `iso_directory`}}/live/{{user `isolive_name`}}.iso,{{user `iso_url_mirror`}}/{{user `isolive_url_directory`}}/{{user `isolive_name`}}.iso",
+    "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
     "boot_command": [
-      "<wait><enter>",
-      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><enter>live<enter><wait10>su<enter><wait10>dnf -y check-update ; ",
-      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "c<wait>linux /isolinux/x86_64/vmlinuz {{user `boot_cmdln_options`}} systemd.unit=multi-user.target ",
+      "automatic=method:http,server:{{user `repo_host`}},directory:{{user `repo_directory`}},network:dhcp auto_install=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-auto_inst.cfg.pl<enter>",
+      "initrd /isolinux/x86_64/all.rdz<enter>boot<enter><wait>"
     ]
   },
   {
@@ -70,15 +68,13 @@
     "shutdown_command": "sudo shutdown -hP +3",
     "output_directory": "output-vms/{{user `vm_name`}}",
 
-    "iso_checksum": "",
-    "iso_checksum_type": "sha512",
-    "iso_checksum_url": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso.sha512",
+    "iso_checksum": "file:file://{{user `iso_directory`}}/live/{{user `isolive_name`}}.iso.sha512",
     "iso_url": "",
-    "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
+    "iso_urls": "file://{{user `iso_directory`}}/live/{{user `isolive_name`}}.iso,{{user `iso_url_mirror`}}/{{user `isolive_url_directory`}}/{{user `isolive_name`}}.iso",
     "boot_command": [
-      "c<wait>linux /isolinux/x86_64/vmlinuz {{user `boot_cmdln_options`}} systemd.unit=multi-user.target ",
-      "automatic=method:http,server:{{user `repo_host`}},directory:{{user `repo_directory`}},network:dhcp auto_install=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-auto_inst.cfg.pl<enter>",
-      "initrd /isolinux/x86_64/all.rdz<enter>boot<enter><wait>"
+      "<wait><enter>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><enter>live<enter><wait10>su<enter><wait10>dnf -y check-update ; ",
+      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
     ]
   }],
 
@@ -91,6 +87,8 @@
       "tar -cf /tmp/scripts.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}",
       "if command -v erb > /dev/null ; then",
       "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
+      "elif command -v pystache > /dev/null ; then",
+      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `vm_name`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
       "fi"
     ]
   },
@@ -140,7 +138,7 @@
       "keep_input_artifact": true,
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
-        "init/common/qemu_lxc/vmrun_qemu.args", "OVMF/OVMF_CODE.fd"],
+        "init/common/qemu_lxc/vmrun_qemu.args", "{{user `qemu_uefi_amd64_path`}}"],
       "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
       "except": ["virtualbox-iso"]
     },
@@ -157,17 +155,17 @@
     "init_hostname": "mageia-boxv0000",
     "vol_mgr": "lvm",
     "boot_cmdln_options": "text nomodeset video=1024x768 ",
-    "qemu_uefi_firmware_path": "/usr/share/OVMF/OVMF_CODE.fd",
+    "qemu_uefi_amd64_path": "/usr/share/OVMF/OVMF_CODE.fd",
 
     "repo_host": "mirrors.kernel.org/mageia",
-    "repo_directory": "/distrib/7.1/x86_64",
+    "repo_directory": "/distrib/8/x86_64",
     "iso_directory": "/mnt/Data0/distros/mageia",
     "iso_url_mirror": "https://mirrors.kernel.org/mageia",
-    "iso_url_directory": "distrib/7.1/x86_64/install/images",
-    "iso_name": "Mageia-7.1-netinstall-x86_64",
-    "isolive_url_directory": "iso/7.1/Mageia-7.1-Live-Plasma-x86_64",
-    "isolive_name": "Mageia-7.1-Live-Plasma-x86_64",
-    "isolive_cdlabel": "Mageia-7.1-Live-Plasma-x86_64",
+    "iso_url_directory": "distrib/8/x86_64/install/images",
+    "iso_name": "Mageia-8-netinstall-x86_64",
+    "isolive_url_directory": "iso/8/Mageia-8-Live-Plasma-x86_64",
+    "isolive_name": "Mageia-8-Live-Plasma-x86_64",
+    "isolive_cdlabel": "Mageia-8-Live-Plasma-x86_64",
 
     "disk_size": "30720",
     "headless": "",

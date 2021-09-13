@@ -53,6 +53,11 @@ if command -v xbps-install.static > /dev/null ; then
 else
   yes | XBPS_ARCH=x86_64 xbps-install -Sy -R http://${MIRROR}/current -r /mnt $pkg_list ;
 fi
+if ! command -v zfs > /dev/null ; then
+  yes | xbps-install -Sy linux-lts-headers zfs ;
+  mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ;
+  modprobe zfs ; zpool version ; sleep 5 ;
+fi
 
 echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
 cp /etc/mtab /mnt/etc/mtab

@@ -1,6 +1,6 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c \"import crypt,getpass ; print(crypt.crypt(getpass.getpass(), '$6$16CHARACTERSSALT'))\") -only=[qemu|virtualbox-iso] template.json",
+  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu|virtualbox-iso] template.json",
 
   "builders": [{
     "type": "qemu",
@@ -12,7 +12,7 @@
     "qemuargs": [
       ["-name", "{{user `vm_name`}}"], ["-boot", "order=cdn,menu=on"],
       ["-smp", "cpus=2"], ["-m", "size=2048"], ["-smbios", "type=0,uefi=on"],
-      ["-bios", "{{user `qemu_uefi_firmware_path`}}"],
+      ["-bios", "{{user `qemu_uefi_amd64_path`}}"],
       ["-vga", "none"], ["-device", "virtio-net,netdev=user.0"],
       ["-display", "gtk,show-cursor=on"], ["-device", "qxl-vga,vgamem_mb=64"],
       ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"]
@@ -28,14 +28,12 @@
     "shutdown_command": "shutdown -p +3",
     "output_directory": "output-vms/{{user `vm_name`}}",
 
-    "iso_checksum": "",
-    "iso_checksum_type": "sha256",
-    "iso_checksum_url": "file://{{user `iso_directory`}}/{{user `iso_checksum_file`}}",
+    "iso_checksum": "file:file://{{user `iso_directory`}}/{{user `iso_checksum_file`}}",
     "iso_url": "",
     "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
     "boot_command": [
       "<esc><wait5>boot -s<wait><enter><wait10><wait10>/bin/sh<enter><wait>",
-      "mdmfs -s 100m md1 /mnt ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; geom -t ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/installerconfig http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installerconfig ; export CRYPTED_PASSWD='{{user `crypted_passwd`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; geom -t ; sleep 3 ; bsdinstall script /tmp/installerconfig<enter>"
     ]
   },
   {
@@ -66,14 +64,12 @@
     "shutdown_command": "shutdown -p +3",
     "output_directory": "output-vms/{{user `vm_name`}}",
 
-    "iso_checksum": "",
-    "iso_checksum_type": "sha256",
-    "iso_checksum_url": "file://{{user `iso_directory`}}/{{user `iso_checksum_file`}}",
+    "iso_checksum": "file:file://{{user `iso_directory`}}/{{user `iso_checksum_file`}}",
     "iso_url": "",
     "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
     "boot_command": [
-      "2<enter><wait10><wait10><enter><wait>",
-      "mdmfs -s 100m md1 /mnt ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/installerconfig http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installerconfig ; export CRYPTED_PASSWD='{{user `crypted_passwd`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; geom -t ; sleep 3 ; bsdinstall script /tmp/installerconfig<enter>"
+      "<esc><wait5>boot -s<wait><enter><wait10><wait10>/bin/sh<enter><wait>",
+      "mdmfs -s 100m md1 /mnt ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; geom -t ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
     ]
   }],
 
@@ -86,6 +82,8 @@
       "tar -cf /tmp/scripts.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}",
       "if command -v erb > /dev/null ; then",
       "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
+      "elif command -v pystache > /dev/null ; then",
+      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `vm_name`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
       "fi"
     ]
   },
@@ -135,7 +133,7 @@
       "keep_input_artifact": true,
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
-        "init/common/qemu_lxc/vmrun_qemu.args", "OVMF/OVMF_CODE.fd"],
+        "init/common/qemu_lxc/vmrun_qemu.args", "{{user `qemu_uefi_amd64_path`}}"],
       "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
       "except": ["virtualbox-iso"]
     },
@@ -152,13 +150,13 @@
     "init_hostname": "freebsd-boxv0000",
     "vol_mgr": "zfs",
     "boot_cmdln_options": " ",
-    "qemu_uefi_firmware_path": "/usr/share/OVMF/OVMF_CODE.fd",
+    "qemu_uefi_amd64_path": "/usr/share/OVMF/OVMF_CODE.fd",
 
     "iso_directory": "/mnt/Data0/distros/freebsd",
     "iso_url_mirror": "https://download.freebsd.org/ftp",
-    "iso_url_directory": "releases/amd64/amd64/ISO-IMAGES/12.2",
-    "iso_name": "FreeBSD-12.2-RELEASE-amd64-disc1",
-    "iso_checksum_file": "CHECKSUM.SHA256-FreeBSD-12.2-RELEASE-amd64",
+    "iso_url_directory": "releases/amd64/amd64/ISO-IMAGES/13.0",
+    "iso_name": "FreeBSD-13.0-RELEASE-amd64-disc1",
+    "iso_checksum_file": "CHECKSUM.SHA256-FreeBSD-13.0-RELEASE-amd64",
 
     "disk_size": "30720",
     "headless": "",

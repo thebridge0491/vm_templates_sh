@@ -19,6 +19,7 @@
 
 USE_VIRTINST=${USE_VIRTINST:-1} ; STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros}
+QEMU_UEFI_AMD64_PATH=${QEMU_UEFI_AMD64_PATH:-/usr/share/OVMF/OVMF_CODE.fd}
 
 mkdir -p $HOME/.ssh/publish_krls $HOME/.pki/publish_crls
 cp -R $HOME/.ssh/publish_krls init/common/skel/_ssh/
@@ -129,14 +130,14 @@ suse() {
 }
 
 redhat() {
-  VOL_MGR=${VOL_MGR:-lvm} ; RELEASE=${RELEASE:-8} ; variant=redhat
+  VOL_MGR=${VOL_MGR:-lvm} ; RELEASE=${RELEASE:-8-stream} ; variant=redhat
   init_hostname=${init_hostname:-centos-boxv0000}
   #repo_host=${repo_host:-dl.rockylinux.org/pub/rocky}
   #repo_host=${repo_host:-repo.almalinux.org/almalinux}
   repo_host=${repo_host:-mirror.centos.org/centos}
   # [rocky/8|almalinux/8|centos/8-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
   repo_directory=${repo_directory:-/${RELEASE}/BaseOS/x86_64/os}
-  GUEST=${1:-centos-Release-${VOL_MGR}}
+  GUEST=${1:-centos-Rolling-${VOL_MGR}}
 
   #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/rocky -name 'Rocky-*-x86_64*-boot.iso' | tail -n1)}
   #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/almalinux -name 'AlmaLinux-*-x86_64*-boot.iso' | tail -n1)}
@@ -258,7 +259,7 @@ if [ "1" = "${USE_VIRTINST}" ] ; then
 	#sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml
 else
 	#------------ using qemu-system-* ---------------
-	QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${STORAGE_DIR}/OVMF/OVMF_CODE.fd"}
+	QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_UEFI_AMD64_PATH}"}
 	echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3
 	cat /etc/qemu/bridge.conf ; sleep 5
 	echo "(if needed) Quickly catch boot menu to add kernel boot parameters"
@@ -289,5 +290,5 @@ variant: ${variant}
 EOF
 fi
 
-cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun* OVMF/OVMF_CODE.fd ${OUT_DIR}/
+cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun* ${QEMU_UEFI_AMD64_PATH} ${OUT_DIR}/
 sleep 30

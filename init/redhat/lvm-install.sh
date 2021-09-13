@@ -26,7 +26,7 @@ export GRP_NM=${GRP_NM:-vg0}
 # (almalinux) mirror: repo.almalinux.org/almalinux
 # (centos[-stream]) mirror: mirror.centos.org/centos
 export MIRROR=${MIRROR:-mirror.centos.org/centos}
-BASEARCH=${BASEARCH:-x86_64} ; RELEASE=${RELEASE:-8}
+BASEARCH=${BASEARCH:-x86_64} ; RELEASE=${RELEASE:-8-stream}
 if [ "7" = "${RELEASE}" ] ; then
   REPO_DIRECTORY="/${RELEASE}/os/x86_64" ;
 else

@@ -12,6 +12,8 @@
 #   sh vmrun.sh run_qemu [freebsd-Release-zfs]
 
 STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)} ; IMGFMT=${IMGFMT:-qcow2}
+QEMU_UEFI_AMD64_PATH=${QEMU_UEFI_AMD64_PATH:-/usr/share/OVMF/OVMF_CODE.fd}
+BHYVE_UEFI_AMD64_PATH=${BHYVE_UEFI_AMD64_PATH:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
 
 #-------- create Vagrant ; use box image --------
 box_vagrant() {
@@ -64,7 +66,7 @@ Vagrant.configure(2) do |config|
     p.video_type = 'qxl'
     p.disk_bus = 'virtio'
     p.nic_model_type = 'virtio'
-    p.loader = '/usr/share/OVMF/OVMF_CODE.fd'
+    p.loader = "${QEMU_UEFI_AMD64_PATH}"
   end
 end
 EOF
@@ -102,11 +104,13 @@ EOF
     #mv ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img ;
     qemu-img convert -f qcow2 -O qcow2 ${STORAGE_DIR}/${IMGFILE} \
       ${STORAGE_DIR}/box.img ;
+    cp ${QEMU_UEFI_AMD64_PATH} ${STORAGE_DIR}/ ;
   elif [ "bhyve" = "${PROVIDER}" ] ; then
     IMGFILE=${IMGFILE:-${GUEST}.raw}
     mv ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img ;
+    cp ${BHYVE_UEFI_AMD64_PATH} ${STORAGE_DIR}/ ;
   fi
-  (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${datestamp}.${PROVIDER}.box metadata.json info.json Vagrantfile `ls vmrun* device.map` OVMF_CODE.fd box.img)
+  (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${datestamp}.${PROVIDER}.box metadata.json info.json Vagrantfile `ls vmrun* *_CODE.fd` box.img)
 
   if command -v erb > /dev/null ; then
     erb author=${author} guest=${GUEST} datestamp=${datestamp} \
@@ -204,8 +208,7 @@ run_bhyve() {
   
   GUEST=${1:-freebsd-Release-zfs} ; IMGFILE=${IMGFILE:-${GUEST}.raw}
   BUEFI_OPTS=${BUEFI_OPTS:--s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
-    -s 30,xhci,tablet \
-    -l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
+    -s 30,xhci,tablet -l bootrom,${BHYVE_UEFI_AMD64_PATH}}
   
   bhyve -A -H -P -c 2 -m 2048M -l com1,stdio -s 0,hostbridge -s 1,lpc \
     -s 2,virtio-net,${NET_OPTS:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
@@ -223,7 +226,7 @@ run_bhyve() {
 #------------ using qemu-system-* ---------------
 run_qemu() {
   GUEST=${1:-freebsd-Release-zfs} ; IMGFILE=${IMGFILE:-${GUEST}.${IMGFMT}}
-  QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${STORAGE_DIR}/OVMF_CODE.fd"}
+  QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_UEFI_AMD64_PATH}"}
   qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg -smp cpus=2 -m size=2048 \
     -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
     -display default,show-cursor=on -boot order=cd,menu=on -usb \

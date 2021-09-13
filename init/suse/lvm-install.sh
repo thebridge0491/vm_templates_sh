@@ -21,7 +21,7 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0} ; BASEARCH=${BASEARCH:-x86_64}
-export MIRROR=${MIRROR:-download.opensuse.org} ; RELEASE=${RELEASE:-15.2}
+export MIRROR=${MIRROR:-download.opensuse.org} ; RELEASE=${RELEASE:-15.3}
 
 export INIT_HOSTNAME=${1:-opensuse-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -55,7 +55,7 @@ echo "Bootstrap base pkgs" ; sleep 3
 #rpm -v --root /mnt --nodeps -i /tmp/release.rpm
 zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/${RELEASE}/repo/oss/ repo-oss
 zypper --non-interactive --root /mnt --gpg-auto-import-keys refresh
-zypper --non-interactive --root /mnt install --no-recommends patterns-base-minimal_base makedev
+zypper --non-interactive --root /mnt install --no-recommends patterns-base-base makedev
 zypper --non-interactive --root /mnt repos ; sleep 5
 
 
@@ -72,6 +72,7 @@ mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars/
 
 #mkdir -p /mnt/var/empty /mnt/var/lock/subsys /mnt/etc/sysconfig/network
 #cp /etc/sysconfig/network/ifcfg-$ifdev /mnt/etc/sysconfig/network/ifcfg-${ifdev}.bak
+mkdir -p /mnt/run/netconfig ; touch /mnt/run/netconfig/resolv.conf
 cp /etc/resolv.conf /mnt/etc/resolv.conf
 
 

@@ -9,5 +9,5 @@ qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg -smp cpus=2 -m size=2048 \
   -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
   -drive file=${OUT_DIR:-build/${GUEST:-freebsd-Release-zfs}}/${GUEST:-freebsd-Release-zfs}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
   -cdrom ${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)} \
-  ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${STORAGE_DIR:-/usr/share}/OVMF/OVMF_CODE.fd} \
+  ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${QEMU_UEFI_AMD64_PATH:-/usr/share/OVMF/OVMF_CODE.fd}} \
   -name ${GUEST:-freebsd-Release-zfs}

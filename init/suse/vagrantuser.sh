@@ -1,5 +1,7 @@
 #!/bin/sh -eux
 
+export PATH=$PATH:/usr/sbin:/usr/bin:/sbin:/bin
+
 ## suse/vagrantuser.sh
 DIR_MODE=0750 useradd -m -G wheel -s /bin/bash -c 'Vagrant User' vagrant
 echo -n "vagrant:vagrant" | chpasswd

@@ -62,8 +62,26 @@ if [ -f /etc/pacman.conf ] && [ -d /etc/pacman.d ] ; then
   cp /etc/pacman.conf /mnt/etc/pacman.conf ;
   cp /etc/pacman.d/mirrorlist* /mnt/etc/pacman.d/ ;
 else
-  mkdir -p /mnt/etc/pacman.d /mnt/var/lib/pacman ;
-  #(cd $(dirname $0) ; cat etc_pacman.conf-arch > /etc/pacman.conf) ;
+  mkdir -p /etc/pacman.d /mnt/etc/pacman.d /mnt/var/lib/pacman ;
+#  cat << EOF > /etc/pacman.conf ;
+#[options]
+#HoldPkg = pacman glibc
+#Architecture = auto
+#
+#CheckSpace
+#SigLevel = Required DatabaseOptional
+#LocalFileSigLevel = Optional
+#
+#[core]
+#Include = /etc/pacman.d/mirrorlist
+#[extra]
+#Include = /etc/pacman.d/mirrorlist
+#[community]
+#Include = /etc/pacman.d/mirrorlist
+#[multilib]
+#Include = /etc/pacman.d/mirrorlist
+#
+#EOF
   curl -s "https://gitea.artixlinux.org/packagesP/pacman/raw/branch/master/trunk/pacman.conf" | tee /etc/pacman.conf ;
   cp /etc/pacman.conf /mnt/etc/pacman.conf ;
 fi
@@ -77,7 +95,7 @@ cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirrorlist
 #rankmirrors -vn 10 /etc/pacman.d/mirrorlist-arch.bak | tee /etc/pacman.d/mirrorlist-arch
 
 sleep 5 ; cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.old
-cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirror-arch /mnt/etc/pacman.d/
+cp `ls /etc/pacman.d/mirrorlist*` /mnt/etc/pacman.d/
 for libname in multilib lib32 ; do
   MULTILIB_LINENO=$(grep -n "\[$libname\]" /mnt/etc/pacman.conf | cut -f1 -d:) ;
   if [ "" = "${MULTILIB_LINENO}" ] ; then continue ; fi ;
@@ -88,7 +106,8 @@ done
 
 
 ## init [artix | archlinux] pacman keyring
-pacman-key --init ; pacman -Sy --noconfirm artix-keyring
+pacman-key --init ; pacman -Sy artix-keyring
+pacman -U --noconfirm `ls /var/cache/pacman/pkg/artix-keyring*`
 pacman-key --populate artix
 pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
 
@@ -98,11 +117,11 @@ pkg_list="base intel-ucode amd-ucode linux-firmware dosfstools e2fsprogs xfsprog
 # ifplugd # wpa_actiond iw wireless_tools
 #pacman -Sg base | cut -d' ' -f2 | sed 's|^linux$|linux-lts|g' | pacstrap /mnt -
 if command -v pacstrap > /dev/null ; then
-  pacstrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list ;
+  pacstrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
 elif command -v basestrap > /dev/null ; then
-  basestrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list ;
+  basestrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
 else
-  pacman --root /mnt -Sy $pkg_list ;
+  pacman --root /mnt -Sy $pkg_list linux-lts ;
 fi
 
 echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
@@ -142,25 +161,22 @@ if [ -f /etc/os-release ] ; then
 elif [ -f /usr/lib/os-release ] ; then
   . /usr/lib/os-release ;
 fi
-if [ "arch" = "\${ID}" ] ; then
-  cp /etc/pacman.d/mirrorlist-arch /etc/pacman.d/mirrorlist ;
-elif [ "artix" = "\${ID}" ] ; then
-  cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirrorlist ;
-fi
 cat /etc/pacman.conf ; sleep 5
 
 pacman-key --init
 if [ "arch" = "\${ID}" ] ; then
+  pacman --needed -Sy archlinux-keyring ;
+  pacman -U --noconfirm \$(ls /var/cache/pacman/pkg/archlinux-keyring*) ;
   pacman-key --populate archlinux ;
-  pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE ;
-  pacman --needed -Sy --noconfirm archlinux-keyring ;
 elif [ "artix" = "\${ID}" ] ; then
+  pacman --needed -Sy artix-keyring ;
+  pacman -U --noconfirm \$(ls /var/cache/pacman/pkg/artix-keyring*) ;
   pacman-key --populate artix ;
-  pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE ;
-  pacman --needed -Sy --noconfirm artix-keyring ;
 fi
+pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
+pacman --noconfirm -S linux-lts-headers ; pacman --noconfirm --needed -S linux-lts
 if [ "arch" = "\${ID}" ] ; then
-  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup device-mapper mdadm lvm2 dhcpcd openssh ;
+  pacman --noconfirm --needed -S cryptsetup device-mapper mdadm lvm2 dhcpcd openssh ;
 elif [ "artix" = "\${ID}" ] ; then
   if command -v rc-update > /dev/null ; then
     service_mgr=openrc ;
@@ -169,7 +185,7 @@ elif [ "artix" = "\${ID}" ] ; then
   elif command -v s6-rc > /dev/null ; then
     service_mgr=s6 ;
   fi ;
-  pacman --noconfirm --needed -S linux-lts linux-lts-headers cryptsetup-\${service_mgr} device-mapper-\${service_mgr} mdadm-\${service_mgr} lvm2-\${service_mgr} dhcpcd-\${service_mgr} openssh-\${service_mgr} ;
+  pacman --noconfirm --needed -S cryptsetup-\${service_mgr} device-mapper-\${service_mgr} mdadm-\${service_mgr} lvm2-\${service_mgr} dhcpcd-\${service_mgr} openssh-\${service_mgr} ;
 fi
 #pacman --noconfirm --needed -S xfce4
 
