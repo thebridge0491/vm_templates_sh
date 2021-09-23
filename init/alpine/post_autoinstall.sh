@@ -55,8 +55,8 @@ sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
-echo "Temporarily permit root login via ssh password" ; sleep 3
-sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
+#echo "Temporarily permit root login via ssh password" ; sleep 3
+#sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
 
 
 echo "Enable SSH service"

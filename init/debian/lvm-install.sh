@@ -23,6 +23,11 @@ fi
 export GRP_NM=${GRP_NM:-vg0}
 # [deb.devuan.org/merged | deb.debian.org/debian]
 export MIRROR=${MIRROR:-deb.devuan.org/merged}
+if [ "aarch64" = "$(uname -m)" ] ; then
+  MACHINE=arm64 ;
+elif [ "x86_64" = "$(uname -m)" ] ; then
+  MACHINE=amd64 ;
+fi
 service_mgr=${service_mgr:-sysvinit} # sysvinit | runit | openrc
 
 export INIT_HOSTNAME=${1:-devuan-boxv0000}
@@ -36,6 +41,7 @@ sh -c 'cat > /mnt/etc/fstab' << EOF
 LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
 LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
 LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
@@ -51,8 +57,8 @@ EOF
 
 
 echo "Bootstrap base pkgs" ; sleep 3
-#debootstrap --no-check-gpg --arch amd64 --variant minbase stable /mnt file:/cdrom/debian/
-debootstrap --verbose --no-check-gpg --arch amd64 stable /mnt http://${MIRROR}
+#debootstrap --no-check-gpg --arch ${MACHINE} --variant minbase stable /mnt file:/cdrom/debian/
+debootstrap --verbose --no-check-gpg --arch ${MACHINE} stable /mnt http://${MIRROR}
 
 echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
 cp /etc/mtab /mnt/etc/mtab
@@ -112,7 +118,9 @@ cat /etc/apt/sources.list ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
 apt-get --yes update
-apt-get --yes install --no-install-recommends linux-image-amd64 grub-efi-amd64 efibootmgr grub-pc-bin sudo linux-headers-amd64 lvm2
+for pkgX in linux-image-${MACHINE} grub-efi-${MACHINE} efibootmgr grub-pc-bin sudo linux-headers-${MACHINE} lvm2 ; do
+  apt-get --yes install --no-install-recommends \$pkgX
+done
 # xfce4
 tasksel install standard
 
@@ -192,7 +200,7 @@ echo '%sudo ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
-if [ "devuan" = "\${ID}" ] ; then
+if [ "devuan" = "\${ID}" ] || [ "debian" = "\${ID}" ] ; then
   if [ "sysvinit" = "${service_mgr}" ] ; then
     service_pkgs="sysvinit-core" ;
   elif [ "runit" = "${service_mgr}" ] ; then
@@ -202,11 +210,7 @@ if [ "devuan" = "\${ID}" ] ; then
   fi ;
   apt-get --yes install --no-install-recommends \${service_pkgs} ;
 fi
-if command -v systemctl > /dev/null ; then
-  systemctl enable lvmetad ;
-  systemctl enable lvm2-lvmpolld ;
-  systemctl enable udev ;
-elif command -v sv > /dev/null ; then
+if command -v sv > /dev/null ; then
   ln -s /etc/sv/lvm2-lvmpolld /etc/service ;
   ln -s /etc/sv/eudev /etc/service ;
 elif command -v rc-update > /dev/null ; then
@@ -215,16 +219,29 @@ elif command -v rc-update > /dev/null ; then
 elif command -v update-rc.d > /dev/null ; then
   update-rc.d lvm2-lvmpolld defaults ;
   update-rc.d eudev defaults ;
+elif command -v systemctl > /dev/null ; then
+  systemctl enable lvmetad ;
+  systemctl enable lvm2-lvmpolld ;
+  systemctl enable udev ;
 fi
 
 
 echo "Bootloader installation & config" ; sleep 3
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable
-grub-install --target=i386-pc --recheck /dev/$DEVX
-mkdir -p /boot/efi/EFI/BOOT
-cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/
-cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak
-cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI
+mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
+if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+  grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
+  cp /boot/efi/EFI/BOOT/BOOTAA64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI.bak ;
+  cp /boot/efi/EFI/BOOT/grubaa64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+  #cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+else
+  grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  grub-install --target=i386-pc --recheck /dev/$DEVX ;
+  cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
+  cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak ;
+  cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+  #cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+fi
 
 #sed -i -e "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
 #sed -i -e "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
@@ -235,8 +252,13 @@ sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodese
   /etc/default/grub
 grub-mkconfig -o /boot/grub/grub.cfg
 
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+else
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+fi
 efibootmgr -v ; sleep 3
 
 

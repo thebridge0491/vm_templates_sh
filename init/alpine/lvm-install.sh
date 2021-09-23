@@ -20,7 +20,7 @@ elif [ -e /dev/sda ] ; then
   export DEVX=sda ;
 fi
 export DEVX=${DEVX:-sda} ; export GRP_NM=${GRP_NM:-vg0}
-export MIRROR=${MIRROR:-dl-cdn.alpinelinux.org/alpine}
+export MIRROR=${MIRROR:-dl-cdn.alpinelinux.org/alpine} ; MACHINE=$(uname -m)
 
 export INIT_HOSTNAME=${1:-alpine-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -33,6 +33,7 @@ sh -c 'cat > /mnt/etc/fstab' << EOF
 LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
 LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
 LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
@@ -52,9 +53,9 @@ EOF
 
 echo "Bootstrap base pkgs" ; sleep 3
 if command -v apk > /dev/null ; then
-  apk --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
+  apk --arch ${MACHINE} --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
 else
-  ./sbin/apk.static --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
+  ./sbin/apk.static --arch ${MACHINE} --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
 fi
 
 
@@ -92,13 +93,16 @@ RELEASE=\$(cat /etc/alpine-release | cut -d. -f1-2)
 sed -i '/cdrom/ s|^|#|' /etc/apk/repositories
 echo "http://${MIRROR}/latest-stable/main" >> /etc/apk/repositories
 echo "http://${MIRROR}/latest-stable/community" >> /etc/apk/repositories
-apk update
+apk --arch ${MACHINE} update
 cat /etc/apk/repositories ; sleep 5
 
 
 echo "Add software package selection(s)" ; sleep 3
-apk add tzdata sudo linux-lts linux-lts-dev dosfstools e2fsprogs mkinitfs dhcp bash util-linux shadow openssh grub-bios grub-efi efibootmgr multipath-tools cryptsetup lvm2
-#apk add xfce4
+apk --arch ${MACHINE} add tzdata sudo linux-lts linux-lts-dev dosfstools e2fsprogs mkinitfs dhcp bash util-linux shadow openssh grub-efi efibootmgr multipath-tools cryptsetup lvm2
+#apk --arch ${MACHINE} add xfce4
+if [ "x86_64" = "${MACHINE}" ] ; then
+  apk --arch ${MACHINE} grub-bios
+fi
 sleep 5
 
 
@@ -172,8 +176,8 @@ sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
-echo "Temporarily permit root login via ssh password" ; sleep 3
-sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
+#echo "Temporarily permit root login via ssh password" ; sleep 3
+#sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
 
 
 echo "Config Linux kernel"
@@ -187,9 +191,14 @@ grub-probe /boot
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable
-grub-install --target=i386-pc --recheck /dev/$DEVX
-cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI
+if [ "aarch64" = "${MACHINE}" ] ; then
+  grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+else
+  grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  grub-install --target=i386-pc --recheck /dev/$DEVX ;
+  cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+fi
 
 #sed -i -e "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
 #sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rd.auto=1 text xdriver=vesa nomodeset rootdelay=5 modules=sd-mod,usb-storage,ext4,lvm"|' /etc/default/grub
@@ -198,12 +207,17 @@ echo 'GRUB_CMDLINE_LINUX_DEFAULT="rd.auto=1 text nomodeset rootdelay=5 modules=s
 echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
 grub-mkconfig -o /boot/grub/grub.cfg
 
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+if [ "aarch64" = "${MACHINE}" ] ; then
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+else
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+fi
 efibootmgr -v ; sleep 3
 
 
-apk -v cache clean
+apk --arch ${MACHINE} -v cache clean
 fstrim -av
 sync
 

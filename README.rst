@@ -3,7 +3,7 @@ Vm_templates
 .. .rst to .html: rst2html5 foo.rst > foo.html
 ..                pandoc -s -f rst -t html5 -o foo.html foo.rst
 
-Virtual machine templates (KVM/QEMU hybrid boot: BIOS+UEFI) using auto install methods and/or chroot install scripts.
+Virtual machine templates (QEMU x86_64[, aarch64]) using auto install methods and/or chroot install scripts.
 
 Installation
 ------------
@@ -25,15 +25,15 @@ to build virtual machine using auto install methods or chroot scripts:
 
         # NOTE, relevant comments -- transfer file(s) ; run manual commands
 
-        [VOL_MGR=zfs] sh vminstall_auto.sh [<oshost> [<guest>]]
+        [MACHINE=x86_64] [VOL_MGR=zfs] sh vminstall_auto.sh [<oshost> [<guest>]]
 
-        [variant=<oshost>] sh vminstall_chroot.sh [<oshost> [<guest>]]
+        [MACHINE=x86_64] [PROVIDER=libvirt] [variant=<oshost>] sh vminstall_chroot.sh [<oshost> [<guest>]]
 
 build examples:
 
-        [VOL_MGR=zfs] sh vminstall_auto.sh [freebsd [freebsd-Release-zfs]]
+        [MACHINE=x86_64] [VOL_MGR=zfs] sh vminstall_auto.sh [freebsd [freebsd-x86_64-zfs]]
 
-        [variant=freebsd] sh vminstall_chroot.sh [freebsd [freebsd-Release-zfs]]
+        [MACHINE=x86_64] [PROVIDER=libvirt] [variant=freebsd] sh vminstall_chroot.sh [freebsd [freebsd-x86_64-zfs]]
 
 [optional] Vagrant option - (in running VM) add vagrant user:
 
@@ -41,7 +41,7 @@ build examples:
 
 [optional] Vagrant option - (with VM shutdown) make box:
 
-        cd build/<guest> ; sh vmrun.sh box_vagrant <guest>
+        cd build/<guest> ; [PROVIDER=libvirt] sh vmrun.sh box_vagrant <guest>
 
 to transfer scripts and execute shell provisioning on running virtual machine:
 

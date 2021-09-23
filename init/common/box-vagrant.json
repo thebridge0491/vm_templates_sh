@@ -1,5 +1,5 @@
 {
-  "_usage_build": "packer build [-var vm_name=freebsd-Release-zfs] [-var variant=freebsd] [-var author=thebridge0491] [-var datestamp=???] -only=[box-libvirt|box-bhyve] box-vagrant.json",
+  "_usage_build": "packer build [-var machine=x86_64] [-var variant=freebsd] [-var vm_name=freebsd-x86_64-zfs] [-var author=thebridge0491] [-var datestamp=???] -only=[box-libvirt|box-bhyve] box-vagrant.json",
 
   "builders": [{
     "type": "null",
@@ -15,7 +15,12 @@
     "type": "shell-local",
     "inline": [
       "cp -R init/common/metadata_libvirt.json output-vms/{{user `vm_name`}}/metadata.json",
-      "cp -R init/common/info.json init/common/qemu_lxc/vmrun* {{user `qemu_uefi_amd64_path`}} output-vms/{{user `vm_name`}}/",
+      "if [ 'aarch64' = '{{user `machine`}}'] ; then",
+      "cp -R {{user `qemu_aa64_firmware`}} output-vms/{{user `vm_name`}}/",
+      "else",
+      "cp -R {{user `qemu_x64_firmware`}} output-vms/{{user `vm_name`}}/",
+      "fi",
+      "cp -R init/common/info.json init/common/qemu_lxc/vmrun* output-vms/{{user `vm_name`}}/",
       "if command -v erb > /dev/null ; then",
       "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
       "erb variant={{user `variant`}} init/common/Vagrantfile_libvirt.erb > output-vms/{{user `vm_name`}}/Vagrantfile",
@@ -33,7 +38,7 @@
     "type": "shell-local",
     "inline": [
       "cp -R init/common/metadata_bhyve.json output-vms/{{user `vm_name`}}/metadata.json",
-      "cp -R init/common/info.json init/common/qemu_lxc/vmrun* {{user `bhyve_uefi_amd64_path`}} output-vms/{{user `vm_name`}}/",
+      "cp -R init/common/info.json init/common/qemu_lxc/vmrun* {{user `bhyve_x64_firmware`}} output-vms/{{user `vm_name`}}/",
       "if command -v erb > /dev/null ; then",
       "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
       "erb variant={{user `variant`}} init/common/Vagrantfile_bhyve.erb > output-vms/{{user `vm_name`}}/Vagrantfile",
@@ -48,11 +53,13 @@
     "only": ["box-bhyve"]
   }],
   "variables": {
-    "vm_name": "freebsd-Release-zfs",
+    "machine": "x86_64",
     "variant": "freebsd",
+    "vm_name": "freebsd-x86_64-zfs",
     "author": "thebridge0491",
-    "qemu_uefi_amd64_path": "/usr/share/OVMF/OVMF_CODE.fd",
-    "bhyve_uefi_amd64_path": "/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd",
+    "bhyve_x64_firmware": "/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd",
+    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
+    "qemu_aa64_firmware": "/usr/share/AAVMF/AAVMF_CODE.fd",
     "datestamp": "{{isotime \"2006.01.02\"}}"
   }
 }

@@ -21,8 +21,7 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0}
-export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos}
-BASEARCH=${BASEARCH:-x86_64}
+export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos} ; MACHINE=$(uname -m)
 
 export INIT_HOSTNAME=${1:-pclinuxos-boxv0000}
 export PLAIN_PASSWD=${2:-abcd0123}
@@ -34,6 +33,7 @@ sh -c 'cat > /mnt/etc/fstab' << EOF
 LABEL=${GRP_NM}-osRoot    /           ext4    errors=remount-ro   0   1
 LABEL=${GRP_NM}-osVar     /var        ext4    defaults    0   2
 LABEL=${GRP_NM}-osHome    /home       ext4    defaults    0   2
+PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 LABEL=${GRP_NM}-osSwap    none        swap    sw          0   0
 
@@ -50,7 +50,7 @@ rm -r /mnt/var/lib/rpm /mnt/var/cache/apt
 mkdir -p /mnt/var/lib/rpm /mnt/var/cache/apt
 rpm -v --root /mnt --initdb
 # [wget -O file url | curl -L -o file url]
-#wget -O /tmp/release.rpm http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.${BASEARCH}/pclinuxos-release-2020-1pclos2020.${BASEARCH}.rpm
+#wget -O /tmp/release.rpm http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.${MACHINE}/pclinuxos-release-2020-1pclos2020.${MACHINE}.rpm
 #rpm -v -qip /tmp/release.rpm ; sleep 5
 #rpm -v --root /mnt --nodeps -i /tmp/release.rpm
 apt-get --root /mnt -y update

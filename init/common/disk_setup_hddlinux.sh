@@ -5,7 +5,10 @@
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
 ## WITHOUT availability of netcat or ssh/scp on system:
-##  (host) simple http server for files: python -m http.server {port}
+##  (host) simple http server for files:
+##         php -S localhost:{port} [-t {dir}]
+##         ruby -run -e httpd -- -p {port} {dir}
+##         python -m http.server {port} [-d {dir}]
 ##  (client) tools:
 ##    [curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file
 
@@ -58,12 +61,6 @@ _sgdisk_hdpartzfs() {
 
   sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
-  DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM0}-osBoot" ${DEV_BOOT0}
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM1}-osBoot" ${DEV_BOOT1}
 }
 _sfdisk_hdpartzfs() {
   GRP_NM0=${1:-vg0} ; GRP_NM1=${2:-vg1}
@@ -95,12 +92,6 @@ _sfdisk_hdpartzfs() {
 
   sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
-  DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM0}-osBoot" ${DEV_BOOT0}
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM1}-osBoot" ${DEV_BOOT1}
 }
 _parted_hdpartzfs() {
   GRP_NM0=${1:-vg0} ; GRP_NM1=${2:-vg1}
@@ -152,16 +143,10 @@ _parted_hdpartzfs() {
   sync ; parted -s /dev/${DEVX} unit GiB print ; sleep 3
   parted -s /dev/${DEVX} align-check optimal 1 ; sleep 3
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
-  DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM0}-osBoot" ${DEV_BOOT0}
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM1}-osBoot" ${DEV_BOOT1}
 }
 
 _sgdisk_hdpartlvm() {
-  PV_NM0=${1:-pvol0} ; PV_NM1=${2:-pvol1}
+  GRP_NM0=${1:-vg0} ; GRP_NM1=${2:-vg1} ; PV_NM0=${3:-pvol0} ; PV_NM1=${4:-pvol1}
 
   sgdisk --zap --clear --mbrtogpt /dev/${DEVX} ; sync
   # typecode: f/ BIOS 1M fat|ef02 (bios_boot) ; f/ EFI 200M efi|ef00 (ESP)
@@ -169,10 +154,10 @@ _sgdisk_hdpartlvm() {
     /dev/${DEVX}
   sgdisk --new 2:0:+200M --typecode 2:ef00 --change-name 2:"ESP" /dev/${DEVX}
 
-  sgdisk --new 3:0:+1G --typecode 3:8300 --change-name 3:"${PV_NM0}-osBoot" /dev/${DEVX}
+  sgdisk --new 3:0:+1G --typecode 3:8300 --change-name 3:"${GRP_NM0}-osBoot" /dev/${DEVX}
   sgdisk --new 4:0:+84G --typecode 4:8e00 --change-name 4:"${PV_NM0}" /dev/${DEVX}
 
-  sgdisk --new 5:0:+1G --typecode 5:8300 --change-name 5:"${PV_NM1}-osBoot" /dev/${DEVX}
+  sgdisk --new 5:0:+1G --typecode 5:8300 --change-name 5:"${GRP_NM1}-osBoot" /dev/${DEVX}
   sgdisk --new 6:0:+80G --typecode 6:8e00 --change-name 6:"${PV_NM1}" /dev/${DEVX}
 
   sgdisk --new 7:0:+4G --typecode 7:a502 --change-name 7:"bsd0-fsSwap" /dev/${DEVX}
@@ -185,15 +170,9 @@ _sgdisk_hdpartlvm() {
 
   sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${PV_NM0}-osBoot" | cut -d' ' -f1)
-  DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${PV_NM1}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
-  sleep 3 ; yes | mkfs.ext2 -L "${PV_NM0}-osBoot" ${DEV_BOOT0}
-  sleep 3 ; yes | mkfs.ext2 -L "${PV_NM1}-osBoot" ${DEV_BOOT1}
 }
 _sfdisk_hdpartlvm() {
-  PV_NM0=${1:-pvol0} ; PV_NM1=${2:-pvol1}
+  GRP_NM0=${1:-vg0} ; GRP_NM1=${2:-vg1} ; PV_NM0=${3:-pvol0} ; PV_NM1=${4:-pvol1}
 
   sfdisk --delete --wipe always /dev/${DEVX} ; sync
   echo -n 'label: gpt' | sfdisk /dev/${DEVX}
@@ -207,10 +186,10 @@ _sfdisk_hdpartlvm() {
   echo -n size=200MiB,bootable,type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,name=ESP | sfdisk -N 2 \
     /dev/${DEVX}
 
-  echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${PV_NM0}-osBoot" | sfdisk -N 3 /dev/${DEVX}
+  echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM0}-osBoot" | sfdisk -N 3 /dev/${DEVX}
   echo -n size=84GiB,name="${PV_NM0}" | sfdisk -N 4 /dev/${DEVX}
 
-  echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${PV_NM1}-osBoot" | sfdisk -N 5 /dev/${DEVX}
+  echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM1}-osBoot" | sfdisk -N 5 /dev/${DEVX}
   echo -n size=80GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${PV_NM1}" | sfdisk -N 6 /dev/${DEVX}
 
   echo -n size=4GiB,type=516E7CB5-6ECF-11D6-8FF8-00022D09712B,name=bsd0-fsSwap | sfdisk -N 7 /dev/${DEVX}
@@ -221,15 +200,9 @@ _sfdisk_hdpartlvm() {
 
   sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
-  DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM0}-osBoot" ${DEV_BOOT0}
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM1}-osBoot" ${DEV_BOOT1}
 }
 _parted_hdpartlvm() {
-  PV_NM0=${1:-pvol0} ; PV_NM1=${2:-pvol1}
+  GRP_NM0=${1:-vg0} ; GRP_NM1=${2:-vg1} ; PV_NM0=${3:-pvol0} ; PV_NM1=${4:-pvol1}
 
   parted --script /dev/${DEVX} mklabel gpt
   DIFF=1 ; END='-0'
@@ -243,14 +216,14 @@ _parted_hdpartlvm() {
 
   DIFF=$END ; END=$(( 1 * 1024 + $DIFF ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 3 ${PV_NM0}-osBoot
+    mkpart primary ext2 $DIFF $END name 3 ${GRP_NM0}-osBoot
   DIFF=$END ; END=$(( 84 * 1024 + $DIFF ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
     mkpart primary ext2 $DIFF $END name 4 ${PV_NM0}
 
   DIFF=$END ; END=$(( 1 * 1024 + $DIFF ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 5 ${PV_NM1}-osBoot
+    mkpart primary ext2 $DIFF $END name 5 ${GRP_NM1}-osBoot
   DIFF=$END ; END=$(( 80 * 1024 + $DIFF ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
     mkpart primary ext2 $DIFF $END name 6 ${PV_NM1}
@@ -275,12 +248,6 @@ _parted_hdpartlvm() {
   sync ; parted -s /dev/${DEVX} unit GiB print ; sleep 3
   parted -s /dev/${DEVX} align-check optimal 1 ; sleep 3
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
-  DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM0}-osBoot" ${DEV_BOOT0}
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM1}-osBoot" ${DEV_BOOT1}
 }
 
 
@@ -316,12 +283,6 @@ _sgdisk_hdpartstd() {
 
   sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
-  DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM0}-osBoot" ${DEV_BOOT0}
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM1}-osBoot" ${DEV_BOOT1}
 }
 _sfdisk_hdpartstd() {
   GRP_NM0=${1:-vg0} ; GRP_NM1=${2:-vg1}
@@ -345,11 +306,11 @@ _sfdisk_hdpartstd() {
   echo -n size=32GiB,name="${GRP_NM0}-osHome" | sfdisk -N 7 /dev/${DEVX}
   echo -n size=24GiB,name="${GRP_NM0}-free" | sfdisk -N 8 /dev/${DEVX}
 
-  echo -n size=1GiB,name="${GRP_NM0}-osBoot" | sfdisk -N 9 /dev/${DEVX}
-  echo -n size=16GiB,name="${GRP_NM0}-osRoot" | sfdisk -N 10 /dev/${DEVX}
-  echo -n size=8GiB,name="${GRP_NM0}-osVar" | sfdisk -N 11 /dev/${DEVX}
-  echo -n size=32GiB,name="${GRP_NM0}-osHome" | sfdisk -N 12 /dev/${DEVX}
-  echo -n size=24GiB,name="${GRP_NM0}-free" | sfdisk -N 13 /dev/${DEVX}
+  echo -n size=1GiB,name="${GRP_NM1}-osBoot" | sfdisk -N 9 /dev/${DEVX}
+  echo -n size=16GiB,name="${GRP_NM1}-osRoot" | sfdisk -N 10 /dev/${DEVX}
+  echo -n size=8GiB,name="${GRP_NM1}-osVar" | sfdisk -N 11 /dev/${DEVX}
+  echo -n size=32GiB,name="${GRP_NM1}-osHome" | sfdisk -N 12 /dev/${DEVX}
+  echo -n size=24GiB,name="${GRP_NM1}-free" | sfdisk -N 13 /dev/${DEVX}
 
   echo -n size=4GiB,type=516E7CB5-6ECF-11D6-8FF8-00022D09712B,name=bsd0-fsSwap | sfdisk -N 14 /dev/${DEVX}
   echo -n size=80GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name=bsd0-fsPool | sfdisk -N 15 /dev/${DEVX}
@@ -359,12 +320,6 @@ _sfdisk_hdpartstd() {
 
   sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
-  DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM0}-osBoot" ${DEV_BOOT0}
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM1}-osBoot" ${DEV_BOOT1}
 }
 _parted_hdpartstd() {
   GRP_NM0=${1:-vg0} ; GRP_NM1=${2:-vg1}
@@ -434,12 +389,6 @@ _parted_hdpartstd() {
   sync ; parted -s /dev/${DEVX} unit GiB print ; sleep 3
   parted -s /dev/${DEVX} align-check optimal 1 ; sleep 3
   sleep 3 ; partprobe --summary
-  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT0=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM0}-osBoot" | cut -d' ' -f1)
-  DEV_BOOT1=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM1}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP -F 32 ${DEV_ESP} ; sleep 3
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM0}-osBoot" ${DEV_BOOT0}
-  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM1}-osBoot" ${DEV_BOOT1}
 }
 
 
@@ -456,9 +405,9 @@ part_hddisk() {
     esac ;
   elif [ "${VOL_MGR}" = "lvm" ] ; then
     case $TOOL in
-      'sfdisk') _sfdisk_hdpartlvm $PV_NM0 $PV_NM1 ;;
-      'parted') _parted_hdpartlvm $PV_NM0 $PV_NM1 ;;
-      *) _sgdisk_hdpartlvm $PV_NM0 $PV_NM1 ;;
+      'sfdisk') _sfdisk_hdpartlvm $GRP_NM0 $GRP_NM1 $PV_NM0 $PV_NM1 ;;
+      'parted') _parted_hdpartlvm $GRP_NM0 $GRP_NM1 $PV_NM0 $PV_NM1 ;;
+      *) _sgdisk_hdpartlvm $GRP_NM0 $GRP_NM1 $PV_NM0 $PV_NM1 ;;
     esac ;
   else
     case $TOOL in
@@ -578,6 +527,10 @@ format_partitions() {
       fi ;
     done ;
   fi
+  DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
+  DEV_BOOT=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osBoot" | cut -d' ' -f1)
+  sleep 3 ; yes | mkfs.fat -n ESP ${DEV_ESP} ; sleep 3
+  sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM}-osBoot" ${DEV_BOOT}
   sync
 }
 

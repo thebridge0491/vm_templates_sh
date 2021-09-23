@@ -5,7 +5,10 @@
 # ssh user@ipaddr "su -m root -c 'sh -xs - arg1 argN'" < script.sh
 
 ## WITHOUT availability of netcat or ssh/scp on system:
-##  (host) simple http server for files: python -m http.server {port}
+##  (host) simple http server for files:
+##         php -S localhost:{port} [-t {dir}]
+##         ruby -run -e httpd -- -p {port} {dir}
+##         python -m http.server {port} [-d {dir}]
 ##  (client) tools:
 ##    [curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file
 

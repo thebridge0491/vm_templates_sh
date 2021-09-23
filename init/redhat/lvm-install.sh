@@ -25,25 +25,20 @@ export GRP_NM=${GRP_NM:-vg0}
 # (rocky) mirror: dl.rockylinux.org/pub/rocky
 # (almalinux) mirror: repo.almalinux.org/almalinux
 # (centos[-stream]) mirror: mirror.centos.org/centos
-export MIRROR=${MIRROR:-mirror.centos.org/centos}
-BASEARCH=${BASEARCH:-x86_64} ; RELEASE=${RELEASE:-8-stream}
+RELEASE=${RELEASE:-8}
+export MIRROR=${MIRROR:-dl.rockylinux.org/pub/rocky} ; MACHINE=$(uname -m)
 if [ "7" = "${RELEASE}" ] ; then
-  REPO_DIRECTORY="/${RELEASE}/os/x86_64" ;
+  REPO_DIRECTORY="/${RELEASE}/os/${MACHINE}" ;
 else
-  REPO_DIRECTORY="/${RELEASE}/BaseOS/x86_64/os" ;
+  REPO_DIRECTORY="/${RELEASE}/BaseOS/${MACHINE}/os" ;
 fi
 
-export INIT_HOSTNAME=${1:-centos-boxv0000}
+export INIT_HOSTNAME=${1:-rocky-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
 export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
 export YUMCMD="yum --setopt=requires_policy=strong --setopt=group_package_types=mandatory --releasever=${RELEASE}"
 export DNFCMD="dnf --setopt=install_weak_deps=False --releasever=${RELEASE}"
-
-umount /mnt/boot/efi
-DEV_ESP=$(lsblk -nlpo name,label,partlabel | grep -e ESP | cut -d' ' -f1)
-yes | mkfs.fat -n ESP ${DEV_ESP}
-mount ${DEV_ESP} /mnt/boot/efi
 
 echo "Create /etc/fstab" ; sleep 3
 mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
@@ -51,6 +46,7 @@ sh -c 'cat > /mnt/etc/fstab' << EOF
 LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
 LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
 LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
@@ -121,11 +117,12 @@ ls /proc ; sleep 5 ; ls /dev ; sleep 5
 
 
 echo "Config pkg repo mirror(s)" ; sleep 3
-. /etc/os-release ; VERSION_MAJOR=\$(echo \${VERSION_ID} | cut -d. -f1)
-##yum-config-manager --add-repo http://mirrorlist.centos.org/?release=${RELEASE}&arch=${BASEARCH}&repo=baseos
-#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/BaseOS/${BASEARCH}/os
-#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/AppStream/${BASEARCH}/os
-#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/extras/${BASEARCH}/os
+. /etc/os-release ; echo \${VERSION_ID} ; sleep 3
+VERSION_MAJOR=\$(echo \${VERSION_ID} | cut -d. -f1)
+##yum-config-manager --add-repo http://mirrorlist.centos.org/?release=${RELEASE}&arch=${MACHINE}&repo=baseos
+#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/BaseOS/${MACHINE}/os
+#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/AppStream/${MACHINE}/os
+#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/extras/${MACHINE}/os
 
 yum -y check-update
 ${YUMCMD} -y reinstall dnf dnf-plugins-core yum yum-utils
@@ -138,28 +135,35 @@ dnf repolist ; sleep 5
 
 
 echo "Add software package selection(s)" ; sleep 3
-${DNFCMD} -y install @core linux-firmware microcode_ctl sudo tar kbd openssl grub2-pc grub2-efi-x64 grub2 efibootmgr lvm2
-${DNFCMD} -y install network-scripts dhcp-client
-# Use EL release kernel packages (avoid dkms build errors)
-if [ "7" = "\${VERSION_MAJOR}" ] ; then
-dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${BASEARCH} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel
+if [ "aarch64" = "${MACHINE}" ] ; then
+  ${DNFCMD} -y install @core linux-firmware sudo tar kbd openssl grub2-efi-aa64 grub2 efibootmgr lvm2
 else
-dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${BASEARCH}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel
+  ${DNFCMD} -y install @core linux-firmware microcode_ctl sudo tar kbd openssl grub2-pc grub2-efi-x64 grub2 efibootmgr
 fi
-dnf -y check-update
-${DNFCMD} -y install 'dnf-command(versionlock)'
-
-kver=\$(dnf list --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1)
-echo \$kver ; sleep 5
-# Use EL release kernel packages (avoid dkms build errors)
-#if [ "7" = "\${VERSION_MAJOR}" ] ; then
-#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${BASEARCH} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel-headers-\$kver.${BASEARCH} kernel-devel-\$kver.${BASEARCH} dkms
-#else
-#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${BASEARCH}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel-headers-\$kver.${BASEARCH} kernel-devel-\$kver.${BASEARCH} dkms
-#fi
+${DNFCMD} -y install network-scripts dhcp-client
 #${DNFCMD} -y install dracut-tools dracut-config-generic dracut-config-rescue
 # @xfce-desktop
 # @^minimal @minimal-environment redhat-lsb-core dracut-tools dracut-config-generic dracut-config-rescue
+dnf -y check-update
+${DNFCMD} -y install 'dnf-command(versionlock)'
+
+
+# Use EL release kernel packages (avoid dkms build errors)
+if [ "7" = "\${VERSION_MAJOR}" ] ; then
+dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${MACHINE} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel kernel-devel
+else
+dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${MACHINE}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel kernel-devel
+fi
+
+
+kver=\$(dnf list --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1)
+echo \$kver ; sleep 5
+## Use EL release kernel packages (avoid dkms build errors)
+#if [ "7" = "\${VERSION_MAJOR}" ] ; then
+#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${MACHINE} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel-headers-\$kver.${MACHINE} kernel-devel-\$kver.${MACHINE}
+#else
+#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${MACHINE}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel-headers-\$kver.${MACHINE} kernel-devel-\$kver.${MACHINE}
+#fi
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -234,11 +238,20 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-grub2-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable
-grub2-install --target=i386-pc --recheck /dev/$DEVX
-cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/
-cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak
-cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI
+if [ "aarch64" = "${MACHINE}" ] ; then
+  grub2-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
+  cp /boot/efi/EFI/BOOT/BOOTAA64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI.bak ;
+  cp /boot/efi/EFI/BOOT/grubaa64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+  #cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+else
+  grub2-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  grub2-install --target=i386-pc --recheck /dev/$DEVX ;
+  cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
+  cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak ;
+  cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+  #cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+fi
 
 sh -c 'cat >> /etc/default/grub' << EOF
 GRUB_TIMEOUT=5
@@ -269,8 +282,13 @@ touch /.autorelabel
 sed -i 's|SELINUX=.*$|SELINUX=permissive|' /etc/sysconfig/selinux
 sestatus ; sleep 5
 
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+if [ "aarch64" = "${MACHINE}" ] ; then
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+else
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+fi
 efibootmgr -v ; sleep 3
 
 

@@ -8,6 +8,7 @@
 #  wget -N --no-check-certificate | curl -kOL]
 #aria2c --check-certificate=false <url_prefix>/script.sh
 
+MACHINE=$(uname -m)
 OS_NAME=$(uname -s) ; sep='#--------------------#' ; NAME="$OS_NAME"
 case $OS_NAME in
   'Darwin') NAME=$(sw_vers -productName) ;;
@@ -368,32 +369,32 @@ collect_all() {
 
   case $OS_NAME in
     'Darwin')
-      #msgfile='msg5.txt' ; echo "($NAME)" 'lang_devel_versions' > $msgfile ;
+      #msgfile="msg5-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'lang_devel_versions' > $msgfile ;
       #lang_devel_versions >> $msgfile ;
-      msgfile='msg4.txt' ; echo "($NAME)" 'desktop applications' > $msgfile ;
+      msgfile="msg4-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'desktop applications' > $msgfile ;
       ls -p /Applications | column >> $msgfile ;
-      msgfile='msg2.txt' ; echo "($NAME)" 'leaf_pkgs' > $msgfile ;
+      msgfile="msg2-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'leaf_pkgs' > $msgfile ;
       (concat_sep 'brew leaves' | column ;
 	    concat_sep 'brew list --cask' | column ;
 	    echo "==================") >> $msgfile ;
 
-	    msgfile='msg1.txt' ; echo "($NAME)" 'collect_info' > $msgfile ;
+	    msgfile="msg1-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'collect_info' > $msgfile ;
       macos_info >> $msgfile ;;
 	  'FreeBSD'|'OpenBSD'|'NetBSD'|'Linux')
-	    #msgfile='msg5.txt' ; echo "($NAME)" 'lang_devel_versions' > $msgfile ;
+	    #msgfile="msg5-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'lang_devel_versions' > $msgfile ;
       #lang_devel_versions >> $msgfile ;
-      msgfile='msg4.txt' ; echo "($NAME)" 'desktop applications' > $msgfile ;
+      msgfile="msg4-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'desktop applications' > $msgfile ;
       if [ -f /usr/local/share/applications ] ; then
         ls /usr/local/share/applications | column >> $msgfile ;
       elif [ -f /usr/share/applications ] ; then
         ls /usr/share/applications | column >> $msgfile ;
       fi ;
-      msgfile='msg3.txt' ; echo "($NAME)" 'explicit_pkgs' > $msgfile ;
+      msgfile="msg3-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'explicit_pkgs' > $msgfile ;
       pkgs_installed explicit >> $msgfile ;
-      msgfile='msg2.txt' ; echo "($NAME)" 'leaf_pkgs' > $msgfile ;
+      msgfile="msg2-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'leaf_pkgs' > $msgfile ;
       pkgs_installed leaf >> $msgfile ;
 
-      msgfile='msg1.txt' ; echo "($NAME)" 'collect_info' > $msgfile ;
+      msgfile="msg1-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'collect_info' > $msgfile ;
       if [ "Linux" = "$OS_NAME" ] ; then
         linux_info >> $msgfile ;
       else
@@ -406,9 +407,9 @@ collect_all() {
   for archive_cmd in "tar" "zip" "7za" ; do
     if command -v $archive_cmd > /dev/null ; then
       case $archive_cmd in
-        'tar'|'gtar') ${tarcmd} -caf info.tar${tarext} msg?.txt ;;
-        'zip') zip -r info.zip msg?.txt ;;
-        '7za') 7za a info.7z msg?.txt ;;
+        'tar'|'gtar') ${tarcmd} -caf info.tar${tarext} msg*.txt ;;
+        'zip') zip -r info.zip msg*.txt ;;
+        '7za') 7za a info.7z msg*.txt ;;
         *) echo 'ERROR: archive cmd is not [g]tar | zip | 7za' ;
           echo '...exiting...' ; exit ;;
       esac ;

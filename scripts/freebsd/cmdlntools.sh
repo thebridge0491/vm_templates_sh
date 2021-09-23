@@ -77,6 +77,7 @@ cp -R /root/init/common/skel/_ssh/* /usr/share/skel/dot.ssh/
 cp /root/init/common/skel/_gitconfig /usr/share/skel/dot.gitconfig
 cp /root/init/common/skel/_hgrc /usr/share/skel/dot.hgrc
 
+sed -i '' "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin no|" /etc/ssh/sshd_config
 if [ "$(grep '^.*%wheel.*ALL.*NOPASSWD.*' /usr/local/etc/sudoers)" ] ; then
   sed -i '' "s|^.*%wheel.*ALL.*NOPASSWD.*|%wheel ALL=(ALL) NOPASSWD: ALL|" /usr/local/etc/sudoers ;
 else

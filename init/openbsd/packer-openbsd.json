@@ -1,25 +1,26 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu|virtualbox-iso] template.json",
+  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu-x86_64|qemu-aarch64|virtualbox-iso] template.json",
 
   "builders": [{
     "type": "qemu",
-    "vm_name": "{{user `vm_name`}}.qcow2",
+    "name": "qemu-x86_64",
+    "vm_name": "{{user `vm_name`}}",
     "machine_type": "pc",
     "disk_interface": "virtio-scsi",
     "disk_discard": "unmap",
     "disk_detect_zeroes": "unmap",
     "qemuargs": [
-      ["-name", "{{user `vm_name`}}"], ["-boot", "order=cdn,menu=on"],
-      ["-smp", "cpus=2"], ["-m", "size=2048"], ["-smbios", "type=0,uefi=on"],
-      ["-bios", "{{user `qemu_uefi_amd64_path`}}"],
-      ["-vga", "cirrus"], ["-device", "virtio-net,netdev=user.0"],
+      ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
+      ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0"],
+      ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
+      ["-usb"], ["-vga", "cirrus"],
       ["-display", "gtk,show-cursor=on"],
-      ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"]
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_x64_firmware`}}"]
     ],
 
     "boot_wait": "10s",
-    "ssh_wait_timeout": "10000s",
+    "ssh_timeout": "2h45m",
     "ssh_username": "root",
     "ssh_password": "{{user `plain_passwd`}}",
     "headless": "{{user `headless`}}",
@@ -29,11 +30,53 @@
     "output_directory": "output-vms/{{user `vm_name`}}",
 
     "disk_image": "true",
-    "iso_checksum": "file:file://{{user `iso_directory`}}/SHA256",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/openbsd/amd64/SHA256",
     "iso_url": "",
-    "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.img,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.img",
+    "iso_urls": "file://{{user `isos_pardir`}}/openbsd/amd64/{{user `iso_x64_name`}}.img,{{user `iso_url_mirror`}}/{{user `iso_x64_url_directory`}}/{{user `iso_x64_name`}}.img",
     "boot_command": [
-      "<wait10><wait10><wait10><wait10><wait10><wait10>S<enter><wait10>dhclient vio0<enter><wait>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "S<enter><wait10>dhclient vio0<enter><wait>",
+      "ftp -o /tmp/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/custom.disklabel ; ftp -o /tmp/install.conf http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/install.conf ; ftp -o /tmp/autoinstall.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"
+    ]
+  },
+  {
+    "type": "qemu",
+    "name": "qemu-aarch64",
+    "vm_name": "{{user `vm_name`}}",
+    "machine_type": "virt",
+    "disk_interface": "virtio",
+    "disk_discard": "unmap",
+    "disk_detect_zeroes": "unmap",
+    "qemuargs": [
+      ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"],
+      ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
+      ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0"],
+      ["-device", "qemu-xhci,id=usb"], ["-usb"],
+      ["-device", "usb-kbd"], ["-device", "usb-tablet"],
+      ["-vga", "none"], ["-device", "virtio-gpu-pci"],
+      ["-display", "gtk,show-cursor=on"],
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_aa64_firmware`}}"]
+    ],
+    "qemu_binary": "qemu-system-aarch64",
+
+    "boot_wait": "10s",
+    "ssh_timeout": "2h45m",
+    "ssh_username": "root",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "shutdown -p +3",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+
+    "disk_image": "true",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/openbsd/arm64/SHA256",
+    "iso_url": "",
+    "iso_urls": "file://{{user `isos_pardir`}}/openbsd/arm64/{{user `iso_aa64_name`}}.img,{{user `iso_url_mirror`}}/{{user `iso_aa64_url_directory`}}/{{user `iso_aa64_name`}}.img",
+    "boot_command": [
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "S<enter><wait10>dhclient vio0<enter><wait>",
       "ftp -o /tmp/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/custom.disklabel ; ftp -o /tmp/install.conf http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/install.conf ; ftp -o /tmp/autoinstall.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"
     ]
   },
@@ -56,7 +99,7 @@
     ],
 
     "boot_wait": "10s",
-    "ssh_wait_timeout": "10000s",
+    "ssh_timeout": "2h45m",
     "ssh_username": "root",
     "ssh_password": "{{user `plain_passwd`}}",
     "headless": "{{user `headless`}}",
@@ -65,12 +108,13 @@
     "shutdown_command": "shutdown -p +3",
     "output_directory": "output-vms/{{user `vm_name`}}",
 
-    "iso_checksum": "file:file://{{user `iso_directory`}}/SHA256",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/openbsd/amd64/SHA256",
     "iso_url": "",
-    "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
+    "iso_urls": "file://{{user `isos_pardir`}}/openbsd/amd64/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_x64_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
-      "<wait10><wait10><wait10><wait10><wait10><wait10>S<enter><wait10>",
-      "mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; dhclient -L /tmp/dhclient.lease.em0 em0 ; dhclient -L /tmp/dhclient.lease.vio0 vio0 ; cd /tmp ; ftp -o /tmp/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/custom.disklabel ; ftp -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/disklabel_setup_vmopenbsd.sh ; ftp -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; (cd /dev ; sh MAKEDEV sd0) ; sh -x /tmp/disk_setup.sh part_format_vmdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `plain_passwd`}}'<enter><wait>"
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "S<enter><wait10>",
+      "mount_mfs -s 100m md1 /tmp ; mount_mfs -s 100m md2 /mnt ; mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; dhclient -L /tmp/dhclient.lease.em0 em0 ; dhclient -L /tmp/dhclient.lease.vio0 vio0 ; cd /tmp ; ftp -o /tmp/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/custom.disklabel ; ftp -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/disklabel_setup_vmopenbsd.sh ; ftp -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; (cd /dev ; sh MAKEDEV sd0) ; sh -x /tmp/disk_setup.sh part_format_vmdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `plain_passwd`}}'<enter><wait>"
     ]
   }],
 
@@ -130,33 +174,55 @@
 
   "post-processors": [
     {
+      "type": "checksum",
+      "checksum_types": ["md5", "sha256"],
+      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+    },
+    {
       "type": "vagrant",
       "keep_input_artifact": true,
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
-        "init/common/qemu_lxc/vmrun_qemu.args", "{{user `qemu_uefi_amd64_path`}}"],
+        "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
+        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_x64_firmware`}}"],
       "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
-      "except": ["virtualbox-iso"]
+      "only": ["qemu-x86_64"]
     },
     {
-      "type": "checksum",
-      "checksum_types": ["md5", "sha256"],
-      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+      "type": "vagrant",
+      "keep_input_artifact": true,
+      "vagrantfile_template": "Vagrantfile.template",
+      "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
+        "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "{{user `qemu_aa64_firmware`}}"],
+      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
+      "only": ["qemu-aarch64"]
+    },
+    {
+      "type": "shell-local",
+      "inline": [
+        "mv output-vms/{{user `vm_name`}}/{{user `vm_name`}} output-vms/{{user `vm_name`}}/{{user `vm_name`}}.qcow2"
+      ],
+      "except": ["virtualbox-iso"]
     }
   ],
 
   "variables": {
-    "vm_name": "openbsd-Release-std",
     "variant": "openbsd",
-    "init_hostname": "openbsd-boxv0000",
+    "distro": "openbsd",
     "vol_mgr": "std",
+    "vm_name": "{{user `distro`}}-x86_64-{{user `vol_mgr`}}",
+    "init_hostname": "openbsd-boxv0000",
     "boot_cmdln_options": " ",
-    "qemu_uefi_amd64_path": "/usr/share/OVMF/OVMF_CODE.fd",
+    "isos_pardir": "/mnt/Data0/distros",
 
-    "iso_directory": "/mnt/Data0/distros/openbsd",
+    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
     "iso_url_mirror": "https://cdn.openbsd.org/pub/OpenBSD",
-    "iso_url_directory": "6.9/amd64",
-    "iso_name": "install69",
+    "iso_x64_url_directory": "6.9/amd64",
+    "iso_x64_name": "install69",
+
+    "qemu_aa64_firmware": "/usr/share/AAVMF/AAVMF_CODE.fd",
+    "iso_aa64_url_directory": "6.9/arm64",
+    "iso_aa64_name": "install69",
 
     "disk_size": "30720",
     "headless": "",

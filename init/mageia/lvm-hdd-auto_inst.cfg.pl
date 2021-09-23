@@ -265,19 +265,23 @@ $o = {
 		sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 		mkdir -p /boot/EFI/EFI/BOOT
-		cp /boot/EFI/EFI/mageia/grubx64.efi /boot/EFI/EFI/BOOT/BOOTX64.EFI
+		if [ -e /boot/EFI/EFI/mageia/grubaa64.efi ] ; then
+		  cp /boot/EFI/EFI/mageia/grubaa64.efi /boot/EFI/EFI/BOOT/BOOTAA64.EFI ;
+		else
+		  cp /boot/EFI/EFI/mageia/grubx64.efi /boot/EFI/EFI/BOOT/BOOTX64.EFI ;
+		fi
 
-    echo GRUB_PRELOAD_MODULES="lvm" >> /etc/default/grub
-    sed -i "/GRUB_CMDLINE_LINUX_DEFAULT/ s|=\"\(.*\)\"|=\"\1 rootdelay=5\"|"  \
+        echo GRUB_PRELOAD_MODULES="lvm" >> /etc/default/grub
+        sed -i "/GRUB_CMDLINE_LINUX_DEFAULT/ s|=\"\(.*\)\"|=\"\1 rootdelay=5\"|"  \
 			/etc/default/grub
-    #grub2-install --target=i386-pc --recheck /dev/[sv]da
-    grub2-mkconfig -o /boot/grub2/grub.cfg
+        #grub2-install --target=i386-pc --recheck /dev/[sv]da
+        grub2-mkconfig -o /boot/grub2/grub.cfg
 
-    service shorewall stop ; service shorewall6 stop
-    systemctl disable shorewall ; systemctl disable shorewall6
+        service shorewall stop ; service shorewall6 stop
+        systemctl disable shorewall ; systemctl disable shorewall6
 
-    dnf -y clean all
-    fstrim -av
-    sync
+        dnf -y clean all
+        fstrim -av
+        sync
     '
 };

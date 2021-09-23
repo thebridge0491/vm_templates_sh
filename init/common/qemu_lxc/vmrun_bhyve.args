@@ -1,17 +1,17 @@
 printf "%40s\n" | tr ' ' '#'
 echo '### Warning: FreeBSD bhyve currently requires root/sudo permission ###'
 printf "%40s\n\n" | tr ' ' '#' ; sleep 5
-  
+
 bhyve -A -H -P -c 2 -m 2048M -s 0,hostbridge -s 1,lpc \
   -s 2,virtio-net,${NET_OPTS:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-  -s 3,virtio-blk,${STORAGE_DIR:-$(dirname $0)}/${IMGFILE:-${GUEST:-freebsd-Release-zfs}.${IMGFMT:-raw}} \
-  ${VIRTFS_OPTS:--s 4,virtio-9p,9p_Data0=/mnt/Data0} -l com1,stdio \
+  -s 3,virtio-blk,${STORAGE_DIR:-$(dirname $0)}/${IMGFILE:-${GUEST:-freebsd-x86_64-zfs}.${IMGFMT:-raw}} \
   ${BUEFI_OPTS:--s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
     -s 30,xhci,tablet \
-    -l bootrom,${BHYVE_UEFI_AMD64_PATH:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}} \
-  ${GUEST:-freebsd-Release-zfs} &
+    -l bootrom,${BHYVE_X64_FIRMWARE:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}} \
+  ${VIRTFS_OPTS:--s 4,virtio-9p,9p_Data0=/mnt/Data0} -l com1,stdio \
+  ${GUEST:-freebsd-x86_64-zfs} &
 
 vncviewer :${VNCPORT:-5901} &
 
 #ls -al /dev/vmm # list running VMs
-#bhyvectl --destroy --vm=${GUEST:-freebsd-Release-zfs}
+#bhyvectl --destroy --vm=${GUEST:-freebsd-x86_64-zfs}

@@ -20,7 +20,8 @@ elif [ -e /dev/sda ] ; then
   export DEVX=sda ;
 fi
 
-export GRP_NM=${GRP_NM:-vg0}
+export GRP_NM=${GRP_NM:-vg0} ; MACHINE=$(uname -m)
+service_mgr=${service_mgr:-openrc} # openrc | runit | s6
 
 export INIT_HOSTNAME=${1:-artix-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -37,6 +38,7 @@ cat << EOF > /mnt/etc/fstab
 LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
 LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
 LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
@@ -113,15 +115,15 @@ pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
 
 
 echo "Bootstrap base pkgs" ; sleep 3
-pkg_list="base intel-ucode amd-ucode linux-firmware dosfstools e2fsprogs xfsprogs reiserfsprogs jfsutils sysfsutils grub efibootmgr usbutils inetutils logrotate which dialog man-db man-pages less perl s-nail texinfo diffutils vi nano sudo"
+pkg_list="base intel-ucode amd-ucode linux-firmware dosfstools e2fsprogs xfsprogs reiserfsprogs jfsutils sysfsutils grub efibootmgr usbutils inetutils logrotate which dialog man-db man-pages less perl s-nail texinfo diffutils vi nano sudo elogind-${service_mgr} mkinitcpio"
 # ifplugd # wpa_actiond iw wireless_tools
 #pacman -Sg base | cut -d' ' -f2 | sed 's|^linux$|linux-lts|g' | pacstrap /mnt -
 if command -v pacstrap > /dev/null ; then
-  pacstrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
+  pacstrap /mnt --noconfirm $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
 elif command -v basestrap > /dev/null ; then
-  basestrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
+  basestrap /mnt --noconfirm $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
 else
-  pacman --root /mnt -Sy $pkg_list linux-lts ;
+  pacman --root /mnt -Sy --noconfirm $pkg_list linux-lts ;
 fi
 
 echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
@@ -174,7 +176,7 @@ elif [ "artix" = "\${ID}" ] ; then
   pacman-key --populate artix ;
 fi
 pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
-pacman --noconfirm -S linux-lts-headers ; pacman --noconfirm --needed -S linux-lts
+pacman --noconfirm --needed -S linux-lts ; pacman --noconfirm -S linux-lts-headers
 if [ "arch" = "\${ID}" ] ; then
   pacman --noconfirm --needed -S cryptsetup device-mapper mdadm lvm2 dhcpcd openssh ;
 elif [ "artix" = "\${ID}" ] ; then

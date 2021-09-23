@@ -1,41 +1,91 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu|virtualbox-iso] template.json",
+  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu-x86_64|qemu-aarch64|virtualbox-iso] template.json",
 
   "builders": [{
     "type": "qemu",
-    "vm_name": "{{user `vm_name`}}.qcow2",
+    "name": "qemu-x86_64",
+    "vm_name": "{{user `vm_name`}}",
     "machine_type": "q35",
     "disk_interface": "virtio-scsi",
     "disk_discard": "unmap",
     "disk_detect_zeroes": "unmap",
     "qemuargs": [
-      ["-name", "{{user `vm_name`}}"], ["-boot", "order=cdn,menu=on"],
-      ["-smp", "cpus=2"], ["-m", "size=2048"], ["-smbios", "type=0,uefi=on"],
-      ["-bios", "{{user `qemu_uefi_amd64_path`}}"],
-      ["-vga", "none"], ["-device", "virtio-net,netdev=user.0"],
-      ["-display", "gtk,show-cursor=on"], ["-device", "qxl-vga,vgamem_mb=64"],
+      ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
+      ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0"],
       ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
-      ["-virtfs", "local,path=/mnt/Data0,mount_tag=Data0,security_model=none"]
+      ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"],
+      ["-display", "gtk,show-cursor=on"],
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_x64_firmware`}}"],
+      ["-virtfs", "{{user `virtfs_opts`}}"]
     ],
 
     "boot_wait": "10s",
-    "ssh_wait_timeout": "10000s",
-    "ssh_username": "root",
+    "ssh_timeout": "2h45m",
+    "ssh_username": "packer",
     "ssh_password": "{{user `plain_passwd`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
-    "shutdown_command": "shutdown -hP +3 || poweroff",
+    "shutdown_command": "sudo shutdown -hP +3 || sudo poweroff",
     "output_directory": "output-vms/{{user `vm_name`}}",
 
-    "iso_checksum": "file:file://{{user `iso_directory`}}/{{user `iso_name`}}.iso.sha256",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/alpine/{{user `iso_x64_name`}}.iso.sha256",
     "iso_url": "",
-    "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
+    "iso_urls": "file://{{user `isos_pardir`}}/alpine/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_x64_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
       "<wait10>root<enter><wait>ifconfig eth0 up ; udhcpc -i eth0<enter><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
-      "wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; export MIRROR='{{user `repo_host`}}' ; . /etc/os-release ; echo http://${MIRROR}{{user `repo_directory`}} >> /etc/apk/repositories ; apk add e2fsprogs dosfstools sgdisk lvm2 util-linux multipath-tools {{user `foreign_pkgmgr`}} ; setup-udev ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems<enter><wait10><wait10><wait10>sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "date +%Y.%m.%d-%H:%M -s '{{user `datestamp`}}-23:59' ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; . /etc/os-release ; echo http://{{user `repo_host`}}/latest-stable/main >> /etc/apk/repositories ; echo http://{{user `repo_host`}}/latest-stable/community >> /etc/apk/repositories ; apk add e2fsprogs dosfstools sgdisk libffi gnupg curl lvm2 util-linux multipath-tools perl {{user `foreign_pkgmgr`}} ; ",
+      "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then apk add zfs ; modprobe zfs ; zpool version ; sleep 5 ; fi ; ",
+      "setup-udev ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems<enter><wait10><wait10><wait10>sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+    ]
+  },
+  {
+    "type": "qemu",
+    "name": "qemu-aarch64",
+    "vm_name": "{{user `vm_name`}}",
+    "machine_type": "virt",
+    "disk_interface": "virtio",
+    "disk_discard": "unmap",
+    "disk_detect_zeroes": "unmap",
+    "qemuargs": [
+      ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3"],
+      ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
+      ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0"],
+      ["-device", "qemu-xhci,id=usb"], ["-usb"],
+      ["-device", "usb-kbd"], ["-device", "usb-tablet"],
+      ["-vga", "none"], ["-device", "virtio-gpu-pci"],
+      ["-display", "gtk,show-cursor=on"],
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_aa64_firmware`}}"],
+      ["-virtfs", "{{user `virtfs_opts`}}"]
+    ],
+    "qemu_binary": "qemu-system-aarch64",
+
+    "boot_wait": "10s",
+    "ssh_timeout": "2h45m",
+    "ssh_username": "packer",
+    "ssh_password": "{{user `plain_passwd`}}",
+    "headless": "{{user `headless`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "http_directory": "init",
+    "shutdown_command": "sudo shutdown -hP +3 || sudo poweroff",
+    "output_directory": "output-vms/{{user `vm_name`}}",
+
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/alpine/{{user `iso_aa64_name`}}.iso.sha256",
+    "iso_url": "",
+    "iso_urls": "file://{{user `isos_pardir`}}/alpine/{{user `iso_aa64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_aa64_url_directory`}}/{{user `iso_aa64_name`}}.iso",
+    "boot_command": [
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10>root<enter><wait>ifconfig eth0 up ; udhcpc -i eth0<enter><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "date +%Y.%m.%d-%H:%M -s '{{user `datestamp`}}-23:59' ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; . /etc/os-release ; echo http://{{user `repo_host`}}/latest-stable/main >> /etc/apk/repositories ; echo http://{{user `repo_host`}}/latest-stable/community >> /etc/apk/repositories ; apk add e2fsprogs dosfstools sgdisk libffi gnupg curl lvm2 util-linux multipath-tools perl {{user `foreign_pkgmgr`}} ; ",
+      "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then apk add zfs ; modprobe zfs ; zpool version ; sleep 5 ; fi ;",
+      "setup-udev ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems<enter><wait10><wait10><wait10>sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
     ]
   },
   {
@@ -54,26 +104,26 @@
         "--memory", "2048", "--vram", "64", "--rtcuseutc", "on", "--cpus", "2",
         "--clipboard", "bidirectional", "--draganddrop", "bidirectional",
         "--accelerate3d", "on", "--groups", "/init_vm"],
-      ["sharedfolder", "add", "{{.Name}}", "--name", "Data0", "--hostpath",
+      ["sharedfolder", "add", "{{.Name}}", "--name", "9p_Data0", "--hostpath",
         "/mnt/Data0", "--automount"]
     ],
 
     "boot_wait": "10s",
-    "ssh_wait_timeout": "10000s",
-    "ssh_username": "root",
+    "ssh_timeout": "2h45m",
+    "ssh_username": "packer",
     "ssh_password": "{{user `plain_passwd`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
-    "shutdown_command": "shutdown -hP +3 || poweroff",
+    "shutdown_command": "sudo shutdown -hP +3 || sudo poweroff",
     "output_directory": "output-vms/{{user `vm_name`}}",
 
-    "iso_checksum": "file:file://{{user `iso_directory`}}/{{user `iso_name`}}.iso.sha256",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/alpine/{{user `iso_x64_name`}}.iso.sha256",
     "iso_url": "",
-    "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
+    "iso_urls": "file://{{user `isos_pardir`}}/alpine/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_x64_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
       "root<enter><wait>ifconfig eth0 up ; udhcpc -i eth0<enter><wait10>",
-      "wget -O /tmp/answers 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-answers' ; wget -O /tmp/post_autoinstall.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/post_autoinstall.sh' ; service sshd stop ; MIRROR='{{user `repo_host`}}' ; APKREPOSOPTS=http://${MIRROR}{{user `repo_directory`}} BOOT_SIZE=200 BOOTLOADER=grub DISKLABEL=gpt setup-alpine -f /tmp/answers<enter><wait5>{{user `plain_passwd`}}<enter>{{user `plain_passwd`}}<enter><wait10><wait10><wait10>y<enter><wait10><wait10><wait10>sh -x /tmp/post_autoinstall.sh '{{user `crypted_passwd`}}'<enter>"
+      "date +%Y.%m.%d-%H:%M -s '{{user `datestamp`}}-23:59' ; wget -O /tmp/answers 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-answers' ; wget -O /tmp/post_autoinstall.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/post_autoinstall.sh' ; service sshd stop ; APKREPOSOPTS=http://{{user `repo_host`}}/latest-stable/main BOOT_SIZE=200 BOOTLOADER=grub DISKLABEL=gpt setup-alpine -f /tmp/answers<enter><wait5>{{user `plain_passwd`}}<enter>{{user `plain_passwd`}}<enter><wait10><wait10><wait10>y<enter><wait10><wait10><wait10>sh -x /tmp/post_autoinstall.sh '{{user `crypted_passwd`}}'<enter>"
     ]
   }],
 
@@ -133,36 +183,58 @@
 
   "post-processors": [
     {
+      "type": "checksum",
+      "checksum_types": ["md5", "sha256"],
+      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+    },
+    {
       "type": "vagrant",
       "keep_input_artifact": true,
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
-        "init/common/qemu_lxc/vmrun_qemu.args", "{{user `qemu_uefi_amd64_path`}}"],
+        "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
+        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_x64_firmware`}}"],
       "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
-      "except": ["virtualbox-iso"]
+      "only": ["qemu-x86_64"]
     },
     {
-      "type": "checksum",
-      "checksum_types": ["md5", "sha256"],
-      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+      "type": "vagrant",
+      "keep_input_artifact": true,
+      "vagrantfile_template": "Vagrantfile.template",
+      "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
+        "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "{{user `qemu_aa64_firmware`}}"],
+      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
+      "only": ["qemu-aarch64"]
+    },
+    {
+      "type": "shell-local",
+      "inline": [
+        "mv output-vms/{{user `vm_name`}}/{{user `vm_name`}} output-vms/{{user `vm_name`}}/{{user `vm_name`}}.qcow2"
+      ],
+      "except": ["virtualbox-iso"]
     }
   ],
 
   "variables": {
-    "vm_name": "alpine-Stable-lvm",
     "variant": "alpine",
-    "init_hostname": "alpine-boxv0000",
+    "distro": "alpine",
     "vol_mgr": "lvm",
+    "vm_name": "{{user `distro`}}-x86_64-{{user `vol_mgr`}}",
+    "init_hostname": "alpine-boxv0000",
     "foreign_pkgmgr": "",
     "boot_cmdln_options": " ",
-    "qemu_uefi_amd64_path": "/usr/share/OVMF/OVMF_CODE.fd",
-
+    "virtfs_opts": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
+    "isos_pardir": "/mnt/Data0/distros",
+    
+    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
     "repo_host": "dl-cdn.alpinelinux.org/alpine",
-    "repo_directory": "/latest-stable/main",
-    "iso_directory": "/mnt/Data0/distros/alpine",
     "iso_url_mirror": "https://dl-cdn.alpinelinux.org/alpine",
-    "iso_url_directory": "latest-stable/releases/x86_64",
-    "iso_name": "alpine-extended-3.14.2-x86_64",
+    "iso_x64_url_directory": "latest-stable/releases/x86_64",
+    "iso_x64_name": "alpine-extended-3.14.2-x86_64",
+
+    "qemu_aa64_firmware": "/usr/share/AAVMF/AAVMF_CODE.fd",
+    "iso_aa64_url_directory": "latest-stable/releases/aarch64",
+    "iso_aa64_name": "alpine-standard-3.14.2-aarch64",
 
     "disk_size": "30720",
     "headless": "",

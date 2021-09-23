@@ -20,8 +20,8 @@ elif [ -e /dev/sda ] ; then
   export DEVX=sda ;
 fi
 
-export GRP_NM=${GRP_NM:-vg0} ; BASEARCH=${BASEARCH:-x86_64}
-export MIRROR=${MIRROR:-download.opensuse.org} ; RELEASE=${RELEASE:-15.3}
+export GRP_NM=${GRP_NM:-vg0}
+export MIRROR=${MIRROR:-download.opensuse.org} ; MACHINE=$(uname -m)
 
 export INIT_HOSTNAME=${1:-opensuse-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -34,6 +34,7 @@ sh -c 'cat > /mnt/etc/fstab' << EOF
 LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
 LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
 LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
@@ -50,10 +51,10 @@ echo "Bootstrap base pkgs" ; sleep 3
 #mkdir -p /mnt/var/lib/rpm /mnt/var/cache/zypp
 #rpm -v --root /mnt --initdb
 # [wget -O file url | curl -L -o file url]
-#wget -O /tmp/release.rpm http://${MIRROR}/distribution/leap/${RELEASE}/repo/oss/${BASEARCH}/openSUSE-release-15.2-lp152.575.1.${BASEARCH}.rpm
+#wget -O /tmp/release.rpm http://${MIRROR}/distribution/openSUSE-current/repo/oss/${MACHINE}/openSUSE-release-15.2-lp152.575.1.${MACHINE}.rpm
 #rpm -v -qip /tmp/release.rpm ; sleep 5
 #rpm -v --root /mnt --nodeps -i /tmp/release.rpm
-zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/${RELEASE}/repo/oss/ repo-oss
+zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/openSUSE-current/repo/oss/ repo-oss
 zypper --non-interactive --root /mnt --gpg-auto-import-keys refresh
 zypper --non-interactive --root /mnt install --no-recommends patterns-base-base makedev
 zypper --non-interactive --root /mnt repos ; sleep 5
@@ -104,15 +105,15 @@ zypper repos ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
 zypper --non-interactive --gpg-auto-import-keys refresh
-zypper --non-interactive install --no-recommends patterns-base-base patterns-yast-yast2_basis
-zypper --non-interactive install --no-recommends --type pattern base yast2_basis
+zypper --non-interactive install --no-recommends patterns-base-base patterns-base-bootloader patterns-yast-yast2_basis
+zypper --non-interactive install --no-recommends --type pattern base bootloader yast2_basis
 # xfce
 # laptop
 
 zypper --non-interactive install ca-certificates-cacert ca-certificates-mozilla
 zypper --gpg-auto-import-keys refresh
 update-ca-certificates
-zypper --non-interactive install kernel-default makedev sudo nano less dosfstools grub2 grub2-x86_64-efi shim efibootmgr firewalld openssl openssh-askpass lvm2
+zypper --non-interactive install kernel-default makedev sudo nano less dosfstools grub2 shim efibootmgr firewalld openssl openssh-askpass lvm2
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -148,18 +149,12 @@ echo "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hos
 
 ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
-#sh -c "cat >> /etc/sysconfig/network/ifcfg-eth0" << EOF
+sh -c "cat >> /etc/sysconfig/network/ifcfg-\${ifdev}" << EOF
 #BOOTPROTO='dhcp'
 #STARTMODE='auto'
 #ONBOOT='yes'
-#
-#EOF
-#sh -c "cat >> /etc/sysconfig/network/ifcfg-eth1" << EOF
-#BOOTPROTO='dhcp'
-#STARTMODE='auto'
-#ONBOOT='yes'
-#
-#EOF
+
+EOF
 #echo "NETWORKING=yes" >> /etc/sysconfig/network
 
 
@@ -188,11 +183,20 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-grub2-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable
-grub2-install --target=i386-pc --recheck /dev/$DEVX
-cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/
-cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak
-cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI
+if [ "aarch64" = "${MACHINE}" ] ; then
+  grub2-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
+  cp /boot/efi/EFI/BOOT/BOOTAA64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI.bak ;
+  cp /boot/efi/EFI/BOOT/grubaa64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+  #cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+else
+  grub2-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  grub2-install --target=i386-pc --recheck /dev/$DEVX ;
+  cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
+  cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak ;
+  cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+  #cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+fi
 
 #sed -i -e "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
 #sed -i -e "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
@@ -205,8 +209,13 @@ grub2-mkconfig -o /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg
 
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+if [ "aarch64" = "${MACHINE}" ] ; then
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+else
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+fi
 efibootmgr -v ; sleep 3
 
 

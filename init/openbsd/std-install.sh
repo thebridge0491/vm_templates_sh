@@ -20,9 +20,9 @@ elif [ -n "`fdisk wd0`" ] ; then
   export DEVX=wd0 ;
 fi
 
-export ARCH=${ARCH:-$(arch -s)}
+#export MACHINE=${MACHINE:-$(arch -s)}
 export REL=${REL:-$(sysctl -n kern.osrelease)}
-export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/OpenBSD}
+export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/OpenBSD} ; MACHINE=$(uname -m)
 
 export INIT_HOSTNAME=${1:-openbsd-boxv0000}
 export PLAIN_PASSWD=${2:-abcd0123}
@@ -60,16 +60,16 @@ sed -i 's|rw|rw,noatime|' /mnt/etc/fstab
 echo "Extracting openbsd dist archives" ; sleep 3
 SUF=$(echo ${REL} | sed 's|\.||g')
 #for file in man${SUF} comp${SUF} base${SUF} ; do
-#    (ftp -o - http://${MIRROR}/${REL}/${ARCH}/${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
+#    (ftp -o - http://${MIRROR}/${REL}/${MACHINE}/${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
 #done
-#ftp -o ${DESTDIR:-/mnt}/bsd http://${MIRROR}/${REL}/${ARCH}/bsd
-#ftp -o ${DESTDIR:-/mnt}/bsd.rd http://${MIRROR}/${REL}/${ARCH}/bsd.rd
-#ftp -o ${DESTDIR:-/mnt}/bsd.mp http://${MIRROR}/${REL}/${ARCH}/bsd.mp
-mount_cd9660 /dev/cd0a /mnt2 ; sync ; cd /mnt2/${REL}/${ARCH}
+#ftp -o ${DESTDIR:-/mnt}/bsd http://${MIRROR}/${REL}/${MACHINE}/bsd
+#ftp -o ${DESTDIR:-/mnt}/bsd.rd http://${MIRROR}/${REL}/${MACHINE}/bsd.rd
+#ftp -o ${DESTDIR:-/mnt}/bsd.mp http://${MIRROR}/${REL}/${MACHINE}/bsd.mp
+mount_cd9660 /dev/cd0a /mnt2 ; sync ; cd /mnt2/${REL}/${MACHINE}
 for file in man${SUF} comp${SUF} base${SUF} ; do
     (cat ${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
 done
-cp /mnt2/${REL}/${ARCH}/bsd* ${DESTDIR:-/mnt}
+cp /mnt2/${REL}/${MACHINE}/bsd* ${DESTDIR:-/mnt}
 
 
 (cd /mnt/dev ; sh MAKEDEV all)
@@ -203,9 +203,15 @@ tar -xf /tmp/init.tar -C /mnt/root/ ; sleep 5
 
 mkdir -p /mnt/efi ; mount -t msdos /dev/${DEVX}i /mnt/efi
 (cd /mnt/efi ; mkdir -p EFI/openbsd EFI/BOOT)
-#ftp -o /mnt/efi/EFI/BOOT/BOOTX64.EFI http://${MIRROR}/${REL}/${ARCH}/BOOTX64.EFI
-cp /mnt/usr/mdec/{BOOTX64.EFI,bootx64.efi} /mnt/efi/EFI/openbsd/
-cp /mnt/usr/mdec/{BOOTX64.EFI,bootx64.efi} /mnt/efi/EFI/BOOT/
+if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+  #ftp -o /mnt/efi/EFI/BOOT/BOOTAA64.EFI http://${MIRROR}/${REL}/${MACHINE}/BOOTAA64.EFI ;
+  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
+  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+else
+  #ftp -o /mnt/efi/EFI/BOOT/BOOTX64.EFI http://${MIRROR}/${REL}/${MACHINE}/BOOTX64.EFI ;
+  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
+  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+fi
 
 cp /mnt/usr/mdec/boot /mnt/boot
 installboot -v ${DEVX}a ; installboot -v /dev/r${DEVX}a

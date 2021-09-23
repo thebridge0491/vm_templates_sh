@@ -1,26 +1,27 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu|virtualbox-iso] template.json",
+  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu-x86_64|virtualbox-iso] template.json",
 
   "builders": [{
     "type": "qemu",
-    "vm_name": "{{user `vm_name`}}.qcow2",
+    "name": "qemu-x86_64",
+    "vm_name": "{{user `vm_name`}}",
     "machine_type": "q35",
     "disk_interface": "virtio-scsi",
     "disk_discard": "unmap",
     "disk_detect_zeroes": "unmap",
     "qemuargs": [
-      ["-name", "{{user `vm_name`}}"], ["-boot", "order=cdn,menu=on"],
-      ["-smp", "cpus=2"], ["-m", "size=2048"], ["-smbios", "type=0,uefi=on"],
-      ["-bios", "{{user `qemu_uefi_amd64_path`}}"],
-      ["-vga", "none"], ["-device", "virtio-net,netdev=user.0"],
-      ["-display", "gtk,show-cursor=on"], ["-device", "qxl-vga,vgamem_mb=64"],
+      ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
+      ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0"],
       ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
-      ["-virtfs", "local,path=/mnt/Data0,mount_tag=Data0,security_model=none"]
+      ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"],
+      ["-display", "gtk,show-cursor=on"],
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_x64_firmware`}}"],
+      ["-virtfs", "{{user `virtfs_opts`}}"]
     ],
 
     "boot_wait": "10s",
-    "ssh_wait_timeout": "10000s",
+    "ssh_timeout": "2h45m",
     "ssh_username": "packer",
     "ssh_password": "{{user `plain_passwd`}}",
     "headless": "{{user `headless`}}",
@@ -29,9 +30,9 @@
     "shutdown_command": "sudo shutdown -hP +3",
     "output_directory": "output-vms/{{user `vm_name`}}",
 
-    "iso_checksum": "file:file://{{user `iso_directory`}}/{{user `iso_name`}}.iso.md5sum",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/pclinuxos/{{user `iso_x64_name`}}.md5sum",
     "iso_url": "",
-    "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
+    "iso_urls": "file://{{user `isos_pardir`}}/pclinuxos/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
       "<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 {{user `boot_cmdln_options`}}<enter>initrd /isolinux/initrd.gz<enter>boot<enter>",
       "<wait><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><enter>guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lvm2 ; apt-get -y --fix-broken install ; modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; ",
@@ -54,12 +55,12 @@
         "--memory", "2048", "--vram", "64", "--rtcuseutc", "on", "--cpus", "2",
         "--clipboard", "bidirectional", "--draganddrop", "bidirectional",
         "--accelerate3d", "on", "--groups", "/init_vm"],
-      ["sharedfolder", "add", "{{.Name}}", "--name", "Data0", "--hostpath",
+      ["sharedfolder", "add", "{{.Name}}", "--name", "9p_Data0", "--hostpath",
         "/mnt/Data0", "--automount"]
     ],
 
     "boot_wait": "10s",
-    "ssh_wait_timeout": "10000s",
+    "ssh_timeout": "2h45m",
     "ssh_username": "packer",
     "ssh_password": "{{user `plain_passwd`}}",
     "headless": "{{user `headless`}}",
@@ -68,9 +69,9 @@
     "shutdown_command": "sudo shutdown -hP +3",
     "output_directory": "output-vms/{{user `vm_name`}}",
 
-    "iso_checksum": "file:file://{{user `iso_directory`}}/{{user `iso_name`}}.iso.md5sum",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/pclinuxos/{{user `iso_x64_name`}}.md5sum",
     "iso_url": "",
-    "iso_urls": "file://{{user `iso_directory`}}/{{user `iso_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name`}}.iso",
+    "iso_urls": "file://{{user `isos_pardir`}}/pclinuxos/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
       "<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 {{user `boot_cmdln_options`}}<enter>initrd /isolinux/initrd.gz<enter>boot<enter>",
       "<wait><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><enter>guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lvm2 ; apt-get -y --fix-broken install ; modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; ",
@@ -134,33 +135,43 @@
 
   "post-processors": [
     {
+      "type": "checksum",
+      "checksum_types": ["md5", "sha256"],
+      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+    },
+    {
       "type": "vagrant",
       "keep_input_artifact": true,
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
-        "init/common/qemu_lxc/vmrun_qemu.args", "{{user `qemu_uefi_amd64_path`}}"],
+        "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
+        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_x64_firmware`}}"],
       "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
-      "except": ["virtualbox-iso"]
+      "only": ["qemu-x86_64"]
     },
     {
-      "type": "checksum",
-      "checksum_types": ["md5", "sha256"],
-      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+      "type": "shell-local",
+      "inline": [
+        "mv output-vms/{{user `vm_name`}}/{{user `vm_name`}} output-vms/{{user `vm_name`}}/{{user `vm_name`}}.qcow2"
+      ],
+      "except": ["virtualbox-iso"]
     }
   ],
 
   "variables": {
-    "vm_name": "pclinuxos-Rolling-lvm",
     "variant": "pclinuxos",
-    "init_hostname": "pclinuxos-boxv0000",
+    "distro": "pclinuxos",
     "vol_mgr": "lvm",
+    "vm_name": "{{user `distro`}}-x86_64-{{user `vol_mgr`}}",
+    "init_hostname": "pclinuxos-boxv0000",
     "boot_cmdln_options": "nokmsboot noacpi 3 text textmode=1 nomodeset video=1024x768 keyb=us ",
-    "qemu_uefi_amd64_path": "/usr/share/OVMF/OVMF_CODE.fd",
+    "virtfs_opts": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
+    "isos_pardir": "/mnt/Data0/distros",
 
-    "iso_directory": "/mnt/Data0/distros/pclinuxos",
+    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
     "iso_url_mirror": "https://spout.ussg.indiana.edu/pclinuxos",
     "iso_url_directory": "pclinuxos/live-cd/64bit",
-    "iso_name": "pclinuxos64-kde5-darkstar-2021.08",
+    "iso_x64_name": "pclinuxos64-kde-darkstar-2021.08",
 
     "disk_size": "30720",
     "headless": "",

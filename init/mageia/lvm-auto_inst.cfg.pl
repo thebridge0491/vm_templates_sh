@@ -95,6 +95,13 @@ $o = {
         },
         {
             'hd' => undef,
+            'type' => 0x83,
+            'fs_type' => 'ext2',
+            #'mntpoint' => '/boot',
+            'size' => 1 << 20 # 1GB
+        },
+        {
+            'hd' => undef,
             'pt_type' => 0x8e,
             'mntpoint' => 'pvol0',
             'size' => 2 << 20, # ~29GB
@@ -178,7 +185,11 @@ $o = {
 		sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 		mkdir -p /boot/EFI/EFI/BOOT
-		cp /boot/EFI/EFI/mageia/grubx64.efi /boot/EFI/EFI/BOOT/BOOTX64.EFI
+		if [ -e /boot/EFI/EFI/mageia/grubaa64.efi ] ; then
+		  cp /boot/EFI/EFI/mageia/grubaa64.efi /boot/EFI/EFI/BOOT/BOOTAA64.EFI ;
+		else
+		  cp /boot/EFI/EFI/mageia/grubx64.efi /boot/EFI/EFI/BOOT/BOOTX64.EFI ;
+		fi
 
         echo GRUB_PRELOAD_MODULES="lvm" >> /etc/default/grub
         sed -i "/GRUB_CMDLINE_LINUX_DEFAULT/ s|=\"\(.*\)\"|=\"\1 rootdelay=5\"|"  \

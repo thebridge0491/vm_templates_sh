@@ -20,7 +20,8 @@ elif [ -e /dev/sda ] ; then
   export DEVX=sda ;
 fi
 
-export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
+export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0} ; MACHINE=$(uname -m)
+service_mgr=${service_mgr:-openrc} # openrc | runit | s6
 
 export INIT_HOSTNAME=${1:-artix-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -122,15 +123,15 @@ EOF
 
 echo "Bootstrap base pkgs" ; sleep 3
 zfs umount $ZPOOLNM/var/mail ; zfs destroy $ZPOOLNM/var/mail
-pkg_list="base base-devel intel-ucode amd-ucode linux-firmware dosfstools e2fsprogs xfsprogs reiserfsprogs jfsutils sysfsutils grub efibootmgr usbutils inetutils logrotate which dialog man-db man-pages less perl s-nail texinfo diffutils vi nano sudo"
+pkg_list="base base-devel intel-ucode amd-ucode linux-firmware dosfstools e2fsprogs xfsprogs reiserfsprogs jfsutils sysfsutils grub efibootmgr usbutils inetutils logrotate which dialog man-db man-pages less perl s-nail texinfo diffutils vi nano sudo elogind-${service_mgr} mkinitcpio"
 # ifplugd # wpa_actiond iw wireless_tools
 #pacman -Sg base | cut -d' ' -f2 | sed 's|^linux$|linux-lts|g' | pacstrap /mnt -
 if command -v pacstrap > /dev/null ; then
-  pacstrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
+  pacstrap /mnt --noconfirm $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
 elif command -v basestrap > /dev/null ; then
-  basestrap /mnt $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
+  basestrap /mnt --noconfirm $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
 else
-  pacman --root /mnt -Sy $pkg_list linux-lts ;
+  pacman --root /mnt -Sy --noconfirm $pkg_list linux-lts ;
 fi
 
 echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
@@ -185,7 +186,7 @@ elif [ "artix" = "\${ID}" ] ; then
   pacman-key --populate artix ;
 fi
 pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
-pacman --noconfirm -S linux-lts-headers ; pacman --noconfirm --needed -S linux-lts
+pacman --noconfirm --needed -S linux-lts ; pacman --noconfirm -S linux-lts-headers
 if [ "arch" = "\${ID}" ] ; then
   pacman --noconfirm --needed -S cryptsetup device-mapper mdadm dhcpcd openssh ;
 elif [ "artix" = "\${ID}" ] ; then
@@ -206,7 +207,7 @@ curl -o /tmp/archzfs.gpg https://archzfs.com/archzfs.gpg
 pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
 pacman -Syu
 
-pacman --noconfirm -Sy zfs-dkms # archzfs-linux-lts
+pacman --noconfirm -Sy --needed linux-lts-headers zfs-dkms # archzfs-linux-lts
 echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
 sh -c 'cat >> /etc/modules-load.d/zfs.conf' << EOF
 # load zfs.ko at boot

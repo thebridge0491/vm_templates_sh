@@ -21,7 +21,9 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
-export MIRROR=${MIRROR:-mirror.clarkson.edu/voidlinux}
+# (x86_64) mirror.clarkson.edu/voidlinux/current
+# (aarch64) mirror.clarkson.edu/voidlinux/current/aarch64
+export MIRROR=${MIRROR:-mirror.clarkson.edu/voidlinux} ; MACHINE=$(uname -m)
 
 export INIT_HOSTNAME=${1:-voidlinux-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -47,12 +49,21 @@ EOF
 
 
 echo "Bootstrap base pkgs" ; sleep 3
-pkg_list="linux-lts linux-lts-headers libgcc ethtool base-voidstrap bash grub grub-x86_64-efi cryptsetup openssh sudo efibootmgr"
+pkg_list="linux-lts linux-lts-headers libgcc ethtool base-voidstrap bash cryptsetup openssh sudo efibootmgr"
 if command -v xbps-install.static > /dev/null ; then
-  yes | XBPS_ARCH=x86_64 xbps-install.static -Sy -R http://${MIRROR}/current -r /mnt $pkg_list ;
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    yes | XBPS_ARCH=${MACHINE} xbps-install.static -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list grub-arm64-efi ;
+  else
+    yes | XBPS_ARCH=${MACHINE} xbps-install.static -Sy -R http://${MIRROR}/current -r /mnt $pkg_list grub-x86_64-efi ;  
+  fi ;
 else
-  yes | XBPS_ARCH=x86_64 xbps-install -Sy -R http://${MIRROR}/current -r /mnt $pkg_list ;
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    yes | XBPS_ARCH=${MACHINE} xbps-install -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list grub-arm64-efi ;
+  else
+    yes | XBPS_ARCH=${MACHINE} xbps-install -Sy -R http://${MIRROR}/current -r /mnt $pkg_list grub-x86_64-efi ;
+  fi ;
 fi
+
 if ! command -v zfs > /dev/null ; then
   yes | xbps-install -Sy linux-lts-headers zfs ;
   mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ;
@@ -85,14 +96,20 @@ export TERM=xterm-color     # xterm | xterm-color
 
 ls /proc ; sleep 5 ; ls /dev ; sleep 5
 
-. /etc/os-release
-echo "repository=https://${MIRROR}/current" >> /etc/xbps.d/00-repository-main.conf
+. /etc/os-release ; mkdir -p /etc/xbps.d
+if [ "aarch64" = "${MACHINE}" ] ; then
+  echo "repository=https://${MIRROR}/current/aarch64" >> /etc/xbps.d/00-repository-main.conf
+else
+  echo "repository=https://${MIRROR}/current" >> /etc/xbps.d/00-repository-main.conf
+fi
 echo "virtualpkg=linux-headers:linux-lts-headers" >> /etc/xbps.d/99-virtualpkg.conf
 xbps-install -S ; xbps-query -L ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
 yes | xbps-install -Su xbps #; yes | xbps-install -u
-yes | xbps-install -Sy void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree python nano wget
+for pkgX in void-repo-nonfree python nano wget curl aria2 void-repo-multilib void-repo-multilib-nonfree ; do
+  yes | xbps-install -Sy \$pkgX
+done
 #yes | xbps-install -Sy xfce4
 xbps-query -Rs void-repo-nonfree ; sleep 5
 
@@ -183,10 +200,14 @@ xbps-query --list-hold-pkgs ; sleep 3
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} ; mkdir -p /boot/efi/EFI/BOOT
-
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable
-grub-install --target=i386-pc --recheck /dev/$DEVX
-cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI
+if [ "aarch64" = "${MACHINE}" ] ; then
+  grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+else
+  grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  grub-install --target=i386-pc --recheck /dev/$DEVX ;
+  cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+fi
 
 #sed -i -e "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
 sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rd.auto=1 text xdriver=vesa nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay=5"|' /etc/default/grub
@@ -194,8 +215,13 @@ sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rd.auto=1 text xdriver=
 echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub
 grub-mkconfig -o /boot/grub/grub.cfg
 
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+if [ "aarch64" = "${MACHINE}" ] ; then
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+else
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+fi
 efibootmgr -v ; sleep 3
 
 

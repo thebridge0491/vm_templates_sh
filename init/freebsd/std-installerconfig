@@ -13,13 +13,13 @@ elif [ -e /dev/da0 ] ; then
   export DEVX=da0 ;
 fi
 
-export GRP_NM=${GRP_NM:-bsd0}
+export GRP_NM=${GRP_NM:-bsd0} ; MACHINE=$(uname -m)
 export INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxv0000}
 
 export nonInteractive="YES"
 PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 4G freebsd-swap,
 	11776M freebsd-ufs /, 6G freebsd-ufs /var, auto freebsd-ufs /usr/home }"
-DISTRIBUTIONS="kernel.txz base.txz lib32.txz "
+DISTRIBUTIONS="kernel.txz base.txz "
 
 
 #!/bin/sh
@@ -46,7 +46,7 @@ sysctl kern.geom.label.gpt.enable=1
 #export nonInteractive="YES"
 #PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 4G freebsd-swap,
 #	11776M freebsd-ufs /, 6G freebsd-ufs /var, auto freebsd-ufs /usr/home }"
-#DISTRIBUTIONS="kernel.txz base.txz lib32.txz "
+#DISTRIBUTIONS="kernel.txz base.txz "
 
 
 gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 $DEVX
@@ -83,7 +83,11 @@ EOF
 mkdir -p boot/efi ; mount -t msdosfs /dev/${DEVX}p2 boot/efi
 (cd boot/efi ; mkdir -p efi/freebsd efi/BOOT)
 cp boot/loader.efi boot/zfsloader boot/efi/efi/freebsd/
-cp boot/loader.efi boot/efi/efi/BOOT/BOOTX64.EFI
+if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+  cp /boot/loader.efi boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+else
+  cp /boot/loader.efi boot/efi/EFI/BOOT/BOOTX64.EFI ;
+fi
 
 
 # ifconfig wlan create wlandev ath0
@@ -177,7 +181,7 @@ FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
 	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI:-FreeBSD:13:amd64}/quarterly",
+	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI:-FreeBSD:13:${MACHINE}}/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
 	fingerprints: "/usr/share/keys/pkg",
@@ -192,8 +196,13 @@ fsck_ffs -E -Z /dev/gpt/${GRP_NM}-fsRoot
 fsck_ffs -E -Z /dev/gpt/${GRP_NM}-fsVar
 sync
 
-(cd boot/efi ; efibootmgr -c -l efi/freebsd/loader.efi -L FreeBSD)
-(cd boot/efi ; efibootmgr -c -l efi/BOOT/BOOTX64.EFI -L Default)
+if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+  (cd boot/efi ; efibootmgr -c -l EFI/freebsd/loader.efi -L FreeBSD) ;
+  (cd boot/efi ; efibootmgr -c -l EFI/BOOT/BOOTAA64.EFI -L Default) ;
+else
+  (cd boot/efi ; efibootmgr -c -l EFI/freebsd/loader.efi -L FreeBSD) ;
+  (cd boot/efi ; efibootmgr -c -l EFI/BOOT/BOOTX64.EFI -L Default) ;
+fi
 efibootmgr -v ; sleep 3
 #read -p "Activate EFI BootOrder XXXX (or blank line to skip): " bootorder
 #if [ ! -z "$bootorder" ] ; then

@@ -20,7 +20,7 @@ elif [ -e /dev/wd0 ] ; then
   export DEVX=wd0 ;
 fi
 
-export GRP_NM=${GRP_NM:-bsd1} ; export ARCH=${ARCH:-$(uname -m)}
+export GRP_NM=${GRP_NM:-bsd1} ; export MACHINE=${MACHINE:-$(uname -m)}
 export REL=${REL:-$(sysctl -n kern.osrelease)}
 export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/NetBSD}
 
@@ -75,11 +75,11 @@ ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 
 echo "Extracting netbsd dist archives" ; sleep 3
 #for file in kern-GENERIC base comp etc man misc modules tests text ; do
-#    (ftp -o - http://${MIRROR}/NetBSD-${REL}/${ARCH}/binary/sets/${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
+#    (ftp -o - http://${MIRROR}/NetBSD-${REL}/${MACHINE}/binary/sets/${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
 #done
-#cd /${ARCH}/binary/kernel
-#(cd /mnt ; tar -xpJf /${ARCH}/binary/kernel/netbsd-GENERIC.tar.xz ; mv netbsd-GENERIC netbsd)
-cd /${ARCH}/binary/sets
+#cd /${MACHINE}/binary/kernel
+#(cd /mnt ; tar -xpJf /${MACHINE}/binary/kernel/netbsd-GENERIC.tar.xz ; mv netbsd-GENERIC netbsd)
+cd /${MACHINE}/binary/sets
 for file in kern-GENERIC base comp etc man misc modules tests text ; do
     (cat ${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
 done
@@ -165,8 +165,8 @@ EOF
 
 
 echo "#PKG_PATH=http://${MIRROR}" >> /etc/pkg_install.conf
-echo "PKG_PATH=ftp://ftp.netbsd.org/pub/pkgsrc/packages/NetBSD/${ARCH}/${REL}/All" >> /etc/pkg_install.conf
-PKG_PATH=http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/${ARCH}/${REL}/All
+echo "PKG_PATH=ftp://ftp.netbsd.org/pub/pkgsrc/packages/NetBSD/${MACHINE}/${REL}/All" >> /etc/pkg_install.conf
+PKG_PATH=http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/${MACHINE}/${REL}/All
 
 pkg_add -u
 pkg_add -v pkgin sudo gtar gmake
@@ -180,7 +180,7 @@ echo "Set root passwd ; add user" ; sleep 3
 usermod -p '${hash_passwd}' root
 #passwd
 
-mkdir -p /home/packer
+#mkdir -p /home/packer
 #DIR_MODE=0750
 useradd -m -G wheel,operator -s /bin/ksh -c 'Packer User' packer
 usermod -p '${hash_passwd}' packer
@@ -237,8 +237,13 @@ tar -xf /tmp/init.tar -C /mnt/root/ ; sleep 5
 
 mkdir -p /mnt/efi ; mount_msdos -l /dev/${dkESP} /mnt/efi
 (cd /mnt/efi ; mkdir -p EFI/netbsd EFI/BOOT)
-cp /mnt/usr/mdec/bootx64.efi /mnt/efi/EFI/netbsd/
-cp /mnt/usr/mdec/bootx64.efi /mnt/efi/EFI/BOOT/
+if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
+  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+else
+  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
+  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+fi
 
 read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
 if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then

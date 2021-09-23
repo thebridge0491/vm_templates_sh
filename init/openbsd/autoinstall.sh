@@ -58,6 +58,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
 cp /usr/mdec/boot /boot
+installboot -v ${DEVX} /usr/mdec/biosboot /usr/mdec/boot
 installboot -v ${DEVX}a /usr/mdec/biosboot /usr/mdec/boot
 installboot -v /dev/r${DEVX}a /usr/mdec/biosboot /usr/mdec/boot
 
