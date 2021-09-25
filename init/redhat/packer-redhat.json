@@ -34,8 +34,8 @@
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/rocky/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
-      "<wait>c<wait>linuxefi /images/pxeboot/vmlinuz textmode=1 text 3 {{user `boot_cmdln_options`}} ",
-      "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-anaconda-ks.cfg inst.repo=http://{{user `repo_host`}}{{user `repo_directory`}} ip=::::{{user `init_hostname`}}::dhcp hostname={{user `init_hostname`}}<enter><wait10>",
+      "<wait>c<wait>linuxefi /images/pxeboot/vmlinuz {{user `boot_cmdln_options`}} ",
+      "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-anaconda-ks.cfg inst.repo=http://{{user `repo_host`}}{{user `repo_directory`}} ip=::::{{user `init_hostname`}}::dhcp hostname={{user `init_hostname`}} inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>",
       "initrdefi /images/pxeboot/initrd.img<enter><wait10>boot<enter><wait10>"
     ]
   },
@@ -74,8 +74,8 @@
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/rocky/{{user `iso_aa64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_aa64_url_directory`}}/{{user `iso_aa64_name`}}.iso",
     "boot_command": [
-      "<wait>c<wait>linux /images/pxeboot/vmlinuz textmode=1 text 3 inst.stage2=hd:LABEL=Rocky-8-4-aarch64-dvd ro {{user `boot_cmdln_options`}} ",
-      "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-anaconda-ks.cfg inst.repo=http://{{user `repo_host`}}{{user `repo_aa64_directory`}} ip=::::{{user `init_hostname`}}::dhcp hostname={{user `init_hostname`}}<enter><wait10>",
+      "<wait>c<wait>linux /images/pxeboot/vmlinuz inst.stage2=hd:LABEL=Rocky-8-4-aarch64-dvd ro {{user `boot_cmdln_options`}} ",
+      "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-anaconda-ks.cfg inst.repo=http://{{user `repo_host`}}{{user `repo_aa64_directory`}} ip=::::{{user `init_hostname`}}::dhcp hostname={{user `init_hostname`}} inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>",
       "initrd /images/pxeboot/initrd.img<enter><wait10>boot<enter><wait10>"
     ]
   },
@@ -213,7 +213,7 @@
     "vol_mgr": "lvm",
     "vm_name": "{{user `distro`}}-x86_64-{{user `vol_mgr`}}",
     "init_hostname": "rocky-boxv0000",
-    "boot_cmdln_options": " quiet nomodeset video=1024x768 selinux=1 enforcing=0 ",
+    "boot_cmdln_options": " quiet nomodeset video=1024x768 ",
     "virtfs_opts": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
     "isos_pardir": "/mnt/Data0/distros",
 

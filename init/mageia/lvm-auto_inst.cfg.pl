@@ -97,7 +97,7 @@ $o = {
             'hd' => undef,
             'type' => 0x83,
             'fs_type' => 'ext2',
-            #'mntpoint' => '/boot',
+            'mntpoint' => '/boot',
             'size' => 1 << 20 # 1GB
         },
         {

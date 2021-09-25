@@ -3,7 +3,7 @@ echo '### Warning: FreeBSD bhyve currently requires root/sudo permission ###'
 printf "%40s\n\n" | tr ' ' '#' ; sleep 5
 
 bhyve -A -H -P -c 2 -m 2048M -s 0,hostbridge -s 1,lpc \
-  -s 2,virtio-net,${NET_OPTS:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+  -s 2,virtio-net,${NET_OPT:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
   -s 3,virtio-blk,${STORAGE_DIR:-$(dirname $0)}/${IMGFILE:-${GUEST:-freebsd-x86_64-zfs}.${IMGFMT:-raw}} \
   ${BUEFI_OPTS:--s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
     -s 30,xhci,tablet \

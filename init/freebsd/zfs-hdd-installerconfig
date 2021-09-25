@@ -13,7 +13,7 @@ elif [ -e /dev/da0 ] ; then
   export DEVX=da0 ;
 fi
 
-export GRP_NM=${GRP_NM:-bsd0} ; MACHINE=$(uname -m)
+export GRP_NM=${GRP_NM:-bsd0} ; export MACHINE=$(uname -m)
 export INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxp0000}
 
 export nonInteractive="YES"

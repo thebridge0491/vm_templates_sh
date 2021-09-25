@@ -1,9 +1,10 @@
 qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
   -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
-   -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST:-freebsd-x86_64-zfs} \
-  -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-  -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 -usb \
+  -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST:-freebsd-x86_64-zfs} \
+  -nic ${NET_OPT:-user,hostfwd=tcp::4022-:22},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+  -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
+  -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
   -drive file=${STORAGE_DIR:-$(dirname $0)}/${IMGFILE:-${GUEST:-freebsd-x86_64-zfs}.${IMGFMT:-qcow2}},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT:-qcow2} \
-  -display gtk,show-cursor=on ${NET_OPTS:--net user,hostfwd=tcp::4022-:22} \
+  -display default,show-cursor=on \
   ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE:-/usr/share/OVMF/OVMF_CODE.fd}} \
   ${VIRTFS_OPTS:--virtfs local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough}

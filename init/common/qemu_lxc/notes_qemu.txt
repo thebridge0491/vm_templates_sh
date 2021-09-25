@@ -174,9 +174,8 @@
 
 # QEMU net option examples
 # # nic with model and random MAC address
-#  -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | \
-#    sed 's|\(..\)|\1:|g; s|:$||') \
-# # then either below:
-#  ${NET_OPTS:--net bridge,br=br0}
-#  ${NET_OPTS:--net tap,ifname=tap0,script=no,downscript=no}
-#  ${NET_OPTS:--net user,hostfwd=tcp::4022-:22}
+#  -nic ${NET_OPT:-user,hostfwd=tcp::4022-:22},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+# # NET_OPT examples:
+#  ${NET_OPT:-bridge,br=br0}
+#  ${NET_OPT:-tap,ifname=tap0,script=no,downscript=no}
+#  ${NET_OPT:-user,hostfwd=tcp::4022-:22}

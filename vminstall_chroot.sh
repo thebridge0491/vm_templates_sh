@@ -186,8 +186,14 @@ alpine() {
 
 suse() {
   variant=${variant:-suse} ; GUEST=${1:-opensuse-${MACHINE}-lvm}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live -name "openSUSE-Leap-*-Live-${MACHINE}-*.iso" | tail -n1)}
-  (cd ${ISOS_PARDIR}/opensuse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-${MACHINE}-*.iso.sha256)
+
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live/aarch64 -name "openSUSE-Leap-*-Live-${MACHINE}*.iso" | tail -n1)}
+    (cd ${ISOS_PARDIR}/opensuse/live/aarch64 ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-${MACHINE}*.iso.sha256) ;
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live -name "openSUSE-Leap-*-Live-${MACHINE}*.iso" | tail -n1)}
+    (cd ${ISOS_PARDIR}/opensuse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-${MACHINE}*.iso.sha256) ;
+  fi
   sleep 5
 
   ##!! login user/passwd: linux/-
@@ -332,13 +338,13 @@ OUT_DIR=${OUT_DIR:-build/${GUEST}}
 mkdir -p ${OUT_DIR}
 if [ "bhyve" = "${PROVIDER}" ] ; then
   truncate -s 30720M ${OUT_DIR}/${GUEST}.raw ;
-  cp ${BHYVE_X64_FIRMWARE} ${OUT_DIR}/ ;
+  cp ${BHYVE_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_${MACHINE}.args ${OUT_DIR}/ ;
 else
   qemu-img create -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M ;
   if [ "aarch64" = "${MACHINE}" ] ; then
-    cp ${QEMU_AA64_FIRMWARE} ${OUT_DIR}/ ;
+    cp ${QEMU_AA64_FIRMWARE} init/common/qemu_lxc/vmrun_qemu_${MACHINE}.args ${OUT_DIR}/ ;
   else
-    cp ${QEMU_X64_FIRMWARE} ${OUT_DIR}/ ;
+    cp ${QEMU_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_${MACHINE}.args ${OUT_DIR}/ ;
   fi ;
 fi
 
@@ -383,7 +389,7 @@ EOF
   fi
 
   bhyve -A -H -P -c 2 -m 2048M -s 0,hostbridge -s 1,lpc \
-    -s 2,virtio-net,${NET_OPTS:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+    -s 2,virtio-net,${NET_OPT:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
     -s 3,ahci-hd,${OUT_DIR}/${GUEST}.raw -l com1,stdio \
     ${BUEFI_OPTS} -s 31,ahci-cd,${ISO_PATH} ${GUEST} &
 
@@ -400,24 +406,25 @@ else
   if [ "aarch64" = "${MACHINE}" ] ; then
     QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"} ;
 
-    qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3 \
+    qemu-system-aarch64 -cpu cortex-a57 -machine virt,accel=kvm:hvf:tcg,gic-version=3 \
       -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
-      -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+      -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
-      -vga none -device virtio-gpu-pci \
-      -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=virtio,format=qcow2 \
-      -display gtk,show-cursor=on ${NET_OPTS:--net bridge,br=br0} \
-      ${QUEFI_OPTS} -cdrom ${ISO_PATH} &
+      -device virtio-blk-pci,drive=hd0 \
+      -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+      -display default,show-cursor=on -vga none -device virtio-gpu-pci \
+      ${QUEFI_OPTS} -cdrom ${ISO_PATH} -no-reboot &
   else
     QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE}"} ;
 
     qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
       -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
       -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
-      -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-      -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 -usb \
+      -nic ${NET_OPT:-user,hostfwd=tcp::4022-:22},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+      -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
+      -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
       -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-      -display gtk,show-cursor=on ${NET_OPTS:--net bridge,br=br0} \
+      -display default,show-cursor=on \
       ${QUEFI_OPTS} -cdrom ${ISO_PATH} &
   fi ;
   echo "### Once network connected, transfer needed file(s) ###"
@@ -451,7 +458,7 @@ EOF
   fi ;
 fi
 
-cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun* ${OUT_DIR}/
+cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun.sh ${OUT_DIR}/
 sleep 30
 
 

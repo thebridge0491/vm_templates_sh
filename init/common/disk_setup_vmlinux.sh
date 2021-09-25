@@ -336,7 +336,7 @@ zfspart_create() {
 }
 
 lvmpv_create() {
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:11776M osVar:6G osHome:7680M}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:11776M osVar:5G osHome:7680M}
   GRP_NM=${1:-vg0} ; PV_NM=${2:-pvol0}
   modprobe dm-mod ; modprobe dm-crypt
   lsmod | grep -e dm_mod -e dm_crypt ; sleep 5
@@ -357,7 +357,7 @@ lvmpv_create() {
 
 format_partitions() {
   MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:11776M osVar:6G osHome:7680M}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:11776M osVar:5G osHome:7680M}
   VOL_MGR=${1:-lvm} ; GRP_NM=${2:-vg0} ; PV_NM=${3:-pvol0}
 
   echo "Formatting file systems" ; sleep 3
@@ -392,7 +392,7 @@ format_partitions() {
 
 part_format_vmdisk() {
   MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:11776M osVar:6G osHome:7680M}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:11776M osVar:5G osHome:7680M}
   TOOL=${1:-sgdisk} ; VOL_MGR=${2:-lvm} ; GRP_NM=${3:-vg0} ; PV_NM=${4:-pvol0}
 
   part_vmdisk $TOOL $VOL_MGR $GRP_NM $PV_NM

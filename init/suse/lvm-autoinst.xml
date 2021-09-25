@@ -86,7 +86,7 @@
           <filesystem config:type="symbol">ext2</filesystem>
           <format config:type="boolean">false</format>
           <label>vg0-osBoot</label>
-          <!--<mount></mount>-->
+          <mount>/boot</mount>
           <size>1G</size>
         </partition>
         <partition>

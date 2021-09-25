@@ -65,38 +65,44 @@ freebsd() {
 }
 
 debian() {
-  VOL_MGR=${VOL_MGR:-lvm} ; variant=debian
+  VOL_MGR=${VOL_MGR:-lvm} ; variant=debian ; cfg_file=preseed.cfg
   init_hostname=${init_hostname:-devuan-boxv0000}
-  #repo_host=${repo_host:-deb.debian.org} ; repo_directory=${repo_directory:-/debian}
-  repo_host=${repo_host:-deb.devuan.org} ; repo_directory=${repo_directory:-/merged}
+  #repo_host=${repo_host:-deb.debian.org}
+  repo_host=${repo_host:-deb.devuan.org}
   GUEST=${1:-devuan-${MACHINE}-${VOL_MGR}}
 
   if [ "aarch64" = "${MACHINE}" ] ; then
     ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'debian-*-arm64-netinst.iso' | tail -n1)} ;
     #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/devuan/arm64 -name 'mini.iso' | tail -n1)} ;
-    if [ ! "" = "$ISO_PATH" ] ; then
+    if [ "$ISO_PATH" ] ; then
       (cd ${ISOS_PARDIR}/debian/arm64 ; sha256sum --ignore-missing -c SHA256SUMS) ;
       #(cd ${ISOS_PARDIR}/devuan/arm64 ; sha256sum --ignore-missing -c SHA256SUMS) ;
     fi ;
-    #INST_SRC_OPTS=${INST_SRC_OPTS:---location="http://${repo_host}${repo_directory}/dists/stable/main/installer-arm64"} ;
-    INST_SRC_OPTS=${INST_SRC_OPTS:---location="http://pkgmaster.devuan.org/devuan/dists/beowulf/main/installer-arm64"} ;
-    #INST_SRC_OPTS=${INST_SRC_OPTS:---location="${ISO_PATH}"} ;
+    #repo_directory=${repo_directory:-/debian/dists/stable/main/installer-arm64}
+    repo_directory=${repo_directory:-/merged/dists/stable/main/installer-arm64}
+    
+    ##dnld: <mirror>/dists/<version>/main/installer-arm64/current/images/cdrom/{vmlinuz,initrd.gz}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'vmlinuz' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'initrd.gz' | tail -n1)}
   else
-    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian -name 'debian-*-amd64-*-CD-1.iso' | tail -n1)} ;
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/devuan -name 'devuan_*_amd64*desktop.iso' | tail -n1)} ;
-    if [ ! "" = "$ISO_PATH" ] ; then
-      #(cd ${ISOS_PARDIR}/debian ; sha256sum --ignore-missing -c SHA256SUMS) ;
-      (cd ${ISOS_PARDIR}/devuan ; sha256sum --ignore-missing -c SHA256SUMS) ;
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian -name 'debian-*-amd64-netinst.iso' | tail -n1)} ;
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/devuan -name 'devuan_*_amd64*desktop.iso' | tail -n1)} ;
+    if [ "$ISO_PATH" ] ; then
+      (cd ${ISOS_PARDIR}/debian ; sha256sum --ignore-missing -c SHA256SUMS) ;
+      #(cd ${ISOS_PARDIR}/devuan ; sha256sum --ignore-missing -c SHA256SUMS) ;
     fi ;
-    INST_SRC_OPTS=${INST_SRC_OPTS:---location="http://${repo_host}${repo_directory}/dists/stable/main/installer-amd64"} ;
-    #INST_SRC_OPTS=${INST_SRC_OPTS:---location="${ISO_PATH}"} ;
+    #repo_directory=${repo_directory:-/debian/dists/stable/main/installer-amd64}
+    repo_directory=${repo_directory:-/merged/dists/stable/main/installer-amd64}
+    
+    ##dnld: <mirror>/dists/<version>/main/installer-amd64/current/images/hd-media/{vmlinuz,initrd.gz}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/devuan -name 'vmlinuz' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/devuan -name 'initrd.gz' | tail -n1)}
   fi
   sleep 5
 
-  INITRD_INJECT_OPTS=${INITRD_INJECT_OPTS:---initrd-inject="/tmp/preseed.cfg" --initrd-inject="/tmp/init.tar"}
-  #KERNEL_ARGS=${KERNEL_ARGS:-auto=true preseed/url=file:///preseed.cfg locale=en_US keymap=us console-setup/ask_detect=false domain= hostname=${init_hostname} mirror/http/hostname=${repo_host} mirror/http/directory=${repo_directory}}
-  KERNEL_ARGS=${KERNEL_ARGS:-auto=true preseed/url=http://localhost:8080/preseed.cfg locale=en_US keymap=us console-setup/ask_detect=false domain= hostname=${init_hostname} mirror/http/hostname=${repo_host} mirror/http/directory=${repo_directory}}
-  cp init/debian/${VOL_MGR}-preseed.cfg /tmp/preseed.cfg
+  #CFGHOST [http://<host>:<port> | file://]
+  EXTRA_ARGS=${EXTRA_ARGS:- auto=true preseed/url=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} locale=en_US keymap=us console-setup/ask_detect=false domain= hostname=${init_hostname} mirror/http/hostname=${repo_host} mirror/http/directory=${repo_directory}}
+  cp init/debian/${VOL_MGR}-preseed.cfg /tmp/${cfg_file}
   tar -cf /tmp/init.tar init/common init/debian
 
   ## NOTE, debconf-get-selections [--installer] -> auto install cfg
@@ -136,31 +142,44 @@ alpine() {
 }
 
 suse() {
-  VOL_MGR=${VOL_MGR:-lvm} ; variant=suse
+  VOL_MGR=${VOL_MGR:-lvm} ; variant=suse ; cfg_file=autoinst.xml
   init_hostname=${init_hostname:-opensuse-boxv0000}
   repo_host=${repo_host:-download.opensuse.org} ; repo_directory=${repo_directory:-/distribution/openSUSE-current/repo/oss}
   GUEST=${1:-opensuse-${MACHINE}-${VOL_MGR}}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse -name "openSUSE-Leap-*-NET-${MACHINE}.iso" | tail -n1)}
-  if [ ! "" = "$ISO_PATH" ] ; then
-    (cd ${ISOS_PARDIR}/opensuse ; sha256sum --ignore-missing -c openSUSE-Leap-*-NET-${MACHINE}.iso.sha256) ;
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/aarch64 -name "openSUSE-Leap-*-NET-${MACHINE}.iso" | tail -n1)}
+    if [ "$ISO_PATH" ] ; then
+      (cd ${ISOS_PARDIR}/opensuse/aarch64 ; sha256sum --ignore-missing -c openSUSE-Leap-*-NET-${MACHINE}.iso.sha256) ;
+    fi ;
+    sleep 5
+    
+    ##dnld: <mirror>/distribution/<version>/repo/oss/boot/aarch64/loader/{linux,initrd}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/opensuse/aarch64 -name 'linux' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/opensuse/aarch64 -name 'initrd' | tail -n1)}
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse -name "openSUSE-Leap-*-NET-${MACHINE}.iso" | tail -n1)}
+    if [ "$ISO_PATH" ] ; then
+      (cd ${ISOS_PARDIR}/opensuse ; sha256sum --ignore-missing -c openSUSE-Leap-*-NET-${MACHINE}.iso.sha256) ;
+    fi ;
+    sleep 5
+    
+    ##dnld: <mirror>/distribution/<version>/repo/oss/boot/x86_64/loader/{linux,initrd}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/opensuse -name 'linux' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/opensuse -name 'initrd' | tail -n1)}
   fi
-  sleep 5
-
-  #INST_SRC_OPTS=${INST_SRC_OPTS:---location="${ISO_PATH}"}
-  INST_SRC_OPTS=${INST_SRC_OPTS:---location="http://${repo_host}${repo_directory}"}
-  INITRD_INJECT_OPTS=${INITRD_INJECT_OPTS:---initrd-inject="/tmp/autoinst.xml" --initrd-inject="/tmp/init.tar"}
-  #KERNEL_ARGS=${KERNEL_ARGS:-netsetup=dhcp lang=en_US install=http://${repo_host}${repo_directory} hostname=${init_hostname} domain= autoyast=file:///autoinst.xml textmode=1}
-  KERNEL_ARGS=${KERNEL_ARGS:-netsetup=dhcp lang=en_US install=http://${repo_host}${repo_directory} hostname=${init_hostname} domain= autoyast=http://localhost:8080/autoinst.xml textmode=1}
-  cp init/suse/${VOL_MGR}-autoinst.xml /tmp/autoinst.xml
+  
+  #CFGHOST [http://<host>:<port> | file://]
+  EXTRA_ARGS=${EXTRA_ARGS:- netsetup=dhcp lang=en_US install=http://${repo_host}${repo_directory} hostname=${init_hostname} domain= autoyast=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} textmode=1}
+  cp init/suse/${VOL_MGR}-autoinst.xml /tmp/${cfg_file}
   tar -cf /tmp/init.tar init/common init/suse
 
   ## NOTE, yast2 clone_system -> auto install config: /root/autoinst.xml
 }
 
 redhat() {
-  VOL_MGR=${VOL_MGR:-lvm} ; RELEASE=${RELEASE:-8} ; variant=redhat
-  init_hostname=${init_hostname:-rocky-boxv0000}
+  VOL_MGR=${VOL_MGR:-lvm} ; variant=redhat ; cfg_file=anaconda-ks.cfg
+  init_hostname=${init_hostname:-rocky-boxv0000} ; RELEASE=${RELEASE:-8}
   # [rocky/8|almalinux/8|centos/8-stream]/BaseOS/${MACHINE}/os | centos/7/os/${MACHINE}]
   repo_host=${repo_host:-dl.rockylinux.org/pub/rocky}
   #repo_host=${repo_host:-repo.almalinux.org/almalinux}
@@ -168,23 +187,40 @@ redhat() {
   repo_directory=${repo_directory:-/${RELEASE}/BaseOS/${MACHINE}/os}
   GUEST=${1:-rocky-${MACHINE}-${VOL_MGR}}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/rocky -name "Rocky-*-${MACHINE}*-boot.iso" | tail -n1)}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/almalinux -name "AlmaLinux-*-${MACHINE}*-boot.iso" | tail -n1)}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos -name "CentOS-*-${MACHINE}*-boot.iso" | tail -n1)}
-  if [ ! "" = "$ISO_PATH" ] ; then
-    (cd ${ISOS_PARDIR}/rocky ; sha256sum --ignore-missing -c CHECKSUM) ;
-    #(cd ${ISOS_PARDIR}/almalinux ; sha256sum --ignore-missing -c CHECKSUM) ;
-    #(cd ${ISOS_PARDIR}/centos ; sha256sum --ignore-missing -c CHECKSUM) ;
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/rocky/aarch64 -name "Rocky-*-${MACHINE}*-boot.iso" | tail -n1)}
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/almalinux/aarch64 -name "AlmaLinux-*-${MACHINE}*-boot.iso" | tail -n1)}
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos/aarch64 -name "CentOS-*-${MACHINE}*-boot.iso" | tail -n1)}
+    if [ "$ISO_PATH" ] ; then
+      (cd ${ISOS_PARDIR}/rocky/aarch64 ; sha256sum --ignore-missing -c CHECKSUM) ;
+      #(cd ${ISOS_PARDIR}/almalinux/aarch64 ; sha256sum --ignore-missing -c CHECKSUM) ;
+      #(cd ${ISOS_PARDIR}/centos/aarch64 ; sha256sum --ignore-missing -c CHECKSUM) ;
+    fi
+    sleep 5
+    
+    ##dnld: <mirror>/<version>/BaseOS/aarch64/kickstart/images/pxeboot/{vmlinuz,initrd.img}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/rocky -name 'vmlinuz' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/rocky -name 'initrd.img' | tail -n1)}
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/rocky -name "Rocky-*-${MACHINE}*-boot.iso" | tail -n1)}
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/almalinux -name "AlmaLinux-*-${MACHINE}*-boot.iso" | tail -n1)}
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos -name "CentOS-*-${MACHINE}*-boot.iso" | tail -n1)}
+    if [ "$ISO_PATH" ] ; then
+      (cd ${ISOS_PARDIR}/rocky ; sha256sum --ignore-missing -c CHECKSUM) ;
+      #(cd ${ISOS_PARDIR}/almalinux ; sha256sum --ignore-missing -c CHECKSUM) ;
+      #(cd ${ISOS_PARDIR}/centos ; sha256sum --ignore-missing -c CHECKSUM) ;
+    fi
+    sleep 5
+    
+    ##dnld: <mirror>/<version>/BaseOS/x86_64/kickstart/images/pxeboot/{vmlinuz,initrd.img}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/rocky -name 'vmlinuz' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/rocky -name 'initrd.img' | tail -n1)}
   fi
-  sleep 5
-
-  #INST_SRC_OPTS=${INST_SRC_OPTS:---location="${ISO_PATH}"}
-  INST_SRC_OPTS=${INST_SRC_OPTS:---location="http://${repo_host}${repo_directory}"}
-  INITRD_INJECT_OPTS=${INITRD_INJECT_OPTS:---initrd-inject="/tmp/anaconda-ks.cfg" --initrd-inject="/tmp/init.tar"}
-  #KERNEL_ARGS=${KERNEL_ARGS:-inst.ks=file:///anaconda-ks.cfg inst.repo=http://${repo_host}${repo_directory} ip=::::${init_hostname}::dhcp hostname=${init_hostname} nomodeset video=1024x768 selinux=1 enforcing=0 text inst.text}
-  KERNEL_ARGS=${KERNEL_ARGS:-inst.ks=http://localhost:8080/anaconda-ks.cfg inst.repo=http://${repo_host}${repo_directory} ip=::::${init_hostname}::dhcp hostname=${init_hostname} nomodeset video=1024x768 selinux=1 enforcing=0 text inst.text}
+  
+  #CFGHOST [http://<host>:<port> | file://]
+  EXTRA_ARGS=${EXTRA_ARGS:- nomodeset video=1024x768 inst.ks=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} inst.repo=http://${repo_host}${repo_directory} ip=::::${init_hostname}::dhcp hostname=${init_hostname} inst.selinux=1 inst.enforcing=0 inst.text}
   # systemd.unit=multi-user.target
-  cp init/redhat/${VOL_MGR}-anaconda-ks.cfg /tmp/anaconda-ks.cfg
+  cp init/redhat/${VOL_MGR}-anaconda-ks.cfg /tmp/${cfg_file}
   tar -cf /tmp/init.tar init/common init/redhat
 
   ## NOTE, in kickstart failure to find ks.cfg:
@@ -195,24 +231,25 @@ redhat() {
 }
 
 mageia() {
-  VOL_MGR=${VOL_MGR:-lvm} ; RELEASE=${RELEASE:-8} ; variant=mageia
-  init_hostname=${init_hostname:-mageia-boxv0000}
+  VOL_MGR=${VOL_MGR:-lvm} ; variant=mageia ; cfg_file=auto_inst_cfg.pl
+  init_hostname=${init_hostname:-mageia-boxv0000} ; RELEASE=${RELEASE:-8}
   repo_host=${repo_host:-mirrors.kernel.org/mageia} ; repo_directory=${repo_directory:-/distrib/${RELEASE}/x86_64}
   GUEST=${1:-mageia-x86_64-${VOL_MGR}}
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia -maxdepth 1 -name "Mageia-*-x86_64*.iso" | tail -n1)}
-  if [ ! "" = "$ISO_PATH" ] ; then
+  if [ "$ISO_PATH" ] ; then
   	(cd ${ISOS_PARDIR}/mageia ; sha512sum --ignore-missing -c Mageia-*-x86_64*.iso.sha512) ;
   fi
   sleep 5
+    
+  ##dnld: <mirror>/distrib/<version>/x86_64/isolinux/x86_64/{vmlinuz,all.rdz}
+  KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/mageia -name 'vmlinuz' | tail -n1)}
+  INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/mageia -name 'all.rdz' | tail -n1)}
 
-  #INST_SRC_OPTS=${INST_SRC_OPTS:---location="${ISO_PATH}"}
-  INST_SRC_OPTS=${INST_SRC_OPTS:---location="http://${repo_host}${repo_directory}"}
-  INITRD_INJECT_OPTS=${INITRD_INJECT_OPTS:---initrd-inject="/tmp/auto_inst.cfg.pl" --initrd-inject="/tmp/init.tar"}
-  #KERNEL_ARGS=${KERNEL_ARGS:-automatic=method:http,server:${repo_host},directory:${repo_directory},network:dhcp auto_install=auto_inst.cfg.pl nomodeset text}
-  KERNEL_ARGS=${KERNEL_ARGS:-automatic=method:http,server:${repo_host},directory:${repo_directory},network:dhcp auto_install=http://localhost:8080/auto_inst.cfg.pl nomodeset text}
+  #CFGHOST [http://<host>:<port> | file://]
+  EXTRA_ARGS=${EXTRA_ARGS:- automatic=method:http,server:${repo_host},directory:${repo_directory},network:dhcp auto_install=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} nomodeset text}
   # systemd.unit=multi-user.target
-  cp init/mageia/${VOL_MGR}-auto_inst.cfg.pl /tmp/auto_inst.cfg.pl
+  cp init/mageia/${VOL_MGR}-auto_inst.cfg.pl /tmp/${cfg_file}
   tar -cf /tmp/init.tar init/common init/mageia
 
   ## NOTE, saved auto install config: /root/drakx/auto_inst_cfg.pl
@@ -227,7 +264,7 @@ openbsd() {
     ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/arm64 -name 'install*.img' | tail -n1)} ;
     (cd ${ISOS_PARDIR}/openbsd/arm64 ; sha256sum --ignore-missing -c SHA256) ;
   else
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/amd64 -name 'install*.img' | tail -n1)} ;
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/amd64 -name 'install*.iso' | tail -n1)} ;
     (cd ${ISOS_PARDIR}/openbsd/amd64 ; sha256sum --ignore-missing -c SHA256) ;
   fi
   sleep 5
@@ -263,12 +300,12 @@ OUT_DIR=${OUT_DIR:-build/${GUEST}}
 mkdir -p ${OUT_DIR}
 qemu-img create -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M
 if [ "aarch64" = "${MACHINE}" ] ; then
-  cp ${QEMU_AA64_FIRMWARE} ${OUT_DIR}/ ;
+  cp ${QEMU_AA64_FIRMWARE} init/common/qemu_lxc/vmrun_qemu_${MACHINE}.args ${OUT_DIR}/ ;
 else
-  cp ${QEMU_X64_FIRMWARE} ${OUT_DIR}/ ;
+  cp ${QEMU_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_${MACHINE}.args ${OUT_DIR}/ ;
 fi
 
-if [ "${KERNEL_ARGS}" ] ; then
+if [ "${EXTRA_ARGS}" ] ; then
   python3 -m http.server 8080 -d /tmp  &
   echo "[curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file" ;
   sleep 5 ;
@@ -278,28 +315,31 @@ if [ "1" = "${USE_VIRTINST:-0}" ] ; then
   #-------------- using virtinst ------------------
   CONNECT_OPT=${CONNECT_OPT:---connect qemu:///system}
   VUEFI_OPTS=${VUEFI_OPTS:---boot uefi}
+  #INST_SRC_OPTS=${INST_SRC_OPTS:---cdrom="${ISO_PATH}"}
+  INST_SRC_OPTS=${INST_SRC_OPTS:---location="http://${repo_host}${repo_directory}"}
 
   # NOTE, to convert qemu-system args to libvirt domain XML:
   #  eval "echo \"$(< vminstall_qemu.args)\"" > /tmp/install_qemu.args
   #  virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
 
-  if [ "" = "${KERNEL_ARGS}" ] ; then
-    virt-install ${CONNECT_OPT} --arch ${MACHINE} --memory 2048 --vcpus 2 \
-      --controller usb,model=ehci --controller virtio-serial \
-      --console pty,target_type=virtio --graphics vnc,port=-1 \
-      --network network=default,model=virtio-net,mac=RANDOM \
-      --boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
-      --disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
-      ${INST_SRC_OPTS} ${VUEFI_OPTS} -n ${GUEST} ${INITRD_INJECT_OPTS} &
-  else
+  if [ "${EXTRA_ARGS}" ] ; then
     virt-install ${CONNECT_OPT} --arch ${MACHINE} --memory 2048 --vcpus 2 \
     --controller usb,model=ehci --controller virtio-serial \
     --console pty,target_type=virtio --graphics vnc,port=-1 \
     --network network=default,model=virtio-net,mac=RANDOM \
     --boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
     --disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
-    ${INST_SRC_OPTS} ${VUEFI_OPTS} -n ${GUEST} ${INITRD_INJECT_OPTS} \
-    --extra-args="${KERNEL_ARGS}" &
+    ${INST_SRC_OPTS} ${VUEFI_OPTS} -n ${GUEST} \
+    --initrd-inject="/tmp/${cfg_file}" --initrd-inject="/tmp/init.tar" \
+    --extra-args="${EXTRA_ARGS}" &
+  else
+    virt-install ${CONNECT_OPT} --arch ${MACHINE} --memory 2048 --vcpus 2 \
+      --controller usb,model=ehci --controller virtio-serial \
+      --console pty,target_type=virtio --graphics vnc,port=-1 \
+      --network network=default,model=virtio-net,mac=RANDOM \
+      --boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
+      --disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
+      ${INST_SRC_OPTS} ${VUEFI_OPTS} -n ${GUEST} &
   fi ;
 
   sleep 30 ; virsh ${CONNECT_OPT} vncdisplay ${GUEST} ;
@@ -313,31 +353,57 @@ else
   echo "(if needed) Quickly catch boot menu to add kernel boot parameters" ;
   sleep 5 ;
 
-  #if [ "${KERNEL_ARGS}" ] ; then
-  #  APPEND_OPTS="-append \"${KERNEL_ARGS}\"" ;
-  #fi
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"} ;
+  if [ "${EXTRA_ARGS}" ] ; then
+    #APPEND_OPTS="-kernel ${KERNEL_PATH} -append \'${EXTRA_ARGS}\' -initrd ${INITRD_PATH}" ;
+    if [ "aarch64" = "${MACHINE}" ] ; then
+      QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"} ;
 
-    qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3 \
-      -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
-      -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-      -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
-      -vga none -device virtio-gpu-pci \
-      -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=virtio,format=qcow2 \
-      -display gtk,show-cursor=on ${NET_OPTS:--net bridge,br=br0} \
-      ${QUEFI_OPTS} ${APPEND_OPTS} -cdrom ${ISO_PATH} &
+      qemu-system-aarch64 -cpu cortex-a57 -machine virt,accel=kvm:hvf:tcg,gic-version=3 \
+        -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+        -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+        -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
+        -device virtio-blk-pci,drive=hd0 \
+        -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+        -display default,show-cursor=on -vga none -device virtio-gpu-pci \
+        ${QUEFI_OPTS} -cdrom ${ISO_PATH} -no-reboot -kernel ${KERNEL_PATH} -append "${EXTRA_ARGS}" -initrd ${INITRD_PATH} &
   else
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE}"}
+      QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE}"}
 
-    qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
-      -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
-      -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
-      -net nic,model=virtio-net-pci,macaddr=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-      -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 -usb \
-      -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-      -display gtk,show-cursor=on ${NET_OPTS:--net bridge,br=br0} \
-      ${QUEFI_OPTS} ${APPEND_OPTS} -cdrom ${ISO_PATH} &
+      qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
+        -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
+        -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+        -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+        -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
+        -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
+        -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+        -display default,show-cursor=on \
+        ${QUEFI_OPTS} -cdrom ${ISO_PATH} -no-reboot -kernel ${KERNEL_PATH} -append "${EXTRA_ARGS}" -initrd ${INITRD_PATH} &
+    fi ;
+  else
+    if [ "aarch64" = "${MACHINE}" ] ; then
+      QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"} ;
+
+      qemu-system-aarch64 -cpu cortex-a57 -machine virt,accel=kvm:hvf:tcg,gic-version=3 \
+        -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+        -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+        -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
+        -device virtio-blk-pci,drive=hd0 \
+        -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+        -display default,show-cursor=on -vga none -device virtio-gpu-pci \
+        ${QUEFI_OPTS} -cdrom ${ISO_PATH} -no-reboot &
+    else
+      QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE}"}
+
+      qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
+        -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
+        -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+        -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+        -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
+        -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
+        -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+        -display default,show-cursor=on \
+        ${QUEFI_OPTS} -cdrom ${ISO_PATH} -no-reboot &
+    fi ;
   fi ;
   echo "### Once network connected, transfer needed file(s) ###" ;
 fi
@@ -355,8 +421,8 @@ variant: ${variant}
 EOF
 fi
 
-if [ "${KERNEL_ARGS}" ] ; then
-  echo "to kill HTTP server process: kill -9 $(pgrep -f 'python -m http\.server')" ;
+if [ "${EXTRA_ARGS}" ] ; then
+  echo "to kill HTTP server process: kill -9 \$(pgrep -f 'python -m http\.server')" ;
 fi
-cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun* ${OUT_DIR}/
+cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun.sh ${OUT_DIR}/
 sleep 30
