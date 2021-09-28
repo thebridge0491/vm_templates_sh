@@ -21,7 +21,7 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0} ; RELEASE=${RELEASE:-8}
-export MIRROR=${MIRROR:-mirrors.kernel.org/mageia} ; MACHINE=$(uname -m)
+export MIRROR=${MIRROR:-mirrors.kernel.org/mageia} ; UNAME_M=$(uname -m)
 
 export INIT_HOSTNAME=${1:-mageia-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -51,8 +51,8 @@ EOF
 
 echo "Bootstrap base pkgs" ; sleep 3
 if command -v dnf > /dev/null ; then
-  #${DNFCMD} --nogpgcheck -y --installroot=/mnt --repofrompath=quickrepo${RELEASE},http://${MIRROR}/distrib/${RELEASE}/${MACHINE}/media/core/release/ --repo=quickrepo${RELEASE} install urpmi dnf dnf-plugins-core locales-en lvm2 ;
-  ${DNFCMD} --nogpgcheck -y --installroot=/mnt config-manager --add-repo http://${MIRROR}/distrib/${RELEASE}/${MACHINE}/media/core/release ;
+  #${DNFCMD} --nogpgcheck -y --installroot=/mnt --repofrompath=quickrepo${RELEASE},http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/ --repo=quickrepo${RELEASE} install urpmi dnf dnf-plugins-core locales-en lvm2 ;
+  ${DNFCMD} --nogpgcheck -y --installroot=/mnt config-manager --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
   dnf -y --installroot=/mnt check-update ;
   ${DNFCMD} --nogpgcheck -y --installroot=/mnt install basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
   dnf -y --installroot=/mnt repolist ;
@@ -61,16 +61,16 @@ elif command -v yum-config-manager > /dev/null ; then
   mkdir -p /mnt/var/lib/rpm /mnt/var/cache/dnf ;
   rpm -v --root /mnt --initdb ;
   # [wget -O file url | curl -L -o file url]
-  #wget -O /tmp/repos.rpm http://${MIRROR}/distrib/${RELEASE}/${MACHINE}/media/core/release/mageia-repos-7-3.mga7.${MACHINE}.rpm ;
+  #wget -O /tmp/repos.rpm http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/mageia-repos-7-3.mga7.${UNAME_M}.rpm ;
   #rpm -v -qip /tmp/repos.rpm ; sleep 5 ;
   #rpm -v --root /mnt --nodeps -i /tmp/repos.rpm ;
-  yum-config-manager --releasever=${RELEASE} --nogpgcheck -y --installroot=/mnt --add-repo http://${MIRROR}/distrib/${RELEASE}/${MACHINE}/media/core/release ;
+  yum-config-manager --releasever=${RELEASE} --nogpgcheck -y --installroot=/mnt --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
   yum -y --installroot=/mnt check-update ;
   ${YUMCMD} --nogpgcheck -y --installroot=/mnt install basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
   yum -y --installroot=/mnt repolist ;
 elif command -v urpmi > /dev/null ; then
   #urpmi.addmedia --urpmi-root /mnt --distrib --mirrorlist '$MIRRORLIST'
-	urpmi.addmedia --urpmi-root /mnt --distrib http://${MIRROR}/distrib/${RELEASE}/${MACHINE} ;
+	urpmi.addmedia --urpmi-root /mnt --distrib http://${MIRROR}/distrib/${RELEASE}/${UNAME_M} ;
 	urpmi.update --urpmi-root /mnt -a ;
 	urpmi --no-recommends --auto --urpmi-root /mnt basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
 	urpmq --list-url ;
@@ -115,9 +115,9 @@ echo "Config pkg repo mirror(s)" ; sleep 3
 . /etc/os-release
 #urpmi.update -a
 ##urpmi.addmedia --distrib --mirrorlist '$MIRRORLIST'
-#urpmi.addmedia --distrib http://${MIRROR}/distrib/\${VERSION_ID}/${MACHINE}
+#urpmi.addmedia --distrib http://${MIRROR}/distrib/\${VERSION_ID}/${UNAME_M}
 #urpmq --list-url ; sleep 5
-${DNFCMD} config-manager --set-enabled \${ID}-${MACHINE} updates-${MACHINE}
+${DNFCMD} config-manager --set-enabled \${ID}-${UNAME_M} updates-${UNAME_M}
 ${DNFCMD} -y --refresh distro-sync
 #cat /etc/yum.repos.d/* ; sleep 5
 ${DNFCMD} -y repolist enabled ; sleep 5
@@ -215,7 +215,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   grub2-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
   cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
   cp /boot/efi/EFI/BOOT/BOOTAA64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI.bak ;
@@ -241,7 +241,7 @@ grub2-mkconfig -o /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg
 
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else

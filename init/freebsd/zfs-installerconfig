@@ -13,7 +13,7 @@ elif [ -e /dev/da0 ] ; then
   export DEVX=da0 ;
 fi
 
-export GRP_NM=${GRP_NM:-bsd0} ; export MACHINE=$(uname -m)
+export GRP_NM=${GRP_NM:-bsd0} ; export UNAME_M=$(uname -m)
 export INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxv0000}
 
 export nonInteractive="YES"
@@ -156,7 +156,7 @@ mkdir -p boot/efi ; mount -t msdosfs /dev/${DEVX}p1 boot/efi
 (cd boot/efi ; mkdir -p EFI/freebsd EFI/BOOT)
 cp boot/loader.efi boot/zfsloader boot/efi/EFI/freebsd/
 cp boot/loader.efi boot/zfsloader boot/efi/EFI/BOOT/
-if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+if [ "arm64" = "${UNAME_M}" ] || [ "aarch64" = "${UNAME_M}" ] ; then
   cp /boot/loader.efi boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
   cp /boot/loader.efi boot/efi/EFI/BOOT/BOOTX64.EFI ;
@@ -290,7 +290,7 @@ FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
 	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI:-FreeBSD:13:${MACHINE}}/quarterly",
+	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$(pkg config abi)/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
 	fingerprints: "/usr/share/keys/pkg",
@@ -305,7 +305,7 @@ ASSUME_ALWAYS_YES=yes pkg clean -y
 zpool trim ${ZFSBOOT_POOL_NAME} ; zpool set autotrim=on ${ZFSBOOT_POOL_NAME}
 sync
 
-if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+if [ "arm64" = "${UNAME_M}" ] || [ "aarch64" = "${UNAME_M}" ] ; then
   (cd boot/efi ; efibootmgr -c -l EFI/freebsd/loader.efi -L FreeBSD) ;
   (cd boot/efi ; efibootmgr -c -l EFI/BOOT/BOOTAA64.EFI -L Default) ;
 else

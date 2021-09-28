@@ -1,11 +1,11 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu-x86_64|virtualbox-iso] template.json",
+  "_usage_build": "(export mypass=$(python -c 'import getpass ; print(getpass.getpass())') ; packer build -var plain_passwd=${mypass} -var crypted_passwd=$(python -c 'import os,crypt ; print(crypt.crypt(os.getenv(\"mypass\"), \"$6$16CHARACTERSSALT\"))') -only=[qemu_x86_64|virtualbox-iso] template.json)",
 
   "builders": [{
     "type": "qemu",
-    "name": "qemu-x86_64",
-    "vm_name": "{{user `vm_name`}}",
+    "name": "qemu_x86_64",
+    "vm_name": "{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
     "machine_type": "q35",
     "disk_interface": "virtio-scsi",
     "disk_discard": "unmap",
@@ -28,7 +28,7 @@
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "sudo shutdown -hP +3",
-    "output_directory": "output-vms/{{user `vm_name`}}",
+    "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/voidlinux/Trident-netinstall-x86_64.iso.sha256",
     "iso_url": "",
@@ -43,7 +43,7 @@
     "type": "virtualbox-iso",
     "guest_os_type": "Linux26_64",
     "format": "ova",
-    "vm_name": "{{user `vm_name`}}",
+    "vm_name": "{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
     "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
     "guest_additions_mode": "disable",
     "hard_drive_interface": "sata",
@@ -67,7 +67,7 @@
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "sudo shutdown -hP +3",
-    "output_directory": "output-vms/{{user `vm_name`}}",
+    "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/voidlinux/Trident-netinstall-x86_64.iso.sha256",
     "iso_url": "",
@@ -85,13 +85,19 @@
       "mkdir -p {{user `home`}}/.ssh/publish_krls {{user `home`}}/.pki/publish_crls",
       "cp -R {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -R {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}",
-      "if command -v erb > /dev/null ; then",
-      "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
-      "elif command -v pystache > /dev/null ; then",
-      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `vm_name`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
-      "fi"
+      "tar -cf /tmp/scripts.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}"
     ]
+  },
+  {
+    "type": "shell-local",
+    "inline": [
+      "if command -v erb > /dev/null ; then",
+      "erb author={{user `author`}} guest={{user `variant`}}-x86_64-{{user `vol_mgr`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}_catalog.json",
+      "elif command -v pystache > /dev/null ; then",
+      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-x86_64-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}_catalog.json",
+      "fi"
+    ],
+    "only": ["qemu_x86_64"]
   },
   {
     "type": "file",
@@ -137,7 +143,8 @@
     {
       "type": "checksum",
       "checksum_types": ["md5", "sha256"],
-      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+      "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}.{{.BuilderType}}.{{.ChecksumType}}",
+      "only": ["qemu_x86_64"]
     },
     {
       "type": "vagrant",
@@ -146,34 +153,33 @@
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
         "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
         "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_x64_firmware`}}"],
-      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
-      "only": ["qemu-x86_64"]
+      "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}-{{user `datestamp`}}.{{.Provider}}.box",
+      "only": ["qemu_x86_64"]
     },
     {
       "type": "shell-local",
       "inline": [
-        "mv output-vms/{{user `vm_name`}}/{{user `vm_name`}} output-vms/{{user `vm_name`}}/{{user `vm_name`}}.qcow2"
+        "mv output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}} output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}.qcow2",
+        "cp init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/"
       ],
-      "except": ["virtualbox-iso"]
+      "only": ["qemu_x86_64"]
     }
   ],
 
   "variables": {
     "variant": "void",
-    "distro": "void",
     "vol_mgr": "lvm",
-    "vm_name": "{{user `distro`}}-x86_64-{{user `vol_mgr`}}",
-    "init_hostname": "voidlinux-boxv0000",
-    "foreign_pkgmgr": "",
+    "init_hostname": "{{user `variant`}}-boxv0000",
+    "foreign_pkgmgr": "apk-tools debootstrap pacman",
     "boot_cmdln_options": " quiet video=1024x768 ",
     "virtfs_opts": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
     "isos_pardir": "/mnt/Data0/distros",
 
-    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
     "repo_host": "mirror.clarkson.edu/voidlinux",
     "iso_url_mirror": "https://mirror.clarkson.edu/voidlinux",
     "iso_url_directory": "live/20210218",
     "iso_x64_name": "void-live-x86_64-20210218",
+    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
 
     "iso_url_mirror_trident": "https://project-trident.org",
     "iso_url_directory_trident": "void",

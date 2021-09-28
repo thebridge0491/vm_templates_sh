@@ -21,9 +21,9 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0}
-export MIRROR=${MIRROR:-download.opensuse.org} ; MACHINE=$(uname -m)
+export MIRROR=${MIRROR:-download.opensuse.org} ; UNAME_M=$(uname -m)
 
-export INIT_HOSTNAME=${1:-opensuse-boxv0000}
+export INIT_HOSTNAME=${1:-suse-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
 export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
@@ -51,7 +51,7 @@ echo "Bootstrap base pkgs" ; sleep 3
 #mkdir -p /mnt/var/lib/rpm /mnt/var/cache/zypp
 #rpm -v --root /mnt --initdb
 # [wget -O file url | curl -L -o file url]
-#wget -O /tmp/release.rpm http://${MIRROR}/distribution/openSUSE-current/repo/oss/${MACHINE}/openSUSE-release-15.2-lp152.575.1.${MACHINE}.rpm
+#wget -O /tmp/release.rpm http://${MIRROR}/distribution/openSUSE-current/repo/oss/${UNAME_M}/openSUSE-release-15.2-lp152.575.1.${UNAME_M}.rpm
 #rpm -v -qip /tmp/release.rpm ; sleep 5
 #rpm -v --root /mnt --nodeps -i /tmp/release.rpm
 zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/openSUSE-current/repo/oss/ repo-oss
@@ -183,7 +183,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   grub2-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
   cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
   cp /boot/efi/EFI/BOOT/BOOTAA64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI.bak ;
@@ -209,7 +209,7 @@ grub2-mkconfig -o /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg
 
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else

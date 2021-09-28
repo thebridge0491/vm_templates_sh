@@ -7,8 +7,9 @@
 ## WITHOUT availability of netcat or ssh/scp on system:
 ##  (host) simple http server for files:
 ##         php -S localhost:{port} [-t {dir}]
-##         ruby -run -e httpd -- -p {port} {dir}
-##         python -m http.server {port} [-d {dir}]
+##         ruby -r un -e httpd -- [-b localhost] -p {port} {dir}
+##         python -m http.server {port} [-b 0.0.0.0] [-d {dir}]
+##  (host) kill HTTP server process: kill -9 $(pgrep -f 'python -m http\.server')
 ##  (client) tools:
 ##    [curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file
 

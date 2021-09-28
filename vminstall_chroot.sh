@@ -12,38 +12,187 @@
 ## WITHOUT availability of netcat or ssh/scp on system:
 ##  (host) simple http server for files:
 ##         php -S localhost:{port} [-t {dir}]
-##         ruby -run -e httpd -- -p {port} {dir}
-##         python -m http.server {port} [-d {dir}]
+##         ruby -r un -e httpd -- [-b localhost] -p {port} {dir}
+##         python -m http.server {port} [-b 0.0.0.0] [-d {dir}]
 ##  (host) kill HTTP server process: kill -9 $(pgrep -f 'python -m http\.server')
 ##  (client) tools:
 ##    [curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file
 
-# usage: [env variant=oshost] sh vminstall_chroot.sh [oshost [GUEST]]
-#   (default) [MACHINE=x86_64] [variant=freebsd] sh vminstall_chroot.sh [freebsd [freebsd-x86_64-zfs]]
+# usage: [env variant=oshost] sh vminstall_chroot.sh [oshost_machine [GUEST]]
+#   (default) [variant=freebsd] sh vminstall_chroot.sh [freebsd_x86_64 [freebsd-x86_64-zfs]]
 
 STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)} ; PROVIDER=${PROVIDER:-libvirt}
-ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros} ; MACHINE=${MACHINE:-x86_64}
+ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros}
 BHYVE_X64_FIRMWARE=${BHYVE_X64_FIRMWARE:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
 QEMU_X64_FIRMWARE=${QEMU_X64_FIRMWARE:-/usr/share/OVMF/OVMF_CODE.fd}
 QEMU_AA64_FIRMWARE=${QEMU_AA64_FIRMWARE:-/usr/share/AAVMF/AAVMF_CODE.fd}
 
-mkdir -p $HOME/.ssh/publish_krls $HOME/.pki/publish_crls
-cp -R $HOME/.ssh/publish_krls init/common/skel/_ssh/
-cp -R $HOME/.pki/publish_crls init/common/skel/_pki/
 
-freebsd() {
-  variant=${variant:-freebsd} ; GUEST=${1:-freebsd-${MACHINE}-zfs}
-  FREEBSDGUEST=1
+_prep() {
+  mkdir -p $HOME/.ssh/publish_krls $HOME/.pki/publish_crls
+  cp -R $HOME/.ssh/publish_krls init/common/skel/_ssh/
+  cp -R $HOME/.pki/publish_crls init/common/skel/_pki/
 
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-aarch64-disc1.iso' | tail -n1)} ;
-    (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE*-aarch64) ;
+  OUT_DIR=${OUT_DIR:-build/${GUEST}}
+  mkdir -p ${OUT_DIR}
+  if [ "bhyve" = "${PROVIDER}" ] ; then
+    truncate -s 30720M ${OUT_DIR}/${GUEST}.raw ;
   else
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)} ;
-    (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE-amd64) ;
+    qemu-img create -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M ;
   fi
-  sleep 5
 
+  #if [ "${EXTRA_ARGS}" ] ; then
+  #  python3 -m http.server 8080 -d /tmp  &
+  #  echo "[curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file" ;
+  #  sleep 5 ;
+  #fi
+}
+
+_finish() {
+  #if [ "${EXTRA_ARGS}" ] ; then
+  #  echo "to kill HTTP server process: kill -9 \$(pgrep -f 'python -m http\.server')" ;
+  #fi
+
+  if command -v erb > /dev/null ; then
+    erb variant=${variant} init/common/Vagrantfile_${PROVIDER}.erb > ${OUT_DIR}/Vagrantfile ;
+  elif command -v pystache > /dev/null ; then
+    pystache init/common/Vagrantfile_${PROVIDER}.mustache "{\"variant\":\"${variant}\"}" \
+      > ${OUT_DIR}/Vagrantfile ;
+  elif command -v mustache > /dev/null ; then
+    cat << EOF >> mustache - init/common/Vagrantfile_${PROVIDER}.mustache > ${OUT_DIR}/Vagrantfile
+---
+variant: ${variant}
+---
+EOF
+  fi
+  cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun.sh ${OUT_DIR}/
+  sleep 30
+}
+
+_install_x86_64() {
+  if [ "bhyve" = "${PROVIDER}" ] ; then
+    cp ${BHYVE_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_x86_64.args ${OUT_DIR}/ ;
+  else
+    cp ${QEMU_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_x86_64.args ${OUT_DIR}/ ;
+  fi
+
+  if [ "1" = "${USE_VIRTINST:-0}" ] ; then
+    #-------------- using virtinst ------------------
+    CONNECT_OPT=${CONNECT_OPT:---connect qemu:///system}
+    VUEFI_OPTS=${VUEFI_OPTS:---boot uefi}
+
+    # NOTE, to convert qemu-system args to libvirt domain XML:
+    #  eval "echo \"$(< vminstall_qemu.args)\"" > /tmp/install_qemu.args
+    #  virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
+
+    virt-install ${CONNECT_OPT} --arch x86_64 --memory 2048 --vcpus 2 \
+      --controller usb,model=ehci --controller virtio-serial \
+      --console pty,target_type=virtio --graphics vnc,port=-1 \
+      --network network=default,model=virtio-net,mac=RANDOM \
+      --boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
+      --disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
+      --cdrom=${ISO_PATH} ${VUEFI_OPTS} -n ${GUEST} &
+
+    sleep 30 ; virsh ${CONNECT_OPT} vncdisplay ${GUEST} ;
+    #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml ;
+  elif [ "$(uname -s)" = "FreeBSD" ] && [ "bhyve" = "${PROVIDER}" ] ; then
+    #---------------- using bhyve -------------------
+    printf "%40s\n" | tr ' ' '#'
+    echo '### Warning: FreeBSD bhyve currently requires root/sudo permission ###'
+    printf "%40s\n\n" | tr ' ' '#' ; sleep 5
+
+    BUEFI_OPTS=${BUEFI_OPTS:- -s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
+      -l bootrom,${BHYVE_X64_FIRMWARE}}
+
+    if [ "1" = "${FREEBSDGUEST:-0}" ] ; then
+      #bhyveload -m 2048M -d ${OUT_DIR}/${GUEST}.raw ${GUEST} ;
+      sleep 1 ;
+    else
+      cat << EOF > ${OUT_DIR}/device.map ;
+(hd0) ${OUT_DIR}/${GUEST}.raw
+(cd0) ${ISO_PATH}
+EOF
+      grub-bhyve -m ${OUT_DIR}/device.map -r cd0 -M 2048M ${GUEST} ;
+    fi
+
+    bhyve -A -H -P -c 2 -m 2048M -s 0,hostbridge -s 1,lpc \
+      -s 2,virtio-net,${NET_OPT:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+      -s 3,ahci-hd,${OUT_DIR}/${GUEST}.raw -l com1,stdio \
+      ${BUEFI_OPTS} -s 31,ahci-cd,${ISO_PATH} ${GUEST} &
+
+    vncviewer :${VNCPORT:-5901} &
+  else
+    #------------ using qemu-system-* ---------------
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE}"}
+    if [ "$(uname -s)" = "Linux" ] ; then
+      echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
+      cat /etc/qemu/bridge.conf ; sleep 5 ;
+    fi
+    echo "(if needed) Quickly catch boot menu to add kernel boot parameters" ;
+    sleep 5 ;
+
+    qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
+      -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
+      -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+      -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+      -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
+      -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
+      -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+      -display default,show-cursor=on \
+      ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot &
+    echo "### Once network connected, transfer needed file(s) ###" ;
+  fi
+  _finish
+}
+
+_install_aarch64() {
+  cp ${QEMU_AA64_FIRMWARE} init/common/qemu_lxc/vmrun_qemu_aarch64.args ${OUT_DIR}/
+
+  if [ "1" = "${USE_VIRTINST:-0}" ] ; then
+    #-------------- using virtinst ------------------
+    CONNECT_OPT=${CONNECT_OPT:---connect qemu:///system}
+    VUEFI_OPTS=${VUEFI_OPTS:---boot uefi}
+
+    # NOTE, to convert qemu-system args to libvirt domain XML:
+    #  eval "echo \"$(< vminstall_qemu.args)\"" > /tmp/install_qemu.args
+    #  virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
+
+    virt-install ${CONNECT_OPT} --arch aarch64 --memory 2048 --vcpus 2 \
+      --controller usb,model=ehci --controller virtio-serial \
+      --console pty,target_type=virtio --graphics vnc,port=-1 \
+      --network network=default,model=virtio-net,mac=RANDOM \
+      --boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
+      --disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
+      --cdrom=${ISO_PATH} ${VUEFI_OPTS} -n ${GUEST} &
+
+    sleep 30 ; virsh ${CONNECT_OPT} vncdisplay ${GUEST} ;
+    #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml ;
+  else
+    #------------ using qemu-system-* ---------------
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"}
+    if [ "$(uname -s)" = "Linux" ] ; then
+      echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
+      cat /etc/qemu/bridge.conf ; sleep 5 ;
+    fi
+    echo "(if needed) Quickly catch boot menu to add kernel boot parameters" ;
+    sleep 5 ;
+
+    qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
+      -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+      -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+      -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
+      -device virtio-blk-pci,drive=hd0 \
+      -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+      -display default,show-cursor=on -vga none -device virtio-gpu-pci \
+      ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot &
+    echo "### Once network connected, transfer needed file(s) ###" ;
+  fi
+  _finish
+}
+#----------------------------------------
+
+
+## freebsd ##
   ##!! (chrootsh) navigate to single user: 2
   ##!! if late, Live CD -> root/-
 
@@ -58,17 +207,27 @@ freebsd() {
   #sh init/common/gpart_setup_vmfreebsd.sh mount_filesystems
 
   #sh init/freebsd/zfs-install.sh [hostname [$CRYPTED_PASSWD]]
+  
+freebsd_x86_64() {
+  FREEBSDGUEST=1
+  variant=${variant:-freebsd} ; GUEST=${1:-${variant}-x86_64-zfs}
+
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE-amd64)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
+freebsd_aarch64() {
+  variant=${variant:-freebsd} ; GUEST=${1:-${variant}-aarch64-zfs}
 
-debian() {
-  variant=${variant:-debian} ; service_mgr=${service_mgr:-sysvinit}
-  GUEST=${1:-devuan-${MACHINE}-lvm}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/live -name 'debian-live-*-amd64*.iso' | tail -n1)}
-  #(cd ${ISOS_PARDIR}/debian/live ; sha256sum --ignore-missing -c SHA256SUMS)
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/devuan/live -name 'devuan_*_amd64_desktop-live.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/devuan/live ; sha256sum --ignore-missing -c SHA256SUMS.txt)
-  sleep 5
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-aarch64-disc1.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE*-aarch64)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+}
+#----------------------------------------
 
+## debian ##
   ##!! (debian) login user/passwd: user/live
   ##!! (devuan) login user/passwd: devuan/devuan
 
@@ -76,7 +235,7 @@ debian() {
   #mount -o remount,size=1G /run/live/overlay ; df -h ; sleep 5
   #sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
   #apt-get --yes update --allow-releaseinfo-change
-  #apt-get --yes install gdisk [lvm2]
+  #apt-get --yes install gdisk [lvm2] [dnf yum-utils zypper]
 
   #------------ if using ZFS ---------------
   #apt-get --yes install --no-install-recommends linux-headers-$(uname -r)
@@ -87,23 +246,25 @@ debian() {
 
   #modprobe zfs ; zpool version ; sleep 5
   #-----------------------------------------
+
+debian_x86_64() {
+  variant=${variant:-debian} ; service_mgr=${service_mgr:-sysvinit}
+  GUEST=${1:-${variant}-x86_64-lvm}
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/live -name 'debian-live-*-amd64*.iso' | tail -n1)}
+  #(cd ${ISOS_PARDIR}/debian/live ; sha256sum --ignore-missing -c SHA256SUMS)
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/devuan/live -name 'devuan_*_amd64_desktop-live.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/devuan/live ; sha256sum --ignore-missing -c SHA256SUMS.txt)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
+#----------------------------------------
 
-void() {
-  variant=${variant:-void} ; GUEST=${1:-voidlinux-${MACHINE}-lvm}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'void-live-x86_64-*.iso' | tail -n1)}
-  #(cd ${ISOS_PARDIR}/voidlinux ; sha256sum --ignore-missing -c sha256.txt)
-  #sleep 5
-  ## change for ZFS already on iso
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'Trident-*-x86_64.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/voidlinux ; sha256sum --ignore-missing -c Trident-*-x86_64.iso.sha256)
-  sleep 5
-
+## void ##
   ##!! login user/passwd: anon/voidlinux
 
   #[bash;] sv down sshd ; export MIRRORHOST=mirror.clarkson.edu/voidlinux
   #yes | xbps-install -Sy -R http://${MIRRORHOST}/current -u xbps ; sleep 3
-  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current netcat wget parted gptfdisk libffi gnupg2 curl [lvm2]
+  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current netcat wget parted gptfdisk libffi gnupg2 curl [lvm2] [apk-tools debootstrap pacman]
 
   #------------ if using ZFS ---------------
   ## install zfs, if needed ##
@@ -112,17 +273,21 @@ void() {
 
   #modprobe zfs ; zpool version ; sleep 5
   #-----------------------------------------
+
+void_x86_64() {
+  variant=${variant:-void} ; GUEST=${1:-${variant}-x86_64-lvm}
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'void-live-x86_64-*.iso' | tail -n1)}
+  #(cd ${ISOS_PARDIR}/voidlinux ; sha256sum --ignore-missing -c sha256.txt)
+  #sleep 5
+  ## change for ZFS already on iso
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'Trident-*-x86_64.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/voidlinux ; sha256sum --ignore-missing -c Trident-*-x86_64.iso.sha256)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
+#----------------------------------------
 
-archlinux() {
-  variant=${variant:-archlinux} ; service_mgr=${service_mgr:-openrc}
-  GUEST=${1:-artix-${MACHINE}-lvm}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'archlinux-*.iso' | tail -n1)}
-  #(cd ${ISOS_PARDIR}/archlinux ; sha1sum --ignore-missing -c sha1sums.txt)
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/artix -name 'artix-*-openrc-*.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/artix ; sha256sum --ignore-missing -c sha256sums)
-  sleep 5
-
+## archlinux ##
   ##!! (arch) login user/passwd: -/-
   ##!! (artix) login user/passwd: artix/artix
 
@@ -152,20 +317,20 @@ archlinux() {
 
   #modprobe zfs ; zpool version ; sleep 5
   #-----------------------------------------
+
+archlinux_x86_64() {
+  variant=${variant:-archlinux} ; service_mgr=${service_mgr:-openrc}
+  GUEST=${1:-${variant}-x86_64-lvm}
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'archlinux-*.iso' | tail -n1)}
+  #(cd ${ISOS_PARDIR}/archlinux ; sha1sum --ignore-missing -c sha1sums.txt)
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/artix -name 'artix-*-openrc-*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/artix ; sha256sum --ignore-missing -c sha256sums)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
+#----------------------------------------
 
-alpine() {
-  variant=${variant:-alpine} ; GUEST=${1:-alpine-${MACHINE}-lvm}
-
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-standard-*-${MACHINE}.iso" | tail -n1)} ;
-    (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-standard-*-${MACHINE}.iso.sha256) ;
-  else
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-extended-*-${MACHINE}.iso" | tail -n1)} ;
-    (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-extended-*-${MACHINE}.iso.sha256) ;
-  fi
-  sleep 5
-
+## alpine ##
   ##!! login user/passwd: root/-
 
   #ifconfig ; ifconfig {ifdev} up ; udhcpc -i {ifdev} ; cd /tmp
@@ -174,7 +339,7 @@ alpine() {
   #. /etc/os-release ; export MIRRORHOST=dl-cdn.alpinelinux.org/alpine
   #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories
   #apk update
-  #apk add e2fsprogs dosfstools sgdisk libffi gnupg curl util-linux multipath-tools perl [lvm2]
+  #apk add e2fsprogs dosfstools sgdisk libffi gnupg curl util-linux multipath-tools perl [lvm2] [xbps debootstrap pacman]
   #setup-udev
 
   #------------ if using ZFS ---------------
@@ -182,26 +347,32 @@ alpine() {
 
   #modprobe zfs ; zpool version ; sleep 5
   #-----------------------------------------
+
+alpine_x86_64() {
+  variant=${variant:-alpine} ; GUEST=${1:-${variant}-x86_64-lvm}
+
+   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-extended-*-x86_64.iso" | tail -n1)}
+  (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-extended-*-x86_64.iso.sha256)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
+alpine_aarch64() {
+  variant=${variant:-alpine} ; GUEST=${1:-${variant}-aarch64-lvm}
 
-suse() {
-  variant=${variant:-suse} ; GUEST=${1:-opensuse-${MACHINE}-lvm}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-standard-*-aarch64.iso" | tail -n1)}
+  (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-standard-*-aarch64.iso.sha256)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+}
+#----------------------------------------
 
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live/aarch64 -name "openSUSE-Leap-*-Live-${MACHINE}*.iso" | tail -n1)}
-    (cd ${ISOS_PARDIR}/opensuse/live/aarch64 ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-${MACHINE}*.iso.sha256) ;
-  else
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live -name "openSUSE-Leap-*-Live-${MACHINE}*.iso" | tail -n1)}
-    (cd ${ISOS_PARDIR}/opensuse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-${MACHINE}*.iso.sha256) ;
-  fi
-  sleep 5
-
+## suse ##
   ##!! login user/passwd: linux/-
 
   #sudo su ; . /etc/os-release ; export MIRRORHOST=download.opensuse.org
   #zypper --non-interactive refresh
 
-  #zypper install ca-certificates-cacert ca-certificates-mozilla efibootmgr [lvm2]
+  #zypper install ca-certificates-cacert ca-certificates-mozilla efibootmgr [lvm2] [debootstrap dnf]
   #zypper --gpg-auto-import-keys refresh
   #update-ca-certificates
 
@@ -213,16 +384,27 @@ suse() {
 
   #modprobe zfs ; zpool version ; sleep 5
   #-----------------------------------------
+
+suse_x86_64() {
+  variant=${variant:-suse} ; GUEST=${1:-${variant}-x86_64-lvm}
+
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live -name "openSUSE-Leap-*-Live-x86_64*.iso" | tail -n1)}
+  (cd ${ISOS_PARDIR}/opensuse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-x86_64*.iso.sha256)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
+suse_aarch64() {
+  variant=${variant:-suse} ; GUEST=${1:-${variant}-aarch64-lvm}
+
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live/aarch64 -name "openSUSE-Leap-*-Live-aarch64*.iso" | tail -n1)}
+  (cd ${ISOS_PARDIR}/opensuse/live/aarch64 ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-aarch64*.iso.sha256)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+}
+#----------------------------------------
 
 ## obsolete/non-existent CentOS [Stream] Live iso
-#redhat() {
-#  RELEASE=${RELEASE:-8} ; variant=${variant:-redhat}
-#  GUEST=${1:-centos-${MACHINE}-lvm}
-#  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos/live -name 'CentOS-*-x86_64-Live*.iso' | tail -n1)}
-#  (cd ${ISOS_PARDIR}/centos/live ; sha256sum --ignore-missing -c CHECKSUM)
-#  sleep 5
-#
+###redhat ##
 #  ##!! login user/passwd: liveuser/-
 #
 #  #. /etc/os-release ; export MIRRORHOST=mirror.centos.org/centos
@@ -238,25 +420,40 @@ suse() {
 #
 #  #dkms status ; modprobe zfs ; zpool version ; sleep 5
 #  #-----------------------------------------
+#
+#redhat_x86_64() {
+#  RELEASE=${RELEASE:-8} ; variant=${variant:-redhat}
+#  GUEST=${1:-${variant}-x86_64-lvm}
+#  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos/live -name 'CentOS-*-x86_64-Live*.iso' | tail -n1)}
+#  (cd ${ISOS_PARDIR}/centos/live ; sha256sum --ignore-missing -c CHECKSUM)
+#
+#  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 #}
+#redhat_aarch64() {
+#  RELEASE=${RELEASE:-8} ; variant=${variant:-redhat}
+#  GUEST=${1:-${variant}-x86_64-lvm}
+#  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos/live -name 'CentOS-*-x86_64-Live*.iso' | tail -n1)}
+#  (cd ${ISOS_PARDIR}/centos/live ; sha256sum --ignore-missing -c CHECKSUM)
+#
+#  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+#}
+#----------------------------------------
 
-mageia() {
-  variant=${variant:-mageia} ; GUEST=${1:-mageia-${MACHINE}-lvm}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia/live -name 'Mageia-*-Live-*-x86_64.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/mageia/live ; sha512sum --ignore-missing -c Mageia-*-Live-*-x86_64.iso.sha512)
-  sleep 5
-
+## mageia ##
   ##!! login user/passwd: live/-
 
   #su - ; export MIRRORHOST=mirrors.kernel.org/mageia
   #dnf -y check-update ; sleep 5
-}
 
-pclinuxos() {
-  variant=${variant:-pclinuxos} ; GUEST=${1:-pclinuxos-${MACHINE}-lvm}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/pclinuxos -name 'pclinuxos64-*.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/pclinuxos ; md5sum --ignore-missing -c pclinuxos64-*.md5sum)
-  sleep 5
+mageia_x86_64() {
+  variant=${variant:-mageia} ; GUEST=${1:-${variant}-x86_64-lvm}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia/live -name 'Mageia-*-Live-*-x86_64.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/mageia/live ; sha512sum --ignore-missing -c Mageia-*-Live-*-x86_64.iso.sha512)
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
+}
+#----------------------------------------
+
+## pclinuxos ##
   ##append to boot parameters: nokmsboot 3 text textmode=1 nomodeset keyb=us
 
   ##!! login user/passwd: guest/-
@@ -267,19 +464,17 @@ pclinuxos() {
   #apt-get -y update ; sleep 5
   #apt-get -y install netcat gdisk efibootmgr [lvm2]
   #apt-get -y --fix-broken install
+
+pclinuxos_x86_64() {
+  variant=${variant:-pclinuxos} ; GUEST=${1:-${variant}-x86_64-lvm}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/pclinuxos -name 'pclinuxos64-*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/pclinuxos ; md5sum --ignore-missing -c pclinuxos64-*.md5sum)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
+#----------------------------------------
 
-netbsd() {
-  variant=${variant:-netbsd} ; GUEST=${1:-netbsd-${MACHINE}-std}
-
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-aarch64.iso' | tail -n1)} ;
-    (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512) ; sleep 5 ;
-  else
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-amd64.iso' | tail -n1)} ;
-    (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512) ; sleep 5 ;
-  fi
-
+## netbsd ##
   # ?? QEMU x86_64 boot uefi kernel page fault for iso (need : -machine pc,accel=kvm)
   # add options: -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1
 
@@ -297,23 +492,26 @@ netbsd() {
   #sh init/netbsd/gpt_setup_vmnetbsd.sh mount_filesystems
 
   #sh init/netbsd/std-install.sh [hostname [$PLAIN_PASSWD]]
+
+netbsd_x86_64() {
+  variant=${variant:-netbsd} ; GUEST=${1:-${variant}-x86_64-std}
+
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-amd64.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512) ; sleep 5
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
+netbsd_aarch64() {
+  variant=${variant:-netbsd} ; GUEST=${1:-${variant}-aarch64-std}
 
-openbsd() {
-  variant=${variant:-openbsd} ; GUEST=${1:-openbsd-${MACHINE}-std}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-aarch64.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512)
+  
+  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+}
+#----------------------------------------
 
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/arm64 -name 'install*.img' | tail -n1)} ;
-    (cd ${ISOS_PARDIR}/openbsd/arm64 ; sha256sum --ignore-missing -c SHA256) ; sleep 5 ;
-  else
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/amd64 -name 'install*.iso' | tail -n1)} ;
-    (cd ${ISOS_PARDIR}/openbsd/amd64 ; sha256sum --ignore-missing -c SHA256) ; sleep 5 ;
-  fi
-
-  ## ?? boot uefi NOT WORKING for iso ??
-  QUEFI_OPTS=" "
-  VUEFI_OPTS=" "
-
+## openbsd ##
   ##!! login user/passwd: root/-
   ##!! (chrootsh) enter shell: S
 
@@ -329,172 +527,72 @@ openbsd() {
   #sh init/openbsd/disklabel_setup_vmopenbsd.sh mount_filesystems
 
   #sh init/openbsd/std-install.sh [hostname [$PLAIN_PASSWD]]
+
+openbsd_x86_64() {
+  variant=${variant:-openbsd} ; GUEST=${1:-${variant}-x86_64-std}
+
+  ## ?? boot uefi NOT WORKING for iso ??
+  #QUEFI_OPTS=" "
+  #VUEFI_OPTS=" "
+
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/amd64 -name 'install*.img' | tail -n1)}
+  (cd ${ISOS_PARDIR}/openbsd/amd64 ; sha256sum --ignore-missing -c SHA256)
+  
+  sleep 5 ; _prep
+  qemu-img convert -O qcow2 ${ISO_PATH} ${OUT_DIR}/${GUEST}.qcow2
+  qemu-img resize -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M
+  sleep 3 ; _install_x86_64
+}
+openbsd_aarch64() {
+  CDROM_OPT=${CDROM_OPT:-" "}
+  variant=${variant:-openbsd} ; GUEST=${1:-${variant}-aarch64-std}
+
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/arm64 -name 'install*.img' | tail -n1)}
+  (cd ${ISOS_PARDIR}/openbsd/arm64 ; sha256sum --ignore-missing -c SHA256)
+  
+  sleep 5 ; _prep
+  qemu-img convert -O qcow2 ${ISO_PATH} ${OUT_DIR}/${GUEST}.qcow2
+  qemu-img resize -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M
+  sleep 3 ; _install_aarch64
 }
 
 #----------------------------------------
-${@:-freebsd freebsd-x86_64-zfs}
-
-OUT_DIR=${OUT_DIR:-build/${GUEST}}
-mkdir -p ${OUT_DIR}
-if [ "bhyve" = "${PROVIDER}" ] ; then
-  truncate -s 30720M ${OUT_DIR}/${GUEST}.raw ;
-  cp ${BHYVE_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_${MACHINE}.args ${OUT_DIR}/ ;
-else
-  qemu-img create -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M ;
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    cp ${QEMU_AA64_FIRMWARE} init/common/qemu_lxc/vmrun_qemu_${MACHINE}.args ${OUT_DIR}/ ;
-  else
-    cp ${QEMU_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_${MACHINE}.args ${OUT_DIR}/ ;
-  fi ;
-fi
-
-if [ "1" = "${USE_VIRTINST:-0}" ] ; then
-  #-------------- using virtinst ------------------
-  CONNECT_OPT=${CONNECT_OPT:---connect qemu:///system}
-  VUEFI_OPTS=${VUEFI_OPTS:---boot uefi}
-
-  # NOTE, to convert qemu-system args to libvirt domain XML:
-  # eval "echo \"$(< vminstall_qemu.args)\"" > /tmp/install_qemu.args
-  # virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
-
-  virt-install ${CONNECT_OPT} --arch ${MACHINE} --memory 2048 --vcpus 2 \
-	--controller usb,model=ehci --controller virtio-serial \
-    --console pty,target_type=virtio --graphics vnc,port=-1 \
-    --network network=default,model=virtio-net,mac=RANDOM \
-    --boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
-    --disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
-    --cdrom=${ISO_PATH} ${VUEFI_OPTS} -n ${GUEST} &
-
-  echo "### Once network connected, transfer needed file(s) ###"
-  sleep 30 ; virsh ${CONNECT_OPT} vncdisplay ${GUEST}
-  #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml
-elif [ "$(uname -s)" = "FreeBSD" ] && [ "bhyve" = "${PROVIDER}" ] ; then
-  #---------------- using bhyve -------------------
-  printf "%40s\n" | tr ' ' '#'
-  echo '### Warning: FreeBSD bhyve currently requires root/sudo permission ###'
-  printf "%40s\n\n" | tr ' ' '#' ; sleep 5
-
-  BUEFI_OPTS=${BUEFI_OPTS:- -s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
-    -l bootrom,${BHYVE_X64_FIRMWARE}}
-
-  if [ "1" = "${FREEBSDGUEST:-0}" ] ; then
-    #bhyveload -m 2048M -d ${OUT_DIR}/${GUEST}.raw ${GUEST} ;
-    sleep 1 ;
-  else
-    cat << EOF > ${OUT_DIR}/device.map ;
-(hd0) ${OUT_DIR}/${GUEST}.raw
-(cd0) ${ISO_PATH}
-EOF
-    grub-bhyve -m ${OUT_DIR}/device.map -r cd0 -M 2048M ${GUEST} ;
-  fi
-
-  bhyve -A -H -P -c 2 -m 2048M -s 0,hostbridge -s 1,lpc \
-    -s 2,virtio-net,${NET_OPT:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-    -s 3,ahci-hd,${OUT_DIR}/${GUEST}.raw -l com1,stdio \
-    ${BUEFI_OPTS} -s 31,ahci-cd,${ISO_PATH} ${GUEST} &
-
-  vncviewer :${VNCPORT:-5901} &
-else
-  #------------ using qemu-system-* ---------------
-  if [ "$(uname -s)" = "Linux" ] ; then
-    echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
-    cat /etc/qemu/bridge.conf ; sleep 5 ;
-  fi
-  echo "(if needed) Quickly catch boot menu to add kernel boot parameters"
-  sleep 5
-
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"} ;
-
-    qemu-system-aarch64 -cpu cortex-a57 -machine virt,accel=kvm:hvf:tcg,gic-version=3 \
-      -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
-      -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-      -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
-      -device virtio-blk-pci,drive=hd0 \
-      -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-      -display default,show-cursor=on -vga none -device virtio-gpu-pci \
-      ${QUEFI_OPTS} -cdrom ${ISO_PATH} -no-reboot &
-  else
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE}"} ;
-
-    qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
-      -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
-      -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
-      -nic ${NET_OPT:-user,hostfwd=tcp::4022-:22},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-      -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
-      -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
-      -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-      -display default,show-cursor=on \
-      ${QUEFI_OPTS} -cdrom ${ISO_PATH} &
-  fi ;
-  echo "### Once network connected, transfer needed file(s) ###"
-fi
-
-if [ "bhyve" = "${PROVIDER}" ] ; then
-  if command -v erb > /dev/null ; then
-    erb variant=${variant} init/common/Vagrantfile_bhyve.erb > ${OUT_DIR}/Vagrantfile ;
-  elif command -v pystache > /dev/null ; then
-    pystache init/common/Vagrantfile_bhyve.mustache "{\"variant\":\"${variant}\"}" \
-      > ${OUT_DIR}/Vagrantfile ;
-  elif command -v mustache > /dev/null ; then
-	cat << EOF >> mustache - init/common/Vagrantfile_bhyve.mustache > ${OUT_DIR}/Vagrantfile
----
-variant: ${variant}
----
-EOF
-  fi ;
-else
-  if command -v erb > /dev/null ; then
-    erb variant=${variant} init/common/Vagrantfile_libvirt.erb > ${OUT_DIR}/Vagrantfile ;
-  elif command -v pystache > /dev/null ; then
-    pystache init/common/Vagrantfile_libvirt.mustache "{\"variant\":\"${variant}\"}" \
-      > ${OUT_DIR}/Vagrantfile ;
-  elif command -v mustache > /dev/null ; then
-	cat << EOF >> mustache - init/common/Vagrantfile_libvirt.mustache > ${OUT_DIR}/Vagrantfile
----
-variant: ${variant}
----
-EOF
-  fi ;
-fi
-
-cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun.sh ${OUT_DIR}/
-sleep 30
+${@:-freebsd_x86_64 freebsd-x86_64-zfs}
 
 
 #-----------------------------------------
 ## package manager tools & config needed to install from existing Linux
 
-#debian variants(debian, devuan):
+#variant debian - distros(debian, devuan):
   # (devuan x86_64 MIRROR: deb.devuan.org/merged, service_mgr: sysvinit)
   # (devuan aarch64 MIRROR: pkgmaster.devuan.org/devuan, service_mgr: sysvinit)
   # (debian [x86_64|aarch64] MIRROR: deb.debian.org/debian)
   #  package(s): [perl,] debootstrap
 
-#void linux: ([x86_64|aarch64] MIRROR: mirror.clarkson.edu/voidlinux)
-  ## dnld: http://${MIRROR}/static/xbps-static-latest.${MACHINE}-musl.tar.xz
+#variant void: ([x86_64|aarch64] MIRROR: mirror.clarkson.edu/voidlinux)
+  ## dnld: http://${MIRROR}/static/xbps-static-latest.<machine>-musl.tar.xz
   #  package(s): xbps[-install.static]
 
-#arch linux variants(x86_64: arch, artix [service_mgr: openrc]):
+#variant archlinux: distros(x86_64: arch, artix [service_mgr: openrc]):
   #  package(s): libffi, curl, pacman
 
-#alpine linux: ([x86_64|aarch64] MIRROR: dl-cdn.alpinelinux.org/alpine)
-  ## dnld: http://${MIRROR}/latest-stable/main/${MACHINE}/apk-tools-static-*.apk
+#variant alpine: ([x86_64|aarch64] MIRROR: dl-cdn.alpinelinux.org/alpine)
+  ## dnld: http://${MIRROR}/latest-stable/main/<machine>/apk-tools-static-*.apk
   #  package(s): apk[-tools][.static] (download apk[-tools][-static])
 
-#suse variants(opensuse): ([x86_64,aarch64] MIRROR: download.opensuse.org)
+#variant suse - distros(opensuse): ([x86_64,aarch64] MIRROR: download.opensuse.org)
   #  package(s): zypper, rpm, ? rinse
 
-#redhat variants(rocky, almalinux, centos[-stream]):
+#variant redhat - distros(rocky, almalinux, centos[-stream]):
   # (rocky [x86_64|aarch64] MIRROR: dl.rockylinux.org/pub/rocky)
   # (almalinux [x86_64|aarch64] MIRROR: repo.almalinux.org/almalinux)
   # (centos[-stream] [x86_64|aarch64] MIRROR: mirror.centos.org/centos)
   #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm, ? rinse
 
-#mageia: (x86_64 MIRROR: mirrors.kernel.org/mageia)
+#variant mageia: (x86_64 MIRROR: mirrors.kernel.org/mageia)
   #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm
 
-#pclinuxos: (x86_64 MIRROR: spout.ussg.indiana.edu/linux/pclinuxos)
+#variant pclinuxos: (x86_64 MIRROR: spout.ussg.indiana.edu/linux/pclinuxos)
   #  package(s): ?
 
 #----------------------------------------

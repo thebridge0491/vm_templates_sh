@@ -26,14 +26,14 @@ export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
 # (almalinux) mirror: repo.almalinux.org/almalinux
 # (centos[-stream]) mirror: mirror.centos.org/centos
 RELEASE=${RELEASE:-8}
-export MIRROR=${MIRROR:-dl.rockylinux.org/pub/rocky} ; MACHINE=$(uname -m)
+export MIRROR=${MIRROR:-dl.rockylinux.org/pub/rocky} ; UNAME_M=$(uname -m)
 if [ "7" = "${RELEASE}" ] ; then
-  REPO_DIRECTORY="/${RELEASE}/os/${MACHINE}" ;
+  REPO_DIRECTORY="/${RELEASE}/os/${UNAME_M}" ;
 else
-  REPO_DIRECTORY="/${RELEASE}/BaseOS/${MACHINE}/os" ;
+  REPO_DIRECTORY="/${RELEASE}/BaseOS/${UNAME_M}/os" ;
 fi
 
-export INIT_HOSTNAME=${1:-rocky-boxv0000}
+export INIT_HOSTNAME=${1:-redhat-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
 export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
@@ -117,10 +117,10 @@ ls /proc ; sleep 5 ; ls /dev ; sleep 5
 echo "Config pkg repo mirror(s)" ; sleep 3
 . /etc/os-release ; echo \${VERSION_ID} ; sleep 3
 VERSION_MAJOR=\$(echo \${VERSION_ID} | cut -d. -f1)
-##yum-config-manager --add-repo http://mirrorlist.centos.org/?release=${RELEASE}&arch=${MACHINE}&repo=baseos
-#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/BaseOS/${MACHINE}/os
-#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/AppStream/${MACHINE}/os
-#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/extras/${MACHINE}/os
+##yum-config-manager --add-repo http://mirrorlist.centos.org/?release=${RELEASE}&arch=${UNAME_M}&repo=baseos
+#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/BaseOS/${UNAME_M}/os
+#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/AppStream/${UNAME_M}/os
+#yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/extras/${UNAME_M}/os
 
 yum -y check-update
 ${YUMCMD} -y reinstall dnf dnf-plugins-core yum yum-utils
@@ -133,7 +133,7 @@ dnf repolist ; sleep 5
 
 
 echo "Add software package selection(s)" ; sleep 3
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   ${DNFCMD} -y install @core linux-firmware sudo tar kbd openssl grub2-efi-aa64 grub2 efibootmgr
 else
   ${DNFCMD} -y install @core linux-firmware microcode_ctl sudo tar kbd openssl grub2-pc grub2-efi-x64 grub2 efibootmgr
@@ -148,9 +148,9 @@ ${DNFCMD} -y install 'dnf-command(versionlock)'
 
 # Use EL release kernel packages (avoid dkms build errors)
 if [ "7" = "\${VERSION_MAJOR}" ] ; then
-dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${MACHINE} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel kernel-devel
+dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${UNAME_M} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel kernel-devel
 else
-dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${MACHINE}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel kernel-devel
+dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${UNAME_M}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel kernel-devel
 fi
 
 
@@ -158,9 +158,9 @@ kver=\$(dnf list --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ 
 echo \$kver ; sleep 5
 ## Use EL release kernel packages (avoid dkms build errors)
 #if [ "7" = "\${VERSION_MAJOR}" ] ; then
-#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${MACHINE} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel-headers-\$kver.${MACHINE} kernel-devel-\$kver.${MACHINE}
+#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${UNAME_M} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel-headers-\$kver.${UNAME_M} kernel-devel-\$kver.${UNAME_M}
 #else
-#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${MACHINE}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel-headers-\$kver.${MACHINE} kernel-devel-\$kver.${MACHINE}
+#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${UNAME_M}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel-headers-\$kver.${UNAME_M} kernel-devel-\$kver.${UNAME_M}
 #fi
 
 ## for centos-stream VERSION_ID=8, not similar 8.4
@@ -268,7 +268,7 @@ echo 'omit_dracutmodules+=" btrfs resume "' >> /etc/dracut.conf.d/zol.conf
 
 echo zfs > /etc/modules-load.d/zfs.conf # ??
 
-dracut --force --kver \$kver.${MACHINE}
+dracut --force --kver \$kver.${UNAME_M}
 
 
 grub2-probe /boot
@@ -279,7 +279,7 @@ dnf versionlock list ; sleep 3
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   grub2-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
   cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
   cp /boot/efi/EFI/BOOT/BOOTAA64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI.bak ;
@@ -323,7 +323,7 @@ touch /.autorelabel
 sed -i 's|SELINUX=.*$|SELINUX=permissive|' /etc/sysconfig/selinux
 sestatus ; sleep 5
 
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else

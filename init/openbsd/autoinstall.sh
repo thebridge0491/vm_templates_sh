@@ -13,8 +13,8 @@ fi
 
 export PLAIN_PASSWD=${1:-abcd0123}
 
-(cd /dev ; sh MAKEDEV $DEVX)
-fdisk -iy -g -b 960 $DEVX ; sync ; fdisk $DEVX ; sleep 3
+#(cd /dev ; sh MAKEDEV $DEVX)
+#fdisk -iy -g -b 960 $DEVX ; sync ; fdisk $DEVX ; sleep 3
 
 # Always use the first line of ftplist.cgi for the default answer of "HTTP Server?".
 # This is a workaround for the change introduced in the following commit:
@@ -57,16 +57,18 @@ sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
-cp /usr/mdec/boot /boot
-installboot -v ${DEVX} /usr/mdec/biosboot /usr/mdec/boot
-installboot -v ${DEVX}a /usr/mdec/biosboot /usr/mdec/boot
-installboot -v /dev/r${DEVX}a /usr/mdec/biosboot /usr/mdec/boot
+cp /usr/mdec/boot /boot ; cp /usr/mdec/* /
+installboot -v ${DEVX:-sd0}
+installboot -v ${DEVX:-sd0}a
+installboot -v ${DEVX:-sd0} /usr/mdec/biosboot /usr/mdec/boot
+installboot -v ${DEVX:-sd0}a /usr/mdec/biosboot /usr/mdec/boot
+installboot -v /dev/r${DEVX:-sd0}a /usr/mdec/biosboot /usr/mdec/boot
 
 sync ; sleep 5
 
 
-#fsck_ffs /dev/${DEVX}a
-#fsck_ffs /dev/${DEVX}d
+#fsck_ffs /dev/${DEVX:-sd0}a
+#fsck_ffs /dev/${DEVX:-sd0}}d
 sync
 
 
@@ -91,7 +93,7 @@ sync
 
 umount -a ; umount /mnt ; sleep 3
 
-installboot -v ${DEVX}a ; installboot -v /dev/r${DEVX}a
+installboot -v ${DEVX:-sd0}a ; installboot -v /dev/r${DEVX:-sd0}a
 
 ##sync ; swapoff -a ; reboot #shutdown -p +3
 #sync ; reboot #shutdown -p +3

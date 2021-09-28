@@ -21,7 +21,7 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0}
-export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos} ; MACHINE=$(uname -m)
+export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos} ; UNAME_M=$(uname -m)
 
 export INIT_HOSTNAME=${1:-pclinuxos-boxv0000}
 export PLAIN_PASSWD=${2:-abcd0123}
@@ -50,7 +50,7 @@ rm -r /mnt/var/lib/rpm /mnt/var/cache/apt
 mkdir -p /mnt/var/lib/rpm /mnt/var/cache/apt
 rpm -v --root /mnt --initdb
 # [wget -O file url | curl -L -o file url]
-#wget -O /tmp/release.rpm http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.${MACHINE}/pclinuxos-release-2020-1pclos2020.${MACHINE}.rpm
+#wget -O /tmp/release.rpm http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.${UNAME_M}/pclinuxos-release-2020-1pclos2020.${UNAME_M}.rpm
 #rpm -v -qip /tmp/release.rpm ; sleep 5
 #rpm -v --root /mnt --nodeps -i /tmp/release.rpm
 apt-get --root /mnt -y update

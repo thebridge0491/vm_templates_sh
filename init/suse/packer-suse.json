@@ -1,11 +1,11 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "packer build -var plain_passwd=abcd0123 -var crypted_passwd=$(python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"$6$16CHARACTERSSALT\"))') -only=[qemu-x86_64|qemu-aarch64|virtualbox-iso] template.json",
+  "_usage_build": "(export mypass=$(python -c 'import getpass ; print(getpass.getpass())') ; packer build -var plain_passwd=${mypass} -var crypted_passwd=$(python -c 'import os,crypt ; print(crypt.crypt(os.getenv(\"mypass\"), \"$6$16CHARACTERSSALT\"))') -only=[qemu_x86_64|qemu_aarch64|virtualbox-iso] template.json)",
 
   "builders": [{
     "type": "qemu",
-    "name": "qemu-x86_64",
-    "vm_name": "{{user `vm_name`}}",
+    "name": "qemu_x86_64",
+    "vm_name": "{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
     "machine_type": "q35",
     "disk_interface": "virtio-scsi",
     "disk_discard": "unmap",
@@ -28,7 +28,7 @@
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "sudo shutdown -hP +3",
-    "output_directory": "output-vms/{{user `vm_name`}}",
+    "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/opensuse/live/{{user `isolive_x64_name`}}.iso.sha256",
     "iso_url": "",
@@ -45,14 +45,14 @@
   },
   {
     "type": "qemu",
-    "name": "qemu-aarch64",
-    "vm_name": "{{user `vm_name`}}",
+    "name": "qemu_aarch64",
+    "vm_name": "{{user `variant`}}-aarch64-{{user `vol_mgr`}}",
     "machine_type": "virt",
     "disk_interface": "virtio",
     "disk_discard": "unmap",
     "disk_detect_zeroes": "unmap",
     "qemuargs": [
-      ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3"],
+      ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"],
       ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
       ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0"],
       ["-device", "qemu-xhci,id=usb"], ["-usb"],
@@ -65,14 +65,14 @@
     "qemu_binary": "qemu-system-aarch64",
 
     "boot_wait": "10s",
-    "ssh_timeout": "2h45m",
+    "ssh_timeout": "4h45m",
     "ssh_username": "packer",
     "ssh_password": "{{user `plain_passwd`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "sudo shutdown -hP +3",
-    "output_directory": "output-vms/{{user `vm_name`}}",
+    "output_directory": "output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}",
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/opensuse/live/{{user `isolive_aa64_name`}}.iso.sha256",
     "iso_url": "",
@@ -98,7 +98,7 @@
     "type": "virtualbox-iso",
     "guest_os_type": "OpenSUSE_64",
     "format": "ova",
-    "vm_name": "{{user `vm_name`}}",
+    "vm_name": "{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
     "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
     "guest_additions_mode": "disable",
     "hard_drive_interface": "sata",
@@ -122,7 +122,7 @@
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "sudo shutdown -hP +3",
-    "output_directory": "output-vms/{{user `vm_name`}}",
+    "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/opensuse/{{user `iso_x64_name`}}.iso.sha256",
     "iso_url": "",
@@ -140,13 +140,30 @@
       "mkdir -p {{user `home`}}/.ssh/publish_krls {{user `home`}}/.pki/publish_crls",
       "cp -R {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -R {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}",
-      "if command -v erb > /dev/null ; then",
-      "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
-      "elif command -v pystache > /dev/null ; then",
-      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `vm_name`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
-      "fi"
+      "tar -cf /tmp/scripts.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}"
     ]
+  },
+  {
+    "type": "shell-local",
+    "inline": [
+      "if command -v erb > /dev/null ; then",
+      "erb author={{user `author`}} guest={{user `variant`}}-x86_64-{{user `vol_mgr`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}_catalog.json",
+      "elif command -v pystache > /dev/null ; then",
+      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-x86_64-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}_catalog.json",
+      "fi"
+    ],
+    "only": ["qemu_x86_64"]
+  },
+  {
+    "type": "shell-local",
+    "inline": [
+      "if command -v erb > /dev/null ; then",
+      "erb author={{user `author`}} guest={{user `variant`}}-aarch64-{{user `vol_mgr`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}}_catalog.json",
+      "elif command -v pystache > /dev/null ; then",
+      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-aarch64-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}}_catalog.json",
+      "fi"
+    ],
+    "only": ["qemu_aarch64"]
   },
   {
     "type": "file",
@@ -192,7 +209,8 @@
     {
       "type": "checksum",
       "checksum_types": ["md5", "sha256"],
-      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}.{{.BuilderType}}.{{.ChecksumType}}"
+      "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}.{{.BuilderType}}.{{.ChecksumType}}",
+      "only": ["qemu_x86_64"]
     },
     {
       "type": "vagrant",
@@ -201,8 +219,22 @@
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
         "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
         "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_x64_firmware`}}"],
-      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
-      "only": ["qemu-x86_64"]
+      "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}-{{user `datestamp`}}.{{.Provider}}.box",
+      "only": ["qemu_x86_64"]
+    },
+    {
+      "type": "shell-local",
+      "inline": [
+        "mv output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}} output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}.qcow2",
+        "cp init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/"
+      ],
+      "only": ["qemu_x86_64"]
+    },
+    {
+      "type": "checksum",
+      "checksum_types": ["md5", "sha256"],
+      "output": "output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}}.{{.BuilderType}}.{{.ChecksumType}}",
+      "only": ["qemu_aarch64"]
     },
     {
       "type": "vagrant",
@@ -210,43 +242,42 @@
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
         "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "{{user `qemu_aa64_firmware`}}"],
-      "output": "output-vms/{{user `vm_name`}}/{{user `vm_name`}}-{{user `datestamp`}}.{{.Provider}}.box",
-      "only": ["qemu-aarch64"]
+      "output": "output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}}-{{user `datestamp`}}.{{.Provider}}.box",
+      "only": ["qemu_aarch64"]
     },
     {
       "type": "shell-local",
       "inline": [
-        "mv output-vms/{{user `vm_name`}}/{{user `vm_name`}} output-vms/{{user `vm_name`}}/{{user `vm_name`}}.qcow2"
+        "mv output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}} output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}}.qcow2",
+        "cp init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/"
       ],
-      "except": ["virtualbox-iso"]
+      "only": ["qemu_aarch64"]
     }
   ],
 
   "variables": {
     "variant": "suse",
-    "distro": "opensuse",
     "vol_mgr": "lvm",
-    "vm_name": "{{user `distro`}}-x86_64-{{user `vol_mgr`}}",
-    "init_hostname": "opensuse-boxv0000",
-    "foreign_pkgmgr": "",
+    "init_hostname": "{{user `variant`}}-boxv0000",
+    "foreign_pkgmgr": "debootstrap dnf",
     "boot_cmdln_options": " ",
     "virtfs_opts": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
     "isos_pardir": "/mnt/Data0/distros",
 
-    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
     "repo_host": "download.opensuse.org",
     "repo_directory": "/distribution/openSUSE-current/repo/oss",
     "iso_url_mirror": "https://download.opensuse.org",
-    "isolive_url_directory": "distribution/openSUSE-current/live",
-    "isolive_x64_name": "openSUSE-Leap-15.3-KDE-Live-x86_64-Media",
-    "isolive_x64_cdlabel": "openSUSE_Leap_15.3_KDE_Live",
     "iso_url_directory": "distribution/openSUSE-current/iso",
     "iso_x64_name": "openSUSE-Leap-15.3-NET-x86_64",
+    "isolive_url_directory": "distribution/openSUSE-current/live",
+    "isolive_x64_cdlabel": "openSUSE_Leap_15.3_KDE_Live",
+    "isolive_x64_name": "openSUSE-Leap-15.3-KDE-Live-x86_64-Media",
+    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
 
-    "qemu_aa64_firmware": "/usr/share/AAVMF/AAVMF_CODE.fd",
-    "isolive_aa64_name": "openSUSE-Leap-15.3-KDE-Live-aarch64-Media",
-    "isolive_aa64_cdlabel": "openSUSE_Leap_15.3_KDE_Live",
     "iso_aa64_name": "openSUSE-Leap-15.3-NET-aarch64",
+    "isolive_aa64_cdlabel": "openSUSE_Leap_15.3_KDE_Live",
+    "isolive_aa64_name": "openSUSE-Leap-15.3-KDE-Live-aarch64-Media",
+    "qemu_aa64_firmware": "/usr/share/AAVMF/AAVMF_CODE.fd",
 
     "disk_size": "30720",
     "headless": "",

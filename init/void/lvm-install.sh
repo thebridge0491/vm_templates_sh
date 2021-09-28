@@ -23,9 +23,9 @@ fi
 export GRP_NM=${GRP_NM:-vg0}
 # (x86_64) mirror.clarkson.edu/voidlinux/current
 # (aarch64) mirror.clarkson.edu/voidlinux/current/aarch64
-export MIRROR=${MIRROR:-mirror.clarkson.edu/voidlinux} ; MACHINE=$(uname -m)
+export MIRROR=${MIRROR:-mirror.clarkson.edu/voidlinux} ; UNAME_M=$(uname -m)
 
-export INIT_HOSTNAME=${1:-voidlinux-boxv0000}
+export INIT_HOSTNAME=${1:-void-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
 export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
@@ -54,16 +54,16 @@ EOF
 echo "Bootstrap base pkgs" ; sleep 3
 pkg_list="linux-lts linux-lts-headers libgcc ethtool base-voidstrap bash  cryptsetup lvm2 openssh sudo efibootmgr"
 if command -v xbps-install.static > /dev/null ; then
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    yes | XBPS_ARCH=${MACHINE} xbps-install.static -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list grub-arm64-efi ;
+  if [ "aarch64" = "${UNAME_M}" ] ; then
+    yes | XBPS_ARCH=${UNAME_M} xbps-install.static -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list grub-arm64-efi ;
   else
-    yes | XBPS_ARCH=${MACHINE} xbps-install.static -Sy -R http://${MIRROR}/current -r /mnt $pkg_list grub-x86_64-efi ;
+    yes | XBPS_ARCH=${UNAME_M} xbps-install.static -Sy -R http://${MIRROR}/current -r /mnt $pkg_list grub-x86_64-efi ;
   fi ;
 else
-  if [ "aarch64" = "${MACHINE}" ] ; then
-    yes | XBPS_ARCH=${MACHINE} xbps-install -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list grub-arm64-efi ;
+  if [ "aarch64" = "${UNAME_M}" ] ; then
+    yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list grub-arm64-efi ;
   else
-    yes | XBPS_ARCH=${MACHINE} xbps-install -Sy -R http://${MIRROR}/current -r /mnt $pkg_list grub-x86_64-efi ;
+    yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current -r /mnt $pkg_list grub-x86_64-efi ;
   fi ;
 fi
 
@@ -94,7 +94,7 @@ export TERM=xterm-color     # xterm | xterm-color
 ls /proc ; sleep 5 ; ls /dev ; sleep 5
 
 . /etc/os-release ; mkdir -p /etc/xbps.d
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   echo "repository=https://${MIRROR}/current/aarch64" >> /etc/xbps.d/00-repository-main.conf
 else
   echo "repository=https://${MIRROR}/current" >> /etc/xbps.d/00-repository-main.conf
@@ -182,7 +182,7 @@ xbps-reconfigure -f \${kernel}
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
   cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
@@ -197,7 +197,7 @@ sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rd.auto=1 text xdriver=
 echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
 grub-mkconfig -o /boot/grub/grub.cfg
 
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else

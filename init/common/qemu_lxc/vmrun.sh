@@ -235,7 +235,7 @@ run_qemu() {
 
   if [ "aarch64" = "${MACHINE}" ] ; then
     QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"}
-    qemu-system-aarch64 -cpu cortex-a57 -machine virt,accel=kvm:hvf:tcg,gic-version=3 \
+    qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
       -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \

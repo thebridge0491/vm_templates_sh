@@ -23,7 +23,7 @@ elif [ -e /dev/da0 ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-bsd0}
-export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/FreeBSD} ; MACHINE=$(uname -m)
+export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/FreeBSD} ; UNAME_M=$(uname -m)
 
 export INIT_HOSTNAME=${1:-freebsd-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -54,7 +54,7 @@ echo "Setup EFI boot" ; sleep 3
 mkdir -p /mnt/boot/efi ; mount -t msdosfs /dev/${DEVX}p2 /mnt/boot/efi
 (cd /mnt/boot/efi ; mkdir -p EFI/freebsd EFI/BOOT)
 cp /boot/loader.efi /boot/zfsloader /mnt/boot/efi/EFI/freebsd/
-if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+if [ "arm64" = "${UNAME_M}" ] || [ "aarch64" = "${UNAME_M}" ] ; then
   cp /boot/loader.efi /mnt/boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
   cp /boot/loader.efi /mnt/boot/efi/EFI/BOOT/BOOTX64.EFI ;
@@ -78,7 +78,7 @@ sysctl kern.geom.label.gpt.enable=1
 
 echo "Extracting freebsd-dist archives" ; sleep 3
 #for file in kernel base ; do
-#    (fetch -o - ftp://${MIRROR}/releases/${MACHINE}/11.0-RELEASE/${file}.txz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt}) ;
+#    (fetch -o - ftp://${MIRROR}/releases/${UNAME_M}/11.0-RELEASE/${file}.txz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt}) ;
 #done
 cd /usr/freebsd-dist
 for file in kernel base ; do
@@ -190,7 +190,7 @@ FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
 	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\${ABI:-FreeBSD:13:${MACHINE}}/quarterly",
+	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$(pkg config abi)/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
 	fingerprints: "/usr/share/keys/pkg",
@@ -210,7 +210,7 @@ exit
 EOFchroot
 # end chroot commands
 
-if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+if [ "arm64" = "${UNAME_M}" ] || [ "aarch64" = "${UNAME_M}" ] ; then
   (cd /mnt/boot/efi ; efibootmgr -c -l EFI/freebsd/loader.efi -L FreeBSD) ;
   (cd /mnt/boot/efi ; efibootmgr -c -l EFI/BOOT/BOOTAA64.EFI -L Default) ;
 else

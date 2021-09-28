@@ -21,7 +21,7 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
-export MIRROR=${MIRROR:-dl-cdn.alpinelinux.org/alpine} ; MACHINE=$(uname -m)
+export MIRROR=${MIRROR:-dl-cdn.alpinelinux.org/alpine} ; UNAME_M=$(uname -m)
 
 export INIT_HOSTNAME=${1:-alpine-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -51,11 +51,11 @@ EOF
 
 echo "Bootstrap base pkgs" ; sleep 3
 if command -v apk > /dev/null ; then
-  #apk --arch ${MACHINE} --repository http://${MIRROR}/v${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
-  apk --arch ${MACHINE} --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
+  #apk --arch ${UNAME_M} --repository http://${MIRROR}/v${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
+  apk --arch ${UNAME_M} --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
 else
-  #./sbin/apk.static --arch ${MACHINE} --repository http://${MIRROR}/v${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo
-  ./sbin/apk.static --arch ${MACHINE} --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
+  #./sbin/apk.static --arch ${UNAME_M} --repository http://${MIRROR}/v${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo
+  ./sbin/apk.static --arch ${UNAME_M} --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
 fi
 
 
@@ -93,18 +93,18 @@ RELEASE=\$(cat /etc/alpine-release | cut -d. -f1-2)
 sed -i '/cdrom/ s|^|#|' /etc/apk/repositories
 echo "http://${MIRROR}/latest-stable/main" >> /etc/apk/repositories
 echo "http://${MIRROR}/latest-stable/community" >> /etc/apk/repositories
-apk --arch ${MACHINE} update
+apk --arch ${UNAME_M} update
 cat /etc/apk/repositories ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
-apk --arch ${MACHINE} add tzdata sudo linux-lts linux-lts-dev dosfstools e2fsprogs mkinitfs dhcp bash util-linux shadow openssh grub-efi efibootmgr multipath-tools cryptsetup
-#apk --arch ${MACHINE} add xfce4
-if [ "x86_64" = "${MACHINE}" ] ; then
-  apk --arch ${MACHINE} grub-bios
+apk --arch ${UNAME_M} add tzdata sudo linux-lts linux-lts-dev dosfstools e2fsprogs mkinitfs dhcp bash util-linux shadow openssh grub-efi efibootmgr multipath-tools cryptsetup
+#apk --arch ${UNAME_M} add xfce4
+if [ "x86_64" = "${UNAME_M}" ] ; then
+  apk --arch ${UNAME_M} grub-bios
 fi
 sleep 5
 
-apk --arch ${MACHINE} add zfs
+apk --arch ${UNAME_M} add zfs
 modprobe zfs ; zpool version ; sleep 3
 
 
@@ -193,16 +193,16 @@ mkinitfs "\${kernel}"
 grub-probe /boot
 
 #echo "Hold zfs & kernel package upgrades (require manual upgrade)"
-apk --arch ${MACHINE} fix ; sleep 3
+apk --arch ${UNAME_M} fix ; sleep 3
 for pkgX in zfs zfs-lts zfs-openrc linux-lts linux-lts-dev ; do
-  apk --arch ${MACHINE} add \${pkgX}=\$(apk --arch ${MACHINE} info -ve \${pkgX} | sed "s|\${pkgX}-\(.*\)|\1|")
+  apk --arch ${UNAME_M} add \${pkgX}=\$(apk --arch ${UNAME_M} info -ve \${pkgX} | sed "s|\${pkgX}-\(.*\)|\1|")
 done
 # ?? how to display held/pinned packages ??
 
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
   cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
@@ -218,7 +218,7 @@ echo 'GRUB_CMDLINE_LINUX_DEFAULT="rd.auto=1 text nomodeset root=ZFS=${ZPOOLNM}/R
 echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub
 grub-mkconfig -o /boot/grub/grub.cfg
 
-if [ "aarch64" = "${MACHINE}" ] ; then
+if [ "aarch64" = "${UNAME_M}" ] ; then
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else
@@ -228,7 +228,7 @@ fi
 efibootmgr -v ; sleep 3
 
 
-apk --arch ${MACHINE} -v cache clean
+apk --arch ${UNAME_M} -v cache clean
 zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM}
 sync
 

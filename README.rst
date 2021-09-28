@@ -25,15 +25,15 @@ to build virtual machine using auto install methods or chroot scripts:
 
         # NOTE, relevant comments -- transfer file(s) ; run manual commands
 
-        [MACHINE=x86_64] [VOL_MGR=zfs] sh vminstall_auto.sh [<oshost> [<guest>]]
+        [VOL_MGR=zfs] sh vminstall_auto.sh [<oshost_machine> [<guest>]]
 
-        [MACHINE=x86_64] [PROVIDER=libvirt] [variant=<oshost>] sh vminstall_chroot.sh [<oshost> [<guest>]]
+        [PROVIDER=libvirt] [variant=<oshost>] sh vminstall_chroot.sh [<oshost_machine> [<guest>]]
 
 build examples:
 
-        [MACHINE=x86_64] [VOL_MGR=zfs] sh vminstall_auto.sh [freebsd [freebsd-x86_64-zfs]]
+        [VOL_MGR=zfs] sh vminstall_auto.sh [freebsd_x86_64 [freebsd-x86_64-zfs]]
 
-        [MACHINE=x86_64] [PROVIDER=libvirt] [variant=freebsd] sh vminstall_chroot.sh [freebsd [freebsd-x86_64-zfs]]
+        [PROVIDER=libvirt] [variant=freebsd] sh vminstall_chroot.sh [freebsd_x86_64 [freebsd-x86_64-zfs]]
 
 [optional] Vagrant option - (in running VM) add vagrant user:
 

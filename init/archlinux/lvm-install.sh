@@ -20,10 +20,10 @@ elif [ -e /dev/sda ] ; then
   export DEVX=sda ;
 fi
 
-export GRP_NM=${GRP_NM:-vg0} ; MACHINE=$(uname -m)
+export GRP_NM=${GRP_NM:-vg0} ; UNAME_M=$(uname -m)
 service_mgr=${service_mgr:-openrc} # openrc | runit | s6
 
-export INIT_HOSTNAME=${1:-artix-boxv0000}
+export INIT_HOSTNAME=${1:-archlinux-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
 export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 

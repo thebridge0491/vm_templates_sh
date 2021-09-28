@@ -30,7 +30,7 @@ elif [ "x86_64" = "$(uname -m)" ] ; then
 fi
 service_mgr=${service_mgr:-sysvinit} # sysvinit | runit | openrc
 
-export INIT_HOSTNAME=${1:-devuan-boxv0000}
+export INIT_HOSTNAME=${1:-debian-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
 export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
