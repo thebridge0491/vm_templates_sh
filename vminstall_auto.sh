@@ -123,7 +123,7 @@ _install_x86_64() {
         -display default,show-cursor=on \
         ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot -kernel ${KERNEL_PATH} -append "${EXTRA_ARGS}" -initrd ${INITRD_PATH} &
     else
-      qemu-system-x86_64 -machine pc,accel=kvm:hvf:tcg \
+      qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
         -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
         -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
         -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
@@ -495,8 +495,6 @@ _openbsd() {
   ##!! login user/passwd: root/-
 
   #ifconfig ; dhclient {ifdev}
-  #cd /tmp ; (cd /dev ; sh MAKEDEV sd0)
-  #fdisk -iy -g -b 960 sd0 ; sync ; fdisk sd0
 
   ## NOTE, transfer [dir(s) | file(s)]: init/common, init/openbsd
 

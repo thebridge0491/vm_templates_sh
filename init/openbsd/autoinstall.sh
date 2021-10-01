@@ -13,8 +13,8 @@ fi
 
 export PLAIN_PASSWD=${1:-abcd0123}
 
-#(cd /dev ; sh MAKEDEV $DEVX)
-#fdisk -iy -g -b 960 $DEVX ; sync ; fdisk $DEVX ; sleep 3
+(cd /dev ; sh MAKEDEV $DEVX)
+fdisk -iy -g -b 960 $DEVX ; sync ; fdisk $DEVX ; sleep 3
 
 # Always use the first line of ftplist.cgi for the default answer of "HTTP Server?".
 # This is a workaround for the change introduced in the following commit:

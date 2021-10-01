@@ -34,9 +34,14 @@
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/pclinuxos/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
-      "<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 {{user `boot_cmdln_options`}}<enter>initrd /isolinux/initrd.gz<enter>boot<enter>",
-      "<wait><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><enter>guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lvm2 ; apt-get -y --fix-broken install ; modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; ",
-      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `plain_passwd`}}'<enter><wait>"
+      "<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 keyb=us<enter>initrd /isolinux/initrd.gz<enter>boot<enter>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10><enter>",
+      "guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lvm2 ; apt-get -y --fix-broken install ; modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; ",
+      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/post_install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/post_drakliveinstall.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; draklive-install --expert --noauto ; sh -x /tmp/post_install.sh {{user `init_hostname`}} '{{user `plain_passwd`}}'<enter><wait>"
     ]
   },
   {
@@ -73,9 +78,14 @@
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/pclinuxos/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
-      "<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 {{user `boot_cmdln_options`}}<enter>initrd /isolinux/initrd.gz<enter>boot<enter>",
-      "<wait><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><enter>guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lvm2 ; apt-get -y --fix-broken install ; modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; ",
-      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `plain_passwd`}}'<enter><wait>"
+      "<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 keyb=us<enter>initrd /isolinux/initrd.gz<enter>boot<enter>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10>",
+      "<wait10><wait10><wait10><wait10><wait10><wait10><enter>",
+      "guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lvm2 ; apt-get -y --fix-broken install ; modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; ",
+      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/post_install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/post_drakliveinstall.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; draklive-install --expert --noauto ; sh -x /tmp/post_install.sh {{user `init_hostname`}} '{{user `plain_passwd`}}'<enter><wait>"
     ]
   }],
 
@@ -170,7 +180,7 @@
     "variant": "pclinuxos",
     "vol_mgr": "lvm",
     "init_hostname": "{{user `variant`}}-boxv0000",
-    "boot_cmdln_options": "nokmsboot noacpi 3 text textmode=1 nomodeset video=1024x768 keyb=us ",
+    "boot_cmdln_options": "nokmsboot noacpi nomodeset video=1024x768 keyb=us ",
     "virtfs_opts": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
     "isos_pardir": "/mnt/Data0/distros",
 

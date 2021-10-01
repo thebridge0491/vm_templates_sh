@@ -4,22 +4,7 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sgdisk lvm vg0 pvol0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0 pvol0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
-
-# passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
-# perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
-# ruby -e "['io/console','digest/sha2'].each {|i| require i} ; puts 'Password:' ; puts STDIN.noecho(&:gets).chomp.crypt(\"\$6\$16CHARACTERSSALT\")"
-# python -c "import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"\$6\$16CHARACTERSSALT\"))"
-
 set -x
-if [ -e /dev/vda ] ; then
-  export DEVX=vda ;
-elif [ -e /dev/sda ] ; then
-  export DEVX=sda ;
-fi
-
 export GRP_NM=${GRP_NM:-vg0}
 export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos} ; UNAME_M=$(uname -m)
 
@@ -27,15 +12,37 @@ export INIT_HOSTNAME=${1:-pclinuxos-boxv0000}
 export PLAIN_PASSWD=${2:-abcd0123}
 #export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
-echo "Create /etc/fstab" ; sleep 3
-mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
-sh -c 'cat > /mnt/etc/fstab' << EOF
-LABEL=${GRP_NM}-osRoot    /           ext4    errors=remount-ro   0   1
-LABEL=${GRP_NM}-osVar     /var        ext4    defaults    0   2
-LABEL=${GRP_NM}-osHome    /home       ext4    defaults    0   2
-PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
-PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
-LABEL=${GRP_NM}-osSwap    none        swap    sw          0   0
+
+echo "Re-mount filesystems" ; sleep 3
+if [ -e /dev/vda ] ; then
+  export DEVX=vda ;
+elif [ -e /dev/sda ] ; then
+  export DEVX=sda ;
+fi
+DEV_BOOT=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osBoot" | cut -d' ' -f1)
+DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
+mount /dev/mapper/${GRP_NM}-osRoot /mnt/install
+mount ${DEV_BOOT} /mnt/install/boot
+mount ${DEV_ESP} /mnt/install/boot/EFI
+mount /dev/mapper/${GRP_NM}-osVar /mnt/install/var
+mount /dev/mapper/${GRP_NM}-osHome /mnt/install/home
+mkdir -p /mnt/install/boot/EFI/EFI/BOOT
+
+echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
+cp /etc/mtab /mnt/install/etc/mtab
+mkdir -p /mnt/install/dev /mnt/install/proc /mnt/install/sys /mnt/install/run /mnt/install/sys/firmware/efi/efivars /mnt/install/lib/modules
+mount --rbind /proc /mnt/install/proc ; mount --rbind /sys /mnt/install/sys
+mount --rbind /dev /mnt/install/dev
+
+mount --rbind /dev/pts /mnt/install/dev/pts ; mount --rbind /run /mnt/install/run
+modprobe efivarfs
+mount -t efivarfs efivarfs /mnt/install/sys/firmware/efi/efivars/
+
+
+echo "Fix /etc/fstab /dev/vgX/osRoot to /dev/mapper/vgX-osRoot, ..." ; sleep 3
+sed -i "s|${GRP_NM}/|mapper/${GRP_NM}-|g" /mnt/install/etc/fstab
+mkdir -p /mnt/install/media ; chmod 0755 /mnt/install/media
+sh -c 'cat >> /mnt/etc/fstab' << EOF
 
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
@@ -45,48 +52,21 @@ sysfs                           /sys        sysfs   defaults    0   0
 EOF
 
 
-echo "Bootstrap base pkgs" ; sleep 3
-rm -r /mnt/var/lib/rpm /mnt/var/cache/apt
-mkdir -p /mnt/var/lib/rpm /mnt/var/cache/apt
-rpm -v --root /mnt --initdb
-# [wget -O file url | curl -L -o file url]
-#wget -O /tmp/release.rpm http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.${UNAME_M}/pclinuxos-release-2020-1pclos2020.${UNAME_M}.rpm
-#rpm -v -qip /tmp/release.rpm ; sleep 5
-#rpm -v --root /mnt --nodeps -i /tmp/release.rpm
-apt-get --root /mnt -y update
-apt-get --root /mnt -y install basesystem-minimal apt rpm makedev
-# fix AND re-attempt install for infrequent errors
-apt-get --root /mnt -y --fix-broken install
-apt-get --root /mnt -y install basesystem-minimal apt rpm makedev
-sleep 5
-
-
-echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
-cp /etc/mtab /mnt/etc/mtab
-mkdir -p /mnt/dev /mnt/proc /mnt/sys /mnt/run /mnt/sys/firmware/efi/efivars /mnt/lib/modules
-mount --rbind /proc /mnt/proc ; mount --rbind /sys /mnt/sys
-mount --rbind /dev /mnt/dev
-
-mount --rbind /dev/pts /mnt/dev/pts ; mount --rbind /run /mnt/run
-modprobe efivarfs
-mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars/
-
-
-#mkdir -p /mnt/var/empty /mnt/var/lock/subsys /mnt/etc/sysconfig/network-scripts
+mkdir -p /mnt/install/var/empty /mnt/install/var/lock/subsys /mnt/install/etc/sysconfig/network-scripts
 #cp /etc/sysconfig/network-scripts/ifcfg-$ifdev /mnt/etc/sysconfig/network-scripts/ifcfg-${ifdev}.bak
-cp /etc/resolv.conf /mnt/etc/resolv.conf
+cp /etc/resolv.conf /mnt/install/etc/resolv.conf
 
 
 # LANG=[C|en_US].UTF-8
-cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en chroot /mnt /bin/sh
+cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en chroot /mnt/install /bin/sh
 set -x
 
 chmod 1777 /tmp ; chmod 1777 /var/tmp
 chown root:root / ; chmod 0755 /
 
-unset LC_ALL
-export TERM=xterm-color     # xterm | xterm-color
-#hostname ${INIT_HOSTNAME}
+#unset LC_ALL
+#export TERM=xterm-color     # xterm | xterm-color
+##hostname ${INIT_HOSTNAME}
 
 ls /proc ; sleep 5 ; ls /dev ; sleep 5
 
@@ -107,7 +87,7 @@ echo "Add software package selection(s)" ; sleep 3
 apt-get -y update
 apt-get -y --fix-broken install
 
-pkgs_nms="basesystem microcode_ctl apt rpm locales-en sudo dhcp-client man-pages nano dosfstools shorewall shorewall-ipv6 mandi-ifw grub2 grub2-efi efibootmgr lvm2" # task-xfce"
+pkgs_nms="basesystem bash apt rpm locales-en sudo dhcp-client man-pages nano dosfstools grub2 grub2-efi microcode_ctl efibootmgr lvm2" # task-xfce"
 apt-get -y install \$pkgs_nms
 # fix AND re-attempt install for infrequent errors
 apt-get -y --fix-broken install
@@ -116,24 +96,24 @@ apt-get -y install \$pkgs_nms
 modprobe dm-mod ; vgscan ; vgchange -ay ; lvs
 
 
-echo "Config keyboard ; localization" ; sleep 3
-kbd_mode -u ; loadkeys us
-#sed -i '/en_US.UTF-8 UTF-8/ s|^# ||' /etc/locale.gen
-#echo 'LANG=en_US.UTF-8' >> /etc/locale.conf
-#locale-gen # en_US en_US.UTF-8
+#echo "Config keyboard ; localization" ; sleep 3
+#kbd_mode -u ; loadkeys us
+##sed -i '/en_US.UTF-8 UTF-8/ s|^# ||' /etc/locale.gen
+##echo 'LANG=en_US.UTF-8' >> /etc/locale.conf
+##locale-gen # en_US en_US.UTF-8
 
-sh -c 'cat >> /etc/default/locale' << EOF
-LANG=en_US.UTF-8
-#LC_ALL=en_US.UTF-8
-LANGUAGE="en_US:en"
+#sh -c 'cat >> /etc/default/locale' << EOF
+#LANG=en_US.UTF-8
+##LC_ALL=en_US.UTF-8
+#LANGUAGE="en_US:en"
+#
+#EOF
 
-EOF
 
-
-echo "Config time zone & clock" ; sleep 3
-rm /etc/localtime
-ln -sf /usr/share/zoneinfo/UTC /etc/localtime
-hwclock --systohc --utc
+#echo "Config time zone & clock" ; sleep 3
+#rm /etc/localtime
+#ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+#hwclock --systohc --utc
 
 
 echo "Config hostname ; network" ; sleep 3
@@ -151,26 +131,30 @@ echo "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hos
 ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 sh -c "cat >> /etc/sysconfig/network-scripts/ifcfg-\$ifdev" << EOF
-DEVICE=\${ifdev}
-BOOTPROTO=dhcp
-STARTMODE=auto
-ONBOOT=yes
-DHCP_CLIENT=dhclient
+#DEVICE=\${ifdev}
+#BOOTPROTO=dhcp
+#STARTMODE=auto
+#ONBOOT=yes
+#DHCP_CLIENT=dhclient
 
 EOF
 
 sh -c "cat >> /etc/sysconfig/network" << EOF
-NETWORKING=yes
-CRDA_DOMAIN=US
-HOSTNAME=${INIT_HOSTNAME}
+#NETWORKING=yes
+#CRDA_DOMAIN=US
+#HOSTNAME=${INIT_HOSTNAME}
 
 EOF
 
 
 echo "Update services" ; sleep 3
-drakfirewall ; sleep 5 ; service shorewall stop ; service shorewall6 stop
+#drakfirewall ; sleep 5 ; service shorewall stop ; service shorewall6 stop
 service -s ; service --status-all ; sleep 5
 
+
+echo "Adjust PAM for simplistic passwords" ; sleep 3
+sed -i '/^password.*required.*cracklib/ s|^|#|' /etc/pam.d/system-auth
+sed -i '/^password.*sufficient/ s| use_authtok||' /etc/pam.d/system-auth
 
 echo "Set root passwd ; add user" ; sleep 3
 groupadd --system wheel
@@ -200,12 +184,12 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
 echo "Bootloader installation & config" ; sleep 3
-mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-grub2-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable
+mkdir -p /boot/EFI/EFI/\${ID} /boot/EFI/EFI/BOOT
+grub2-install --target=x86_64-efi --efi-directory=/boot/EFI --bootloader-id=\${ID} --recheck --removable
 grub2-install --target=i386-pc --recheck /dev/$DEVX
-cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/
-cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak
-cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI
+cp -R /boot/EFI/EFI/\${ID}/* /boot/EFI/EFI/BOOT/
+cp /boot/EFI/EFI/BOOT/BOOTX64.EFI /boot/EFI/EFI/BOOT/BOOTX64.EFI.bak
+cp /boot/EFI/EFI/BOOT/grubx64.EFI /boot/EFI/EFI/BOOT/BOOTX64.EFI
 
 #sed -i -e "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
 #sed -i -e "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
@@ -215,8 +199,8 @@ echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 nokmsboot noacpi text xdriver=vesa nomodeset rootdelay=5"|'  \
   /etc/default/grub
 grub2-mkconfig -o /boot/grub2/grub.cfg
-#cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
-#cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg
+#cp -f /boot/EFI/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
+#cp -f /boot/EFI/EFI/\${ID}/grub.cfg /boot/EFI/EFI/BOOT/grub.cfg
 
 efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
 efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
@@ -238,10 +222,10 @@ exit
 EOFchroot
 # end chroot commands
 
-tar -xf /tmp/init.tar -C /mnt/root/ ; sleep 5
+tar -xf /tmp/init.tar -C /mnt/install/root/ ; sleep 5
 
 read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
 if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
-  sync ; swapoff -va ; umount -vR /mnt ;
+  sync ; swapoff -va ; umount -vR /mnt/install ;
   reboot ; #poweroff ;
 fi

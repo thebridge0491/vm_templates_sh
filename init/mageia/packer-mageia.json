@@ -34,7 +34,7 @@
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/mageia/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
-      "c<wait>linux /isolinux/x86_64/vmlinuz {{user `boot_cmdln_options`}} systemd.unit=multi-user.target ",
+      "c<wait>linux /isolinux/x86_64/vmlinuz text 3 textmode=1 {{user `boot_cmdln_options`}} systemd.unit=multi-user.target ",
       "automatic=method:http,server:{{user `repo_host`}},directory:{{user `repo_directory`}},network:dhcp auto_install=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-auto_inst.cfg.pl<enter>",
       "initrd /isolinux/x86_64/all.rdz<enter>boot<enter><wait>"
     ]

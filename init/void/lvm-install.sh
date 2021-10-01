@@ -104,7 +104,7 @@ xbps-install -S ; xbps-query -L ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
 yes | xbps-install -Su xbps ; yes | xbps-install -u
-for pkgX in void-repo-nonfree python nano wget curl aria2 void-repo-multilib void-repo-multilib-nonfree ; do
+for pkgX in linux-lts linux-lts-headers void-repo-nonfree python nano wget curl aria2 void-repo-multilib void-repo-multilib-nonfree ; do
   yes | xbps-install -Sy \$pkgX
 done
 #yes | xbps-install -Sy xfce4

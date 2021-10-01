@@ -129,6 +129,8 @@ pkgs_nms="basesystem kernel-desktop-latest microcode_ctl locales-en sudo dhcp-cl
 #urpmi --no-recommends --auto \$pkgs_nms
 ${DNFCMD} -y check-update
 ${DNFCMD} -y install \$pkgs_nms
+dnf -y check-update
+${DNFCMD} -y install 'dnf-command(versionlock)'
 
 modprobe dm-mod ; vgscan ; vgchange -ay ; lvs
 

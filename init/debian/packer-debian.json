@@ -34,7 +34,7 @@
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/devuan/live/{{user `isolive_x64_name`}}.iso,{{user `iso_x64_url_mirror`}}/{{user `isolive_url_directory`}}/{{user `isolive_x64_name`}}.iso",
     "boot_command": [
-      "<wait>c<wait>linux /live/vmlinuz {{user `boot_cmdln_options`}} boot=live components username=devuan text 3<enter>initrd /live/initrd.img<enter>boot<enter>",
+      "<wait>c<wait>linux /live/vmlinuz {{user `boot_cmdln_options`}} boot=live components username=devuan text 3 textmode=1<enter>initrd /live/initrd.img<enter>boot<enter>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",

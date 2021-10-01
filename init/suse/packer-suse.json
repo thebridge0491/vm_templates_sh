@@ -34,7 +34,7 @@
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/opensuse/live/{{user `isolive_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `isolive_url_directory`}}/{{user `isolive_x64_name`}}.iso",
     "boot_command": [
-      "<wait>c<wait>linuxefi /boot/x86_64/loader/linux root=live:CDLABEL={{user `isolive_x64_cdlabel`}} ro rd.live.image rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 textmode=1 text 3 {{user `boot_cmdln_options`}}<enter>initrdefi /boot/x86_64/loader/initrd<enter>boot<enter>",
+      "<wait>c<wait>linuxefi /boot/x86_64/loader/linux root=live:CDLABEL={{user `isolive_x64_cdlabel`}} ro rd.live.image rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 text 3 textmode=1 {{user `boot_cmdln_options`}} systemd.unit=multi-user.target<enter>initrdefi /boot/x86_64/loader/initrd<enter>boot<enter>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
@@ -78,7 +78,7 @@
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/opensuse/live/{{user `isolive_aa64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `isolive_aa64_name`}}.iso",
     "boot_command": [
-     "<wait>c<wait>linux /boot/aarch64/loader/linux root=live:CDLABEL={{user `isolive_aa64_cdlabel`}} ro rd.live.image rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 textmode=1 text 3 {{user `boot_cmdln_options`}}<enter>initrd /boot/aarch64/loader/initrd<enter>boot<enter>",
+     "<wait>c<wait>linux /boot/aarch64/loader/linux root=live:CDLABEL={{user `isolive_aa64_cdlabel`}} ro rd.live.image rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 text 3 textmode=1 {{user `boot_cmdln_options`}} systemd.unit=multi-user.target<enter>initrd /boot/aarch64/loader/initrd<enter>boot<enter>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
@@ -129,7 +129,7 @@
     "iso_urls": "file://{{user `isos_pardir`}}/opensuse/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
       "<wait>c<wait>linuxefi /boot/x86_64/loader/linux ",
-      "netsetup=dhcp lang=en_US install=http://{{user `repo_host`}}{{user `repo_directory`}} hostname={{user `init_hostname`}} domain= textmode=1 text 3 autoyast=http://{{ .HTTPIP }}:{{ .HTTPPort }}/{{user `variant`}}/{{user `vol_mgr`}}-autoinst.xml<enter><wait10>",
+      "netsetup=dhcp lang=en_US install=http://{{user `repo_host`}}{{user `repo_directory`}} hostname={{user `init_hostname`}} domain= text 3 textmode=1 systemd.unit=multi-user.target autoyast=http://{{ .HTTPIP }}:{{ .HTTPPort }}/{{user `variant`}}/{{user `vol_mgr`}}-autoinst.xml<enter><wait10>",
       "initrdefi /boot/x86_64/loader/initrd<enter><wait10>boot<enter><wait10>"
     ]
   }],

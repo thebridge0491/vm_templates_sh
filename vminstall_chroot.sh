@@ -228,6 +228,8 @@ freebsd_aarch64() {
 #----------------------------------------
 
 ## debian ##
+  ##append to boot parameters: 3 text textmode=1
+  
   ##!! (debian) login user/passwd: user/live
   ##!! (devuan) login user/passwd: devuan/devuan
 
@@ -268,7 +270,7 @@ debian_x86_64() {
 
   #------------ if using ZFS ---------------
   ## install zfs, if needed ##
-  ##yes | xbps-install -Sy linux-headers zfs
+  ##yes | xbps-install -Sy [linux-headers] zfs
   ##mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
 
   #modprobe zfs ; zpool version ; sleep 5
@@ -338,6 +340,7 @@ archlinux_x86_64() {
   #service sshd stop ; date +%Y.%m.%d-%H:%M -s "YYYY.mm.dd-23:59"
   #. /etc/os-release ; export MIRRORHOST=dl-cdn.alpinelinux.org/alpine
   #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories
+  #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories
   #apk update
   #apk add e2fsprogs dosfstools sgdisk libffi gnupg curl util-linux multipath-tools perl [lvm2] [xbps debootstrap pacman]
   #setup-udev
@@ -367,9 +370,12 @@ alpine_aarch64() {
 #----------------------------------------
 
 ## suse ##
+  ##append to boot parameters: 3 text textmode=1
+  
   ##!! login user/passwd: linux/-
 
   #sudo su ; . /etc/os-release ; export MIRRORHOST=download.opensuse.org
+  #wicked ifstatus all ; wicked ifup {ifdev}
   #zypper --non-interactive refresh
 
   #zypper install ca-certificates-cacert ca-certificates-mozilla efibootmgr [lvm2] [debootstrap dnf]
@@ -408,6 +414,7 @@ suse_aarch64() {
 #  ##!! login user/passwd: liveuser/-
 #
 #  #. /etc/os-release ; export MIRRORHOST=mirror.centos.org/centos
+#  #nmcli device status ; nmcli connection up {ifdev}
 #  #[dnf | yum] -y check-update ; sestatus ; sleep 5
 #  #[dnf | yum] -y install nmap-ncat
 #
@@ -440,9 +447,12 @@ suse_aarch64() {
 #----------------------------------------
 
 ## mageia ##
+  ##append to boot parameters: 3 text textmode=1
+  
   ##!! login user/passwd: live/-
 
   #su - ; export MIRRORHOST=mirrors.kernel.org/mageia
+  #networkctl status ; networkctl up {ifdev}
   #dnf -y check-update ; sleep 5
 
 mageia_x86_64() {
@@ -454,16 +464,23 @@ mageia_x86_64() {
 #----------------------------------------
 
 ## pclinuxos ##
-  ##append to boot parameters: nokmsboot 3 text textmode=1 nomodeset keyb=us
-
+  # (PCLinuxOS distro) install using draklive-install, then post chroot cmds
   ##!! login user/passwd: guest/-
+  ## NOTE, transfer [dir(s) | file(s)]: init/common, init/pclinuxos
 
   #su - ; export MIRRORHOST=spout.ussg.indiana.edu/linux/pclinuxos
+  #nmcli device status ; nmcli connection up {ifdev}
   #sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list
   #sed -i "/${MIRRORHOST}/ s|^.*rpm|rpm|" /etc/apt/sources.list
   #apt-get -y update ; sleep 5
   #apt-get -y install netcat gdisk efibootmgr [lvm2]
   #apt-get -y --fix-broken install
+
+  #[[sgdisk -p | sfdisk -l] /dev/[sv]da | parted /dev/[sv]da -s unit GiB print]
+  #sh init/common/disk_setup_vmlinux.sh part_format_vmdisk [sgdisk | sfdisk | parted] [lvm] [ .. ]
+  
+  #draklive-install --expert --noauto
+  #sh init/pclinuxos/post_drakliveinstall.sh [hostname [$PLAIN_PASSWD]]
 
 pclinuxos_x86_64() {
   variant=${variant:-pclinuxos} ; GUEST=${1:-${variant}-x86_64-lvm}
