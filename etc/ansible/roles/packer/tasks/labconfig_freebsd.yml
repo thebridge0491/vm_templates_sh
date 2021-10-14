@@ -13,3 +13,15 @@
     regexp: '^fdesc'
     line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
   ignore_errors: true
+
+- block:
+  - name: "(variant: {{variant}}) Install xterm,Xauth pkgs for X11 forwarding over SSH"
+    #shell: echo xauth xterm
+    #ignore_errors: true
+    debug: var='xauth xterm'
+
+  - package:
+      use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
+      name: {{item}}
+      state: present
+    loop: ['xauth', 'xterm']

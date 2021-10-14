@@ -1,0 +1,26 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+UNAME_M=$(uname -m)
+sudo pacman --noconfirm --needed -S base-devel git
+
+mkdir -p aur-packages ; cd aur-packages
+git clone https://aur.archlinux.org/debootstrap-git.git
+cd debootstrap-git
+
+# if [__.sig | __.asc] signature file, acquire relevant public key
+#   (see validpgpkeys array in PKGBUILD file)
+#sudo pacman-key --recv-keys '______' ; sudo pacman-key --lsign-key ______
+
+# verify PKGBUILD, associated files
+less PKGBUILD
+
+makepkg -s -r -c
+
+sudo pacman -U debootstrap-git-<version>-${UNAME_M}.pkg.tar.zst
+pacman -Qi debootstrap-git ; sleep 5

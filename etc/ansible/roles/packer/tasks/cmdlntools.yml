@@ -169,6 +169,13 @@
         RevokedKeys /etc/ssh/krl.krl
         #HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
         #HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+
+        #Match User packer,user2
+        Match User packer
+            X11Forwarding yes
+            AllowTcpForwarding yes
+            X11UseLocalHost yes
+            X11DisplayOffset 10
     ignore_errors: true
 
 - blockinfile:
@@ -206,15 +213,15 @@
   - lineinfile:
       path: /etc/fstab
       state: present
-      regexp: '^.*/mnt/Data0.*'
-      line: '{{sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto  0  0'
+      regexp: '^.*:/mnt/Data0.*'
+      line: '#{{sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto  0  0'
     when: variant in ['freebsd', 'netbsd', 'openbsd']
 
   - lineinfile:
       path: /etc/fstab
       state: present
-      regexp: '^.*/mnt/Data0.*'
-      line: '{{sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0'
+      regexp: '^.*:/mnt/Data0.*'
+      line: '#{{sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0'
     when: not variant in ['freebsd', 'netbsd', 'openbsd']
 
   - file:

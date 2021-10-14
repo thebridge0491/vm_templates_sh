@@ -21,7 +21,12 @@ set +e
 . /root/init/debian/distro_pkgs.ini
 apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
   tee /etc/apt/apt.conf.d/999norecommends
-apt-get -y --no-install-recommends install $pkgs_cmdln_tools
+for pkgX in $pkgs_cmdln_tools ; do
+	apt-get -y --no-install-recommends install --download-only $pkgX ;
+done
+for pkgX in $pkgs_cmdln_tools ; do
+	apt-get -y --no-install-recommends install $pkgX ;
+done
 tasksel --list-tasks ; sleep 5
 
 if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then

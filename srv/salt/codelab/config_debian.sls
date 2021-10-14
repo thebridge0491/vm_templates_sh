@@ -14,3 +14,7 @@
     - pattern: '^JAVA_VERSION.*'
     - repl: 'JAVA_VERSION={{varsdict.distro_pkgs.default_java_version}}'
     - append_if_not_found: True
+
+'(variant: {{grains['os_family']|lower}}) Install xterm,Xauth pkgs for X11 forwarding over SSH':
+  pkg.installed:
+    - pkgs: ['xauth', 'xterm']

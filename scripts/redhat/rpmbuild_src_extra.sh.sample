@@ -1,0 +1,31 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+UNAME_M=$(uname -m)
+#yum --enablerepo=epel repoquery --source debootstrap ; sleep 3
+dnf --enablerepo=epel repoquery --source debootstrap ; sleep 3
+
+#sudo yum --enablerepo=epel install -y rpm-build fakeroot
+sudo dnf --enablerepo=epel install -y rpm-build fakeroot
+
+mkdir -p rpm-packages ; cd rpm-packages
+##yum --releasever=8 -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+#dnf --releasever=8 -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+#wget https://dl.fedoraproject.org/pub/epel/8/Everything/source/tree/Packages/d/debootstrap-<version>.el8.src.rpm
+#yumdownloader --enablerepo=epel --source -y debootstrap
+dnf --enablerepo=epel download --source -y debootstrap
+rpm -i debootstrap-<version>.el8.src.rpm      # install SRPM -> ~/rpmbuild/{SPECS,SOURCES}
+
+cd ~/rpmbuild/SPECS
+rpmbuild -ba debootstrap.spec
+
+cd ~/rpmbuild/RPMS
+#sudo yum --enablerepo=epel install -y ${UNAME_M}/debootstrap-<version>.el8.${UNAME_M}.rpm
+sudo dnf --enablerepo=epel install -y ${UNAME_M}/debootstrap-<version>.el8.${UNAME_M}.rpm
+#yum info debootstrap ; sleep 5
+dnf info debootstrap ; sleep 5

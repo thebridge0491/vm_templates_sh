@@ -10,6 +10,7 @@ LANGS=${@:-py c java} ; export LANGS
 set +e
 
 . /root/init/freebsd/distro_pkgs.ini
+pkg update
 for langX in ${LANGS} ; do
   case ${langX} in
     py) pkgs_var=${pkgs_lang_py} ;;
@@ -30,7 +31,9 @@ for langX in ${LANGS} ; do
     swift) pkgs_var=${pkgs_lang_swift} ;;
     *) pkgs_var=${pkgs_lang_py} ;;
   esac
-  pkg install -y ${pkgs_var} ;
+  for pkgX in ${pkgs_var} ; do
+	pkg install -Uy ${pkgX} ;
+  done ;
 done
 
 if [ -z "$(grep '^setenv JAVA_HOME' /etc/csh.cshrc)" ] ; then
@@ -39,6 +42,11 @@ fi
 if [ -z "$(grep '^fdesc' /etc/fstab)" ] ; then
   echo 'fdesc  /dev/fd  fdescfs  rw  0  0' >> /etc/fstab ;
 fi
+
+echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
+for pkgX in xauth xterm ; do
+  pkg install -Uy $pkgX ;
+done
 
 set +e
 ## scripts/cleanup.sh

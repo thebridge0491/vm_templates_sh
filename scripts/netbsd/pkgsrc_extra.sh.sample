@@ -1,0 +1,32 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+sudo pkgin update
+
+mkdir -p ~/Downloads ; cd ~/Downloads
+# if never installed distribution pkgsrc.tar.gz:
+#ftp https://ftp.netbsd.org/pub/pkgsrc/pkgsrc-2021Q3/pkgsrc.tar.gz
+#sudo tar -xzf pkgsrc.tar.gz -C /usr
+
+#update via CVS
+#(cd /usr ; sudo cvs -q -z2 -d anoncvs@anoncvs.NetBSD.org:/cvsroot checkout -P pkgsrc)
+
+(cd /usr/pkgsrc ; find . -type d -name rpm)
+
+# use pkgin to install dependencies binary pkgs, if available
+#(cd /usr/pkgsrc/misc/rpm ; make print-build-depends-list | sed -n 's|.*"\(.*\)".*|\1|p' | xargs pkgin -y install)
+pkgs_var=`cd /usr/pkgsrc/misc/rpm ; make print-build-depends-list | sed -n 's|.*"\(.*\)".*|\1|p'`
+for pkgX in $pkgs_var ; do
+	sudo pkgin -yd install $pkgX ;
+done
+for pkgX in $pkgs_var ; do
+	sudo pkgin -y install $pkgX ;
+done
+
+(cd /usr/pkgsrc/misc/rpm ; sudo make install clean)     # install manually
+pkgin info rpm ; pkg_info rpm ; sleep 5

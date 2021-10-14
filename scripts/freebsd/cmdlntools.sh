@@ -16,7 +16,14 @@ set +e
 
 
 . /root/init/freebsd/distro_pkgs.ini
-pkg fetch -dy $pkgs_cmdln_tools ; pkg install -y $pkgs_cmdln_tools
+pkg update
+for pkgX in $pkgs_cmdln_tools ; do
+	pkg fetch -Udy $pkgX ;
+done
+for pkgX in $pkgs_cmdln_tools ; do
+	pkg install -Uy $pkgX ;
+done
+
 
 if [ -z "$(grep '^setenv JAVA_HOME' /etc/csh.cshrc)" ] ; then
   echo "setenv JAVA_HOME ${default_java_home}" >> /etc/csh.cshrc ;

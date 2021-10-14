@@ -19,7 +19,9 @@ for langX in ${LANGS} ; do
     cs) pkgs_var=${pkgs_lang_cs} ;;
     *) pkgs_var=${pkgs_lang_py} ;;
   esac
-  apt-get -y --no-install-recommends install ${pkgs_var} ;
+  for pkgX in ${pkgs_var} ; do
+	apt-get -y --no-install-recommends install ${pkgX} ;
+  done ;
 done
 
 if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
@@ -29,6 +31,11 @@ mkdir -p ${default_java_home}
 if [ -z "$(grep '^JAVA_VERSION' ${default_java_home}/release)" ] ; then
   echo JAVA_VERSION="${default_java_version}" >> ${default_java_home}/release ;
 fi
+
+echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
+for pkgX in xauth xterm ; do
+  apt-get -y --no-install-recommends install $pkgX ;
+done
 
 set -e ; set -u
 

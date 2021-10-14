@@ -30,7 +30,12 @@ rm /var/lib/pacman/db.lck
 
 pacman --noconfirm -Syy ; pacman --noconfirm -Syu
 . /root/init/archlinux/distro_pkgs.ini
-pacman --noconfirm --needed -S $pkgs_cmdln_tools
+for pkgX in $pkgs_cmdln_tools ; do
+	pacman --noconfirm --needed -Sw $pkgX ;
+done
+for pkgX in $pkgs_cmdln_tools ; do
+	pacman --noconfirm --needed -S $pkgX ;
+done
 
 if [ -f /etc/os-release ] ; then
   . /etc/os-release ;

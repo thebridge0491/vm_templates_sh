@@ -1,0 +1,24 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+UNAME_M=$(uname -m)
+dnf repoquery --source debootstrap ; sleep 3
+
+sudo dnf install -y rpm-build fakeroot
+
+mkdir -p rpm-packages ; cd rpm-packages
+#wget https://mirrors.kernel.org/mageia/distrib/8/SRPMS/core/release/debootstrap-<version>.mga8.src.rpm
+dnf download --source -y debootstrap
+rpm -i debootstrap-<version>.mga8.src.rpm      # install SRPM -> ~/rpmbuild/{SPECS,SOURCES}
+
+cd ~/rpmbuild/SPECS
+rpmbuild -ba debootstrap.spec
+
+cd ~/rpmbuild/RPMS
+sudo dnf install -y ${UNAME_M}/debootstrap-<version>.mga8.${UNAME_M}.rpm
+dnf info debootstrap ; sleep 5

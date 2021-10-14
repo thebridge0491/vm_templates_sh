@@ -16,9 +16,11 @@ case $CHOICE_DESKTOP in
 	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
 esac
 
-pkg fetch -dy $pkgs_var
 for pkgX in $pkgs_var ; do
-	pkg install -y $pkgX ;
+	pkg fetch -Udy $pkgX ;
+done
+for pkgX in $pkgs_var ; do
+	pkg install -Uy $pkgX ;
 done
 sleep 3
 

@@ -27,7 +27,9 @@ case $CHOICE_DESKTOP in
 	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
 esac
 
-apt-get -y --no-install-recommends install --download-only $pkgs_var
+for pkgX in $pkgs_var ; do
+	apt-get -y --no-install-recommends install --download-only $pkgX ;
+done
 for pkgX in $pkgs_var ; do
 	apt-get -y --no-install-recommends install $pkgX ;
 done

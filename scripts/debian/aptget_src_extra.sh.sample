@@ -1,0 +1,31 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+#?? how to search for source pkgs
+
+
+# [deb.devuan.org/merged | deb.debian.org/debian]
+export MIRROR=${MIRROR:-deb.devuan.org/merged}
+
+sudo apt-get -y install build-essential fakeroot devscripts
+# if needed, edit entries in /etc/apt/sources.list
+#cat << EOF >> /etc/apt/sources.list
+#deb-src http://${MIRROR} stable main
+#
+#EOF
+sudo apt-get -y update
+
+mkdir -p debian-packages ; cd debian-packages
+apt-get source debootstrap
+sudo apt-get build-dep debootstrap
+
+cd debootstrap-<version>
+debuild -b -uc -us
+
+sudo dpkg -i ../debootstrap_<version>_all.deb
+dpkg -l debootstrap ; dpkg -s debootstrap ; sleep 5

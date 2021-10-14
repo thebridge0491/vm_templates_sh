@@ -12,7 +12,9 @@ case $CHOICE_DESKTOP in
 	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
 esac
 
-xbps-install -y -D $pkgs_var
+for pkgX in $pkgs_var ; do
+	xbps-install -y -D $pkgX ;
+done
 for pkgX in $pkgs_var ; do
 	xbps-install -y $pkgX ;
 done

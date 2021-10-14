@@ -1,0 +1,38 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+REL=${REL:-$(sysctl -n kern.osrelease)}
+MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/OpenBSD}
+
+sudo pkg_add -u
+
+mkdir -p ~/Downloads ; cd ~/Downloads
+# if never installed distribution ports.tar.gz:
+#ftp https://${MIRROR}/${REL}/{ports.tar.gz,SHA256.sig}
+#signify -Cp /etc/signify/openbsd-${REL/./}-base.pub -x SHA256.sig ports.tar.gz
+#sudo tar -xzf ports.tar.gz -C /usr
+
+#update via CVS
+#(cd /usr ; sudo cvs -qd anoncvs@anoncvs2.usa.openbsd.org:/cvs checkout -r OPENBSD_${REL/./_} -P ports)
+
+sudo pkg_add portslist
+
+(cd /usr/ports ; make search key=rpm)
+
+# use pkg_add to install dependencies binary pkgs, if available
+#(cd /usr/ports/misc/rpm ; make print-build-depends | sed -n 's|.*"\(.*\)".*|\1|p' | xargs pkg_add -ziU)
+pkgs_var=`cd /usr/ports/misc/rpm ; make print-build-depends | sed -n 's|.*"\(.*\)".*|\1|p'`
+for pkgX in $pkgs_var ; do
+	sudo pkg_add -ziU -n $pkgX ;
+done
+for pkgX in $pkgs_var ; do
+	sudo pkg_add -ziU $pkgX ;
+done
+
+(cd /usr/ports/misc/rpm ; sudo make install clean)     # install manually
+pkg_info rpm ; sleep 5

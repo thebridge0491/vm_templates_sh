@@ -36,7 +36,9 @@ case $CHOICE_DESKTOP in
 	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
 esac
 
-pacman --noconfirm --needed -Sw $pkgs_var
+for pkgX in $pkgs_var ; do
+	pacman --noconfirm --needed -Sw $pkgX ;
+done
 for pkgX in $pkgs_var ; do
 	pacman --noconfirm --needed -S $pkgX ;
 done

@@ -11,3 +11,7 @@
     - pattern: '^fdesc.*'
     - repl: 'fdesc  /dev/fd  fdescfs  rw  0  0'
     - append_if_not_found: True
+
+'(variant: {{grains['os_family']|lower}}) Install xterm,Xauth pkgs for X11 forwarding over SSH':
+  pkg.installed:
+    - pkgs: ['xauth', 'xterm']

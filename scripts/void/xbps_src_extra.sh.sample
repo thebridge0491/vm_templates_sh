@@ -1,0 +1,20 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+sudo xbps-install -Sy git
+
+## initial setup void-packages repo clone
+#git clone https://github.com/void-linux/void-packages.git
+#cd void-packages ; ./xbps-src binary-bootstrap
+#echo XBPS_ALLOW_RESTRICTED=yes >> etc/conf
+
+cd void-packages
+./xbps-src pkg debootstrap
+
+sudo xbps-install -R hostdir/binpkgs debootstrap
+xbps-query debootstrap ; sleep 5

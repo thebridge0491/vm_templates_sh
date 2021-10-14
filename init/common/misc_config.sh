@@ -79,6 +79,13 @@ RevokedKeys /etc/ssh/krl.krl
 #HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
 #HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
 
+#Match User packer,user2
+Match User packer
+    X11Forwarding yes
+    AllowTcpForwarding yes
+    X11UseLocalHost yes
+    X11DisplayOffset 10
+
 EOF
 }
 
@@ -119,12 +126,12 @@ share_nfs_data0() { # requires sudo/root access
 
     ${SED_INPLACE} "/^9p_Data0 / s|^9p_Data0|#9p_Data0|" /etc/fstab
     if [ "Linux" = "`uname -s`" ] ; then
-      nfsmount="${sharednode}:/mnt/Data0  /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0" ;
+      nfsmount="#${sharednode}:/mnt/Data0  /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0" ;
     else
-      nfsmount="${sharednode}:/mnt/Data0  /media/nfs_Data0  nfs  rw,noauto  0  0" ;
+      nfsmount="#${sharednode}:/mnt/Data0  /media/nfs_Data0  nfs  rw,noauto  0  0" ;
     fi ;
-    if grep -q -E "^.*/mnt/Data0.*" /etc/fstab ; then
-        ${SED_INPLACE} "s|^.*/mnt/Data0.*|${nfsmount}|" /etc/fstab ;
+    if grep -q -E "^.*:/mnt/Data0.*" /etc/fstab ; then
+        ${SED_INPLACE} "s|^.*:/mnt/Data0.*|${nfsmount}|" /etc/fstab ;
     else
         echo "$nfsmount" >> /etc/fstab ;
     fi

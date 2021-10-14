@@ -7,7 +7,12 @@ set +e
 #set -e
 
 . /root/init/void/distro_pkgs.ini
-xbps-install -y $pkgs_cmdln_tools
+for pkgX in $pkgs_cmdln_tools ; do
+	xbps-install -y -D $pkgX ;
+done
+for pkgX in $pkgs_cmdln_tools ; do
+	xbps-install -y $pkgX ;
+done
 
 if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
   echo "export JAVA_HOME=${default_java_home}" >> /etc/bash.bashrc ;

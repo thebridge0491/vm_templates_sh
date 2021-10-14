@@ -1,0 +1,24 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+UNAME_M=$(uname -m)
+zypper search -v debootstrap ; zypper search -v -t srcpackage debootstrap ; sleep 3
+
+sudo zypper --non-interactive install rpm-build
+
+mkdir -p rpm-packages ; cd rpm-packages
+#sudo zypper --non-interactive source-install -D debootstrap # install SRPM -> /usr/src/packages/{SPECS,SOURCES}
+curl -LO http://download.opensuse.org/pub/opensuse/source/distribution/leap/15.3/repo/oss/src/debootstrap-<version>.el8.src.rpm
+rpm -i debootstrap-<version>.el8.src.rpm      # install SRPM -> ~/rpmbuild/{SPECS,SOURCES}
+
+cd ~/rpmbuild/SPECS
+rpmbuild -ba debootstrap.spec
+
+cd ~/rpmbuild/RPMS
+sudo zypper --non-interactive install --allow-unsigned-rpm ${UNAME_M}/debootstrap-<version>.el8.${UNAME_M}.rpm
+zypper info debootstrap ; sleep 5

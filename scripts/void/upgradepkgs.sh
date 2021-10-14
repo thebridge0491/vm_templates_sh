@@ -4,7 +4,7 @@
 set +e
 
 xbps-install -S ; xbps-install -y -u
-xbps-install -y file sudo libressl
+xbps-install -y file sudo openssl
 xbps-query --list-hold-pkgs ; sleep 3
 
 xbps-remove -O

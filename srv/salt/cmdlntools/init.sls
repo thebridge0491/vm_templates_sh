@@ -160,6 +160,13 @@ Copy SSH CA pubkey & krl to /etc/ssh/:
         RevokedKeys /etc/ssh/krl.krl
         #HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
         #HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+
+        #Match User packer,user2
+        Match User packer
+            X11Forwarding yes
+            AllowTcpForwarding yes
+            X11UseLocalHost yes
+            X11DisplayOffset 10
     - append_if_not_found: True
 
 {{varsdict.skel_shellrc}}:
@@ -185,12 +192,12 @@ Add NFS share /etc/fstab:
   file.replace:
   {% if variant in ['freebsd'] %}
     - name: '/etc/fstab'
-    - pattern: '^.*/mnt/Data0.*'
-    - repl: '{{varsdict.sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto  0  0'
+    - pattern: '^.*:/mnt/Data0.*'
+    - repl: '#{{varsdict.sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto  0  0'
   {% else %}
     - name: '/etc/fstab'
-    - pattern: '^.*/mnt/Data0.*'
-    - repl: '{{varsdict.sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0'
+    - pattern: '^.*:/mnt/Data0.*'
+    - repl: '#{{varsdict.sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0'
   {% endif %}
     - append_if_not_found: True
 

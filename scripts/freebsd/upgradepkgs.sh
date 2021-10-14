@@ -40,7 +40,7 @@ if [ "$major_version" -lt 10 ] ; then
 fi
 pkg update ; pkg fetch -udy
 pkg upgrade -y
-pkg install -y sudo
+pkg install -Uy sudo
 
 pkg clean -y
 if command -v zpool > /dev/null ; then

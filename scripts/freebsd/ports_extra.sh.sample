@@ -1,0 +1,33 @@
+#!/bin/sh -eux
+
+if [ ! "root" = "${USER}" ] || [ -z "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Must run script as root or under sudo. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+if command -v aria2c > /dev/null ; then
+	FETCH_CMD=${FETCH_CMD:-aria2c} ;
+fi
+
+pkg update
+
+# if never installed distribution ports.txz:
+#portsnap cron ; portsnap extract        # 1st time only (interactive: fetch, else cron)
+portsnap cron update                    # (interactive: fetch, else cron)
+
+(cd /usr/ports ; make search name=debootstrap)
+
+# use pkg to install dependencies binary pkgs, if available
+#(cd /usr/ports/sysutils/debootstrap ; make all-depends-list | cut -c 12- | xargs pkg install -y)
+pkgs_var=`cd /usr/ports/sysutils/debootstrap ; make package-depends-list | cut -d' ' -f3`
+for pkgX in $pkgs_var ; do
+	pkg fetch -Udy $pkgX ;
+done
+for pkgX in $pkgs_var ; do
+	pkg install -Uy $pkgX ;
+done
+
+#portmaster sysutils/debootstrap                             # install using portmaster
+#portmaster -L ; sleep 5
+(cd /usr/ports/sysutils/debootstrap ; make install clean)     # install manually
+pkg info debootstrap ; sleep 5

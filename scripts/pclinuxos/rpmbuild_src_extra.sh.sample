@@ -1,0 +1,24 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos} ; UNAME_M=$(uname -m)
+
+sudo apt-get -y install rpm-build
+
+mkdir -p rpm-packages ; cd rpm-packages
+#apt-get source rpm
+#sudo apt-get build-dep rpm
+curl -LO http://${MIRROR}/pclinuxos/srpms/SRPMS.pclos/rpm-<version>.src.rpm
+rpm -i rpm-<version>.src.rpm      # install SRPM -> ~/rpmbuild/{SPECS,SOURCES}
+
+cd ~/rpmbuild/SPECS
+rpmbuild -ba rpm.spec
+
+cd ~/rpmbuild/RPMS
+sudo apt-get -y install ${UNAME_M}/rpm-<version>.${UNAME_M}.rpm
+apt-cache show rpm ; sleep 5

@@ -17,3 +17,15 @@
     regexp: '^JAVA_VERSION.*'
     line: 'JAVA_VERSION={{distro_pkgs.default_java_version}}'
   ignore_errors: true
+
+- block:
+  - name: "(variant: {{variant}}) Install xterm,Xauth pkgs for X11 forwarding over SSH"
+    #shell: echo xauth xterm
+    #ignore_errors: true
+    debug: var='xauth xterm'
+
+  - package:
+      use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
+      name: {{item}}
+      state: present
+    loop: ['xauth', 'xterm']
