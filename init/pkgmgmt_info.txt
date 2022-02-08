@@ -1,0 +1,116 @@
+                pkg (FreeBSD)            apt (Debian,PCLinuxOS)   xbps (Void)
+                grep pkg /var/log/msgs   /var/log/apt/history.log 
+                                         /var/log/dpkg.log
+                                           (PCLOS) grep apt \
+                                             /var/log/msgs
+                ----------------------   ----------------------   ----------------------
+install pkg     pkg install <pkg>        apt-get [--fix-broken] \ xbps-install <pkg>
+                                           install <pkg>
+install file                             dpkg -i <f>            
+upgrade pkg     pkg install <pkg>        apt-get install <pkg>    xbps-install -u <pkg>
+remove pkg      pkg remove <pkg>         apt-get remove <pkg>     xbps-remove <pkg>
+lock pkg        pkg lock <pkg>           apt-mark hold <pkg>      xbps-pkgdb -m hold <pkg>
+                                           (PCLOS) (edit \
+                                             /etc/apt/apt.conf \
+                                             Hold {"<pkg>"};)
+update pkg db   pkg update               apt-get update           xbps-install -S
+upgrade all     pkg upgrade              apt-get upgrade          xbps-install -u
+upgrade OS      freebsd-update fetch \   apt-get dist-upgrade     
+                  install
+                ----------------------   ----------------------   ----------------------
+search pkg      pkg search <pkg>         apt-cache search <pkg>   xbps-query -Rs <pkg>
+search rexp     pkg search --regex <pkg> apt-cache search <pkg>   xbps-query -Rs <pkg>
+search file                              apt-file search <f>      xbps-query -o <f>
+                                           (PCLOS) rpm -qf <f>
+list installed  pkg info                 dpkg -l | grep '^i'      xbps-query -i
+                pkg query %n               (PCLOS) rpm -qa
+list explicit   pkg query -e '%a=0' %o   apt-mark showmanual      xbps-query -m
+show pkg info   pkg info <pkg>           apt-cache show <pkg>     xbps-query -S <pkg>
+pkg depns                                dpkg-query --show <pkg>  xbps-query -Rx <pkg>
+pkg revdepns                             apt-cache rdepends <pkg> xbps-query -RX <pkg>
+                ----------------------   ----------------------   ----------------------
+list repos      pkg -vv | grep -A99 \    cat /etc/apt/ \          xbps-query -L
+                   -e "Repositories:"      sources.list           
+add repo                                 (edit /etc/apt/ \        (add repofile to
+                                           sources.list)            /etc/xbps.d/)
+remove repo                              (edit /etc/apt/ \        (del repofile fm
+                                           sources.list)            /etc/xbps.d/)
+########################################################################################
+########################################################################################
+                pacman (Arch)            zypper (SUSE)            apk (Alpine)
+                /var/log/pacman.log      /var/log/zypp/history    
+                ----------------------   ----------------------   ----------------------
+install pkg     pacman -S <pkg>          zypper install <pkg>     apk add <pkg>
+install file    pacman -U <f>            zypper install <f>     
+upgrade pkg     pacman -S <pkg>          zypper update <pkg>      apk upgrade -U <pkg>
+remove pkg      pacman -R <pkg>          zypper remove <pkg>      
+lock pkg        (edit /etc/pacman.conf \ zypper addlock <pkg>     apk add <pkg>=<ver>
+                  IgnorePkg=<pkg>                                 
+update pkg db   pacman -Sy               zypper refresh           apk update ; apk fix
+upgrade all     pacman -Su               zypper update            apk upgrade -U -a
+upgrade OS                               zypper dist-upgrade      (edit /etc/apk/ \
+                                                                    repositories)
+                                                                  apk update ; apk fix \
+                                                                  apk upgrade --available
+                ----------------------   ----------------------   ----------------------
+search pkg      pacman -Ss <pkg>         zypper search <pkg>      apk search <pkg>
+search rexp     pacman -Ss <pkg>         zypper search \          
+                                           -t pattern <pkg>
+search file     pacman -Qo <f>           zypper wp <f>            apk info --who-owns <f>
+list installed  pacman -Q                zypper search -is        
+list explicit   pacman -Qqe              awk -F\| '$6 && $2 == \
+                                           "install" {print $3}' \
+                                           /var/log/zypp/history \
+                                           | sort | uniq
+show pkg info   pacman -Qi <pkg>         zypper info <pkg>        apk info <pkg>
+pkg depns                                                         apk info -R <pkg>
+pkg revdepns                                                      apk info -r <pkg>
+                ----------------------   ----------------------   ----------------------
+list repos      cat \                    zypper repos             cat /etc/apk/ \
+                  /etc/pacman.conf                                  repositories
+add repo        (edit \                  zypper addrepo \
+                  /etc/pacman.conf)        <url> <alias>
+remove repo     (edit \                  zypper removerepo \
+                  /etc/pacman.conf)        <alias>
+########################################################################################
+########################################################################################
+                pkgin (NetBSD)           dnf (RedHat, Mageia)     
+                                         /var/log/dnf*.log        
+                ----------------------   ----------------------   ----------------------
+install pkg     pkgin install <pkg>      dnf install <pkg>        
+                                                                  
+install file                             dnf localinstall <f>   
+upgrade pkg     pkgin install <pkg>      dnf update <pkg>         
+remove pkg                               dnf remove <pkg>         
+lock pkg                                 dnf versionlock add <pkg> 
+                                                                  
+update pkg db   pkgin update             dnf check-update         
+upgrade all     pkgin upgrade            dnf distro-sync          
+upgrade OS      pkgin full-upgrade       dnf install \            
+                                           'dnf-command ( \
+                                           system-upgrade)' \
+                                         dnf system-upgrade \
+                                           --releasever <X> \
+                                           download --allowerasing \
+                                         dnf system-upgrade reboot
+                ----------------------   ----------------------   ----------------------
+search pkg      pkgin search <pkg>       dnf search <pkg>         
+search rexp     pkgin search <pkg>       dnf search <pkg>         
+search file                              dnf provides <f>         
+list installed  pkg_info                 dnf list installed       
+                                         dnf group list -v \
+                                           --installed --hidden
+                                         dnf repoquery --installed
+list explicit   pkg_info -u              dnf -C history \         
+                                           userinstalled          
+show pkg info   pkg_info <pkg>           dnf info <pkg>
+pkg depns       pkg_info -n <pkg>                                 
+pkg revdepns    pkg_info -R <pkg>                                 
+                ----------------------   ----------------------   ----------------------
+list repos      cat /usr/pkg/ \          dnf repolist             
+                  etc/pkgin/ \                                    
+                  repositories.conf
+add repo                                 (add repofile to \       
+                                           /etc/yum.repos.d/)     
+remove repo                              (del repofile fm \       
+                                           /etc/yum.repos.d/)     

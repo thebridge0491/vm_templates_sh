@@ -38,7 +38,7 @@ if [ "$major_version" -lt 10 ] ; then
     #echo "WITH_PKGNG=yes" >> /etc/make.conf ;
     sed -i'' '/^WITH_PKGNG/ s|WITH_PKGNG=.*|WITH_PKGNG=yes|' /etc/make.conf ;
 fi
-pkg update ; pkg fetch -udy
+pkg update ; pkg upgrade -Fy
 pkg upgrade -y
 pkg install -Uy sudo
 

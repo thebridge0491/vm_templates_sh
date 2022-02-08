@@ -48,6 +48,10 @@ for pkgX in xauth xterm ; do
   pkg install -Uy $pkgX ;
 done
 
+echo "Fix .NET access problem SSL CA cert path" >> /dev/stderr ; sleep 3
+ln -s /usr/local/share/certs/ca-root-nss.crt
+  /compat/linux/etc/pki/tls/certs/ca-bundle.crt
+
 set +e
 ## scripts/cleanup.sh
 pkg clean -y

@@ -9,6 +9,16 @@ editor = nano
 pager = LESS='FRX' less
 
 [extensions]
-pager = 
-hgext.convert = 
-#hggit = 
+pager =
+hgext.convert =
+#hggit =
+
+
+# hg config usage example:
+# hg config ui ; hg config [--global] -e
+
+# #Note: 1st time per repository init [& test SSH key access]
+# hg init [; ssh -T hg@bitbucket.org ; ssh -T -p 443 hg@altssh.bitbucket.org]
+# $EDITOR .hg/hgrc  # create/edit file
+# [paths]
+# default = ssh://hg@bitbucket.org/<user>/<app>

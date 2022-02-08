@@ -2,5 +2,25 @@
 	name = imcomputer
 	email = imcomputer-codelab@yahoo.com
 [core]
-    ; comments - Linux|Freebsd|Mac(nano), Windows(notepad)
+  ; comments - Linux|Freebsd|Mac(nano), Windows(notepad)
 	editor = nano
+[cola]
+  spellcheck = false
+  textwidth = 78
+  tabwidth = 4
+[gui]
+  editor = nano
+[log]
+	date = iso
+[pretty]
+	compact = "%C(yellow)commit %h%Creset %ci %ce %C(auto)%d%Creset %n%B"
+[format]
+	pretty = compact
+
+
+# git config usage example:
+# git config --list ; git config [--global] <key> <value>
+
+# #Note: 1st time per repository init [& test SSH key access]
+# git init [; ssh -T git@github.com ; ssh -T -p 443 git@ssh.github.com]
+# git remote add <origin> ssh://git@github.com/<user>/<app>.git

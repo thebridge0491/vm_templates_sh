@@ -404,7 +404,7 @@ collect_all() {
       echo '...exiting...' ; exit ;;
   esac
 
-  for archive_cmd in "tar" "zip" "7za" ; do
+  for archive_cmd in ${tarcmd} "zip" "7za" ; do
     if command -v $archive_cmd > /dev/null ; then
       case $archive_cmd in
         'tar'|'gtar') ${tarcmd} -caf info.tar${tarext} msg*.txt ;;

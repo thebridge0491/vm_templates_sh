@@ -1,0 +1,57 @@
+                BSD rc.d (FreeBSD,NetBSD)         sysvinit (Devuan,PCLinuxOS)
+                ------------------------------    ------------------------------
+list services   service -l                        service --status-all
+                                                    (PCLOS) chkconfig --list
+enable svc      sysrc sshd_enable="YES"           update-rc.d ssh defaults
+  (NetBSD /etc/rc.conf) sshd=YES                    (PCLOS) chkconfig --add sshd
+disable svc     sysrc sshd_enable="NO"            update-rc.d ssh remove
+  (NetBSD /etc/rc.conf) sshd=NO                     (PCLOS) chkconfig --del sshd
+svc status      service netif status              invoke-rc.d networking status
+  (NetBSD)        service dhcpcd status             (PCLOS) service network status
+start svc       service netif start               invoke-rc.d networking start
+  (NetBSD)        service dhcpcd start              (PCLOS) service network start
+########################################################################################
+########################################################################################
+                openrc (Artix,Alpine,Devuan)      runit (Void,Artix,Devuan)
+                ------------------------------    ------------------------------
+list services   rc-status --all                   sv status /var/service/*
+                                                    (Artix) sv status /run/runit/service/*
+                                                    (Devuan) sv status /etc/service/*
+enable svc      rc-update add sshd default        ln -s /etc/sv/sshd /var/service/
+                                                    (Artix) ln -s /etc/runit/sv/sshd \
+                                                      /run/runit/service/
+                                                    (Devuan) ln -s /etc/sv/ssh \
+                                                      /etc/service/
+disable svc     rc-update del sshd default        rm /var/service/sshd
+                                                    (Artix) rm /run/runit/service/sshd
+                                                    (Devuan) rm /etc/service/ssh
+svc status      rc-service networking status      sv status dhcpcd
+start svc       rc-service networking start       sv up dhcpcd
+########################################################################################
+########################################################################################
+                s6 (Artix)                        suite66 tools f/ s6 (Artix)
+                ------------------------------    ------------------------------
+list services   s6-rc -a list                     66-intree -go contents default
+            or  for i in /var/run/service/* ; do \
+                  echo -n "$i: " ; s6-svstat $i ; \
+                done
+enable svc      s6-rc-bundle-update add \         66-enable -t default sshd
+                  default sshd
+disable svc     s6-rc-bundle-update delete \      66-disable -t default sshd
+                  default sshd
+svc status      s6-rc -a list dhcpcd              66-inservice -t default dhcpcd
+start svc       s6-rc -u change dhcpcd            66-start -t default dhcpcd
+########################################################################################
+########################################################################################
+                systemctl (Debian,Arch)           OpenBSD rc.d (OpenBSD)
+                ------------------------------    ------------------------------
+list services   systemctl list-units \            rcctl ls all
+                  --type=service [--state=active] 
+enable svc      systemctl enable ssh              rcctl enable sshd
+  (Arch)          systemctl enable sshd
+disable svc     systemctl disable ssh             rcctl disable sshd
+  (Arch)          systemctl disable sshd
+svc status      systemctl status networking       rcctl get sshd
+  (Arch)          systemctl status dhcpcd[@eth0]
+start svc       systemctl start networking        rcctl start sshd
+  (Arch)          systemctl start dhcpcd[@eth0]
