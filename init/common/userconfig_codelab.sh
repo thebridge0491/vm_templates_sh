@@ -54,7 +54,7 @@ _alias_lang_jvm() {
   else
   	shell_rc=${shell_rc:-$HOME/.bashrc} ;
   fi
-  
+
   for cmd_mainclass in checkstyle:com.puppycrawl.tools.checkstyle.Main \
       scalastyle:org.scalastyle.Main CodeNarc:org.codenarc.CodeNarc \
       scalac:scala.tools.nsc.Main scala:scala.tools.nsc.MainGenericRunner \
@@ -69,7 +69,7 @@ _alias_lang_jvm() {
 
     # skip creating alias, if cmd exists
     if command -v $cmd > /dev/null ; then continue ; fi ;
-    
+
     if ! grep -q -E "alias $cmd" ${shell_rc} ; then
 		  if grep -q -E "csh" "$SHELL" ; then
 				case $cmd in
@@ -259,7 +259,7 @@ _prep_lang_hs() {
   	shell_rc=${shell_rc:-$HOME/.bashrc} ;
   fi
   RESOLVER=${RESOLVER:-lts-13.30}
-  
+
   mkdir -p $HOME/.stack/global-project
   if ! grep -q -E "system-ghc" $HOME/.stack/config.yaml ; then
   	cat << EOF >> $HOME/.stack/config.yaml ;
@@ -273,7 +273,7 @@ EOF
 	fi
   echo "NOTE: Update/fix (as needed) $HOME/.stack/config.yaml" >> /dev/stderr ;
   sleep 2 ; $EDITOR $HOME/.stack/config.yaml
-  if ! grep -q -E "system-ghc" $HOME/.stack/global-project/stack.yaml ; then
+  if ! grep -q -E "resolver:" $HOME/.stack/global-project/stack.yaml ; then
   	cat << EOF >> $HOME/.stack/global-project/stack.yaml ;
 packages: []
 resolver: ${RESOLVER}
@@ -281,7 +281,7 @@ EOF
 	fi
   echo "NOTE: Update/fix (as needed) $HOME/.stack/global-project/stack.yaml" >> /dev/stderr ;
   sleep 2 ; $EDITOR $HOME/.stack/global-project/stack.yaml
-  
+
   if ! grep -q -E "alias stack" ${shell_rc} ; then
     if grep -q -E "csh" "$SHELL" ; then
       echo alias stack stack --resolver ${RESOLVER} >> ${shell_rc} ;
