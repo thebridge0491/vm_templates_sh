@@ -102,18 +102,18 @@ $o = {
         },
         {
             'hd' => undef,
-            'pt_type' => 0x8e,
-            'mntpoint' => 'pvol0',
-            'size' => 2 << 20, # ~29GB
-            'ratio' => 100 # remaining
-        },
-        {
-			'VG_name' => 'vg0',
-            'hd' => 'vg0',
+            'type' => 0x82,
             'fs_type' => 'swap',
             'mntpoint' => 'swap',
             'options' => 'defaults',
             'size' => 4 * 2 << 20 # 4GB
+        },
+        {
+            'hd' => undef,
+            'pt_type' => 0x8e,
+            'mntpoint' => 'pvol0',
+            'size' => 2 << 20, # ~24GB
+            'ratio' => 100 # remaining
         },
         {
 			'VG_name' => 'vg0',
@@ -129,7 +129,7 @@ $o = {
             'fs_type' => 'ext4',
             'mntpoint' => '/var',
             'options' => 'noatime,acl',
-            'size' => 6 * 2 << 20 # 6GB
+            'size' => 5 * 2 << 20 # 5GB
         },
         {
 			'VG_name' => 'vg0',
@@ -176,6 +176,8 @@ $o = {
         }
     ],
     'postInstall' => '
+		#depmod -a ; modprobe dm-mod ; modprobe dm-crypt
+
 		init_hostname=$(cat /etc/hostname)
 		sed -i "/127.0.1.1/d" /etc/hosts
         echo "127.0.1.1    ${init_hostname}.localdomain    ${init_hostname}" >> /etc/hosts
@@ -195,6 +197,9 @@ $o = {
         sed -i "/GRUB_CMDLINE_LINUX_DEFAULT/ s|=\"\(.*\)\"|=\"\1 rootdelay=5\"|"  \
 			/etc/default/grub
         #grub2-install --target=i386-pc --recheck /dev/[sv]da
+        if [ "`dmesg | grep -ie \'Hypervisor detected\'`" ] ; then
+          sed -i -e \'/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|\' /etc/default/grub ;
+        fi
         grub2-mkconfig -o /boot/grub2/grub.cfg
 
         service shorewall stop ; service shorewall6 stop

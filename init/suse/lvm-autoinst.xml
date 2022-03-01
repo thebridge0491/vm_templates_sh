@@ -84,20 +84,20 @@
           <format t="boolean">false</format>
           <label>bios_boot</label>
           <!--<mount></mount>-->
-          <!--<mountby t="symbol">uuid</mountby>-->
+          <!--<mountby t="symbol">label</mountby>-->
           <size>1M</size>
         </partition>
         <partition t="map">
           <partition_type>primary</partition_type>
           <!--<create t="boolean">true</create>-->
-          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_id t="integer">259</partition_id>-->
           <!--<partition_nr t="integer">2</partition_nr>-->
           <!--<resize t="boolean">false</resize>-->
           <filesystem t="symbol">vfat</filesystem>
           <fstopt>utf8</fstopt>
           <label>ESP</label>
           <mount>/boot/efi</mount>
-          <mountby t="symbol">uuid</mountby>
+          <mountby t="symbol">label</mountby>
           <size>200M</size>
         </partition>
         <partition t="map">
@@ -110,19 +110,32 @@
           <format t="boolean">false</format>
           <label>vg0-osBoot</label>
           <mount>/boot</mount>
-          <mountby t="symbol">uuid</mountby>
+          <mountby t="symbol">label</mountby>
           <size>1G</size>
         </partition>
         <partition t="map">
           <partition_type>primary</partition_type>
           <!--<create t="boolean">true</create>-->
-          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_id t="integer">130</partition_id>-->
           <!--<partition_nr t="integer">4</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">swap</filesystem>
+          <format t="boolean">false</format>
+          <label>vg0-osSwap</label>
+          <mount>swap</mount>
+          <mountby t="symbol">label</mountby>
+          <size>4G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">142</partition_id>-->
+          <!--<partition_nr t="integer">5</partition_nr>-->
           <!--<resize t="boolean">false</resize>-->
           <format t="boolean">false</format>
           <label>pvol0</label>
           <lvm_group>vg0</lvm_group>
-          <size>28G</size>
+          <size>24G</size>
         </partition>
       </partitions>
       <!--<type t="symbol">CT_DISK</type>-->
@@ -140,26 +153,12 @@
           <!--<pool t="boolean">false</pool>-->
           <!--<stripes t="integer">1</stripes>-->
           <!--<stripesize t="integer">0</stripesize>-->
-          <filesystem t="symbol">swap</filesystem>
-          <format t="boolean">false</format>
-          <lv_name>osSwap</lv_name>
-          <label>vg0-osSwap</label>
-          <mount>swap</mount>
-          <!--<mountby t="symbol">uuid</mountby>-->
-          <size>4G</size>
-        </partition>
-        <partition t="map">
-          <!--<create t="boolean">true</create>-->
-          <!--<resize t="boolean">false</resize>-->
-          <!--<pool t="boolean">false</pool>-->
-          <!--<stripes t="integer">1</stripes>-->
-          <!--<stripesize t="integer">0</stripesize>-->
           <filesystem t="symbol">ext4</filesystem>
           <format t="boolean">false</format>
           <lv_name>osRoot</lv_name>
           <label>vg0-osRoot</label>
           <mount>/</mount>
-          <!--<mountby t="symbol">uuid</mountby>-->
+          <mountby t="symbol">label</mountby>
           <size>11776M</size>
         </partition>
         <partition t="map">
@@ -173,7 +172,7 @@
           <lv_name>osVar</lv_name>
           <label>vg0-osVar</label>
           <mount>/var</mount>
-          <!--<mountby t="symbol">uuid</mountby>-->
+          <mountby t="symbol">label</mountby>
           <size>5G</size>
         </partition>
         <partition t="map">
@@ -187,7 +186,7 @@
           <lv_name>vg0-osHome</lv_name>
           <label>osHome</label>
           <mount>/home</mount>
-          <!--<mountby t="symbol">uuid</mountby>-->
+          <mountby t="symbol">label</mountby>
           <size>max</size>
           <!--<crypt>twofish256</crypt>
           <crypt_fs t="boolean">true</crypt_fs>
@@ -214,8 +213,8 @@
   </services-manager>
   <software t="map">
     <install_recommended t="boolean">false</install_recommended>
-    <!--<instsource>http://download.opensuse.org/distribution/openSUSE-current/repo/oss/</instsource>-->
-    <instsource/>
+    <instsource>http://download.opensuse.org/distribution/openSUSE-current/repo/oss/</instsource>
+    <!--<instsource/>-->
     <do_online_update t="boolean">false</do_online_update>
     <kernel>kernel-default</kernel>
     <patterns t="list">
@@ -232,6 +231,7 @@
       <package>zypper</package>
       <package>openSUSE-release</package>
       <package>makedev</package>
+      <package>system-group-wheel</package>
       <package>sudo</package>
       <package>nano</package>
       <package>less</package>
@@ -346,13 +346,17 @@ echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rootdelay=5"|'  \
   /etc/default/grub
 #grub2-install --target=i386-pc --recheck /dev/[sv]da
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
 
-#sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
-#Defaults:packer !requiretty
-#$(id -un packer) ALL=(ALL) NOPASSWD: ALL
-#EOF
-#chmod 0440 /etc/sudoers.d/99_packer
+sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
+Defaults:packer !requiretty
+#\$(id -un packer) ALL=(ALL) NOPASSWD: ALL
+packer ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/99_packer
 
 
 zypper --non-interactive clean

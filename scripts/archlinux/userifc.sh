@@ -12,7 +12,7 @@ svc_enable() {
   elif command -v s6-rc > /dev/null ; then
     s6-rc-bundle-update add default $svc ;
   elif command -v sv > /dev/null ; then
-    ln -s /etc/runit/sv/$svc /run/runit/service ;
+    ln -s /etc/runit/sv/$svc /run/runit/service/ ;
   elif command -v rc-update > /dev/null ; then
   	rc-update add $svc default ;
   fi

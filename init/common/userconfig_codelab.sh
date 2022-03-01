@@ -236,13 +236,20 @@ EOF
 
 _prep_lang_dotnet() {
   nuget_ver=${nuget_ver:-latest} ; framework=${framework:-net471}
+  echo "Synchronize certificate store for Mono ..." >> /dev/stderr ; sleep 3
+  if [ "Linux" = "`uname -s`" ] ; then
+    #cert-sync --user /etc/pki/tls/certs/ca-bundle.crt ; # RedHat
+    cert-sync --user /etc/ssl/certs/ca-certificates.crt ; # Debian,Void
+  elif [ "FreeBSD" = "`uname -s`" ] ; then
+    cert-sync --user /usr/local/share/certs/ca-root-nss.crt ;
+  fi
   echo "Configuring for .NET language(s) ..." >> /dev/stderr ; sleep 3
   mkdir -p $HOME/bin $HOME/.nuget/packages $HOME/nuget/packages ; cd $HOME/bin
   curl -LO https://dist.nuget.org/win-x86-commandline/${nuget_ver}/nuget.exe
   for pkg_ver in netstandard.library:2.0.3 fsharp.core:4.7.2 mono.gendarme:2.11.0.20121120 ilrepack:2.0.18 ; do
   	pkgX=$(echo $pkg_ver | cut -d: -f1) ;
   	verX=$(echo $pkg_ver | cut -d: -f2) ;
-  	mono $HOME/bin/nuget.exe install -framework ${framework} -excludeversion $pkgX -version $verX ;
+  	mono $HOME/bin/nuget.exe install -framework ${framework} -excludeversion -o $HOME/nuget/packages $pkgX -version $verX ;
   done
 }
 

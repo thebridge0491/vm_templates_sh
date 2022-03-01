@@ -4,6 +4,7 @@ Architecture = auto
 
 CheckSpace
 SigLevel = Required DatabaseOptional
+#SigLevel = Never
 LocalFileSigLevel = Optional
 
 [core]

@@ -1,5 +1,5 @@
 <domain type='kvm'>
-  <name>freebsd-Release-zfs</name>
+  <name>freebsd-x86_64-zfs</name>
   <!--<uuid>f5d1c004-eab5-46d7-a693-604221aa56b5</uuid>-->
   <memory unit='KiB'>2097152</memory>
   <currentMemory unit='KiB'>2097152</currentMemory>
@@ -7,7 +7,7 @@
   <os>
     <type arch='x86_64' machine='pc-i440fx-2.8'>hvm</type>
     <loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.fd</loader>
-    <nvram>/var/lib/libvirt/qemu/nvram/freebsd-Release-zfs_VARS.fd</nvram>
+    <nvram>/var/lib/libvirt/qemu/nvram/freebsd-x86_64-zfs_VARS.fd</nvram>
     <boot dev='hd'/>
   </os>
   <features>
@@ -31,7 +31,7 @@
     <emulator>/usr/bin/qemu-system-x86_64</emulator>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' cache='writeback' discard='unmap'/>
-      <source file='/mnt/Data0/vm_samples/freebsd-Release-zfs.qcow2'/>
+      <source file='/mnt/Data0/vm_samples/freebsd-x86_64-zfs.qcow2'/>
       <target dev='sda' bus='scsi'/>
       <address type='drive' controller='0' bus='0' target='0' unit='0'/>
     </disk>

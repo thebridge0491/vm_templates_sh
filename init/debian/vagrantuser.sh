@@ -14,10 +14,10 @@ chown -R vagrant:$(id -gn vagrant) /home/vagrant
 
 pubkey_url="https://raw.githubusercontent.com/mitchellh/vagrant/master/keys/vagrant.pub"
 mkdir -p /home/vagrant/.ssh
-if command -v wget > /dev/null ; then
-    wget --no-check-certificate -O /home/vagrant/.ssh/authorized_keys "$pubkey_url" ;
-elif command -v curl > /dev/null ; then
+if command -v curl > /dev/null ; then
     curl --insecure --location -o /home/vagrant/.ssh/authorized_keys "$pubkey_url" ;
+elif command -v wget > /dev/null ; then
+    wget --no-check-certificate -O /home/vagrant/.ssh/authorized_keys "$pubkey_url" ;
 elif command -v aria2c > /dev/null ; then
     aria2c --check-certificate=false -d / -o /home/vagrant/.ssh/authorized_keys "$pubkey_url" ;
 elif command -v fetch > /dev/null ; then

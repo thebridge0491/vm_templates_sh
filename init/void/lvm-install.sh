@@ -4,9 +4,8 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sgdisk lvm vg0 pvol0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0 pvol0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
+#sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
+#sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -33,12 +32,12 @@ export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlA
 echo "Create /etc/fstab" ; sleep 3
 mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
 sh -c 'cat > /mnt/etc/fstab' << EOF
-LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
-LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
-LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+LABEL=${GRP_NM}-osRoot   /           auto    errors=remount-ro   0   1
+LABEL=${GRP_NM}-osVar    /var        auto    defaults    0   2
+LABEL=${GRP_NM}-osHome   /home       auto    defaults    0   2
 PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
-LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
+PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
@@ -51,19 +50,26 @@ sysfs                           /sys        sysfs   defaults    0   0
 EOF
 
 
+# ip link ; dhcpcd {ifdev}
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
+
+
 echo "Bootstrap base pkgs" ; sleep 3
 pkg_list="linux-lts linux-lts-headers libgcc ethtool base-voidstrap bash  cryptsetup lvm2 openssh sudo efibootmgr"
-if command -v xbps-install.static > /dev/null ; then
-  if [ "aarch64" = "${UNAME_M}" ] ; then
-    yes | XBPS_ARCH=${UNAME_M} xbps-install.static -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list grub-arm64-efi ;
-  else
-    yes | XBPS_ARCH=${UNAME_M} xbps-install.static -Sy -R http://${MIRROR}/current -r /mnt $pkg_list grub-x86_64-efi ;
-  fi ;
-else
+if command -v xbps-install > /dev/null ; then
   if [ "aarch64" = "${UNAME_M}" ] ; then
     yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list grub-arm64-efi ;
   else
     yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current -r /mnt $pkg_list grub-x86_64-efi ;
+  fi ;
+else
+  curl -LO http://${MIRROR}/static/xbps-static-latest.${UNAME_M}-musl.tar.xz ;
+  tar -xf xbps-static-latest.${UNAME_M}-musl.tar.xz ;
+  if [ "aarch64" = "${UNAME_M}" ] ; then
+    yes | XBPS_ARCH=${UNAME_M} ./usr/bin/xbps-install.static -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list grub-arm64-efi ;
+  else
+    yes | XBPS_ARCH=${UNAME_M} ./usr/bin/xbps-install.static -Sy -R http://${MIRROR}/current -r /mnt $pkg_list grub-x86_64-efi ;
   fi ;
 fi
 
@@ -110,6 +116,8 @@ done
 #yes | xbps-install -Sy xfce4
 xbps-query -Rs void-repo-nonfree ; sleep 10
 
+modprobe dm-mod ; vgscan ; vgchange -ay ; lvs
+
 echo "Config keyboard ; localization" ; sleep 3
 kbd_mode -u ; loadkeys us
 sed -i -e '/en_US.UTF-8 UTF-8/ s|^# ||' /etc/locale.gen
@@ -135,8 +143,8 @@ ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*
 
 
 echo "Update services" ; sleep 3
-ln -s /etc/sv/dhcpcd /etc/runit/runsvdir/default/dhcpcd
-ln -s /etc/sv/sshd /etc/runit/runsvdir/default/sshd
+ln -s /etc/sv/dhcpcd /etc/runit/runsvdir/default/
+ln -s /etc/sv/sshd /etc/runit/runsvdir/default/
 sh -c 'cat >> /etc/rc.conf' << EOF
 HOSTNAME="${INIT_HOSTNAME}"
 HARDWARECLOCK="UTC"
@@ -195,6 +203,9 @@ fi
 sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rd.auto=1 text xdriver=vesa nomodeset rootdelay=5"|' /etc/default/grub
 #sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
 echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "aarch64" = "${UNAME_M}" ] ; then

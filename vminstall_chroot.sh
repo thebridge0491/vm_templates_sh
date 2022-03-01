@@ -19,7 +19,7 @@
 ##    [curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file
 
 # usage: [env variant=oshost] sh vminstall_chroot.sh [oshost_machine [GUEST]]
-#   (default) [variant=freebsd] sh vminstall_chroot.sh [freebsd_x86_64 [freebsd-x86_64-zfs]]
+#   (default) [variant=freebsd] sh vminstall_chroot.sh [freebsd_x86_64 [freebsd-x86_64-std]]
 
 STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)} ; PROVIDER=${PROVIDER:-libvirt}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros}
@@ -41,23 +41,27 @@ _prep() {
     qemu-img create -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M ;
   fi
 
-  #if [ "${EXTRA_ARGS}" ] ; then
-  #  python3 -m http.server 8080 -d /tmp  &
+  #if [ ! "${EXTRA_ARGS}" ] || [ ! "${EXTRA_ARGS}" = " " ] ; then
+  #  ${PYTHON:-python3} -m http.server 8080 -d /tmp  &
   #  echo "[curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file" ;
   #  sleep 5 ;
   #fi
 }
 
 _finish() {
-  #if [ "${EXTRA_ARGS}" ] ; then
+  #if [ ! "${EXTRA_ARGS}" ] || [ ! "${EXTRA_ARGS}" = " " ] ; then
   #  echo "to kill HTTP server process: kill -9 \$(pgrep -f 'python -m http\.server')" ;
   #fi
 
   if command -v erb > /dev/null ; then
-    erb variant=${variant} init/common/Vagrantfile_${PROVIDER}.erb > ${OUT_DIR}/Vagrantfile ;
-  elif command -v pystache > /dev/null ; then
-    pystache init/common/Vagrantfile_${PROVIDER}.mustache "{\"variant\":\"${variant}\"}" \
+    erb variant=${variant} init/common/Vagrantfile_${PROVIDER}.erb \
       > ${OUT_DIR}/Vagrantfile ;
+  elif command -v chevron > /dev/null ; then
+    echo "{\"variant\":\"${variant}\"}" | chevron -d /dev/stdin \
+      init/common/Vagrantfile_${PROVIDER}.mustache > ${OUT_DIR}/Vagrantfile ;
+  elif command -v pystache > /dev/null ; then
+    pystache init/common/Vagrantfile_${PROVIDER}.mustache \
+      "{\"variant\":\"${variant}\"}" > ${OUT_DIR}/Vagrantfile ;
   elif command -v mustache > /dev/null ; then
     cat << EOF >> mustache - init/common/Vagrantfile_${PROVIDER}.mustache > ${OUT_DIR}/Vagrantfile
 ---
@@ -138,7 +142,7 @@ EOF
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
       -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
       -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-      -display default,show-cursor=on \
+      -display default,show-cursor=on -vga none -device qxl-vga,vgamem_mb=64 \
       ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot &
     echo "### Once network connected, transfer needed file(s) ###" ;
   fi
@@ -196,67 +200,70 @@ _install_aarch64() {
   ##!! (chrootsh) navigate to single user: 2
   ##!! if late, Live CD -> root/-
 
-  #mdmfs -s 100m md1 /mnt ; cd /tmp
+  #mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; cd /tmp
   #ifconfig ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev} {ifdev}
 
   ## (FreeBSD) install via chroot
-  ## NOTE, transfer [dir(s) | file(s)]: init/common, init/freebsd
+  ## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/freebsd)
 
   #geom -t
-  #sh init/common/gpart_setup_vmfreebsd.sh part_format_vmdisk [std | zfs]
-  #sh init/common/gpart_setup_vmfreebsd.sh mount_filesystems
+  #sh init/common/gpart_setup_vmfreebsd.sh part_format [std | zfs]
+  #sh init/common/gpart_setup_vmfreebsd.sh mount_filesystems [std | zfs]
 
-  #sh init/freebsd/zfs-install.sh [hostname [$CRYPTED_PASSWD]]
-  
+  #sh init/freebsd/[std | zfs]-install.sh [hostname [$CRYPTED_PASSWD]]
+
 freebsd_x86_64() {
   FREEBSDGUEST=1
-  variant=${variant:-freebsd} ; GUEST=${1:-${variant}-x86_64-zfs}
+  variant=${variant:-freebsd} ; GUEST=${1:-${variant}-x86_64-std}
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE-amd64)
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
 freebsd_aarch64() {
-  variant=${variant:-freebsd} ; GUEST=${1:-${variant}-aarch64-zfs}
+  variant=${variant:-freebsd} ; GUEST=${1:-${variant}-aarch64-std}
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-aarch64-disc1.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE*-aarch64)
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_aarch64
 }
 #----------------------------------------
 
 ## debian ##
   ##append to boot parameters: 3 text textmode=1
-  
+
   ##!! (debian) login user/passwd: user/live
   ##!! (devuan) login user/passwd: devuan/devuan
 
   #sudo su ; . /etc/os-release
+  #ip link ; [networkctl status ; networkctl up {ifdev}]
+  #[dhcpcd {ifdev}]
   #mount -o remount,size=1G /run/live/overlay ; df -h ; sleep 5
   #sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
   #apt-get --yes update --allow-releaseinfo-change
-  #apt-get --yes install gdisk [lvm2] [dnf yum-utils zypper]
+  #apt-get --yes install gdisk [lvm2 btrfs-progs] [yum-utils zypper]
 
   #------------ if using ZFS ---------------
   #apt-get --yes install --no-install-recommends linux-headers-$(uname -r)
 
-  #grep -e '-security' /etc/apt/sources.list | sed 's|-security|-backports|g' >> /etc/apt/sources.list
-  #apt-get --yes update
-  #apt-get --yes install -t $VERSION_CODENAME-backports --no-install-recommends zfs-dkms zfsutils-linux
+  #sed -i 's|^#deb|deb|g' /etc/apt/sources.list
+  #apt-get --yes update --allow-releaseinfo-change
+  #apt-get --yes install -t ${VERSION_CODENAME/ */}-backports --no-install-recommends zfs-dkms
+  #apt-get --yes install -t ${VERSION_CODENAME/ */}-backports --no-install-recommends zfsutils-linux
 
-  #modprobe zfs ; zpool version ; sleep 5
+  #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
 
 debian_x86_64() {
   variant=${variant:-debian} ; service_mgr=${service_mgr:-sysvinit}
-  GUEST=${1:-${variant}-x86_64-lvm}
+  GUEST=${1:-${variant}-x86_64-std}
   #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/live -name 'debian-live-*-amd64*.iso' | tail -n1)}
   #(cd ${ISOS_PARDIR}/debian/live ; sha256sum --ignore-missing -c SHA256SUMS)
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/devuan/live -name 'devuan_*_amd64_desktop-live.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/devuan/live ; sha256sum --ignore-missing -c SHA256SUMS.txt)
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
 #----------------------------------------
@@ -264,27 +271,24 @@ debian_x86_64() {
 ## void ##
   ##!! login user/passwd: anon/voidlinux
 
+  #ip link ; [dhcpcd {ifdev}]
   #[bash;] sv down sshd ; export MIRRORHOST=mirror.clarkson.edu/voidlinux
   #yes | xbps-install -Sy -R http://${MIRRORHOST}/current -u xbps ; sleep 3
-  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current netcat wget parted gptfdisk libffi gnupg2 curl [lvm2] [apk-tools debootstrap pacman]
+  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current netcat wget parted gptfdisk libffi gnupg2 curl [lvm2 btrfs-progs] [apk-tools debootstrap pacman]
 
   #------------ if using ZFS ---------------
   ## install zfs, if needed ##
   ##yes | xbps-install -Sy [linux-headers] zfs
   ##mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
 
-  #modprobe zfs ; zpool version ; sleep 5
+  #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
 
 void_x86_64() {
-  variant=${variant:-void} ; GUEST=${1:-${variant}-x86_64-lvm}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'void-live-x86_64-*.iso' | tail -n1)}
-  #(cd ${ISOS_PARDIR}/voidlinux ; sha256sum --ignore-missing -c sha256.txt)
-  #sleep 5
-  ## change for ZFS already on iso
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'Trident-*-x86_64.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/voidlinux ; sha256sum --ignore-missing -c Trident-*-x86_64.iso.sha256)
-  
+  variant=${variant:-void} ; GUEST=${1:-${variant}-x86_64-std}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'void-live-x86_64-*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/voidlinux ; sha256sum --ignore-missing -c sha256.txt)
+
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
 #----------------------------------------
@@ -292,16 +296,22 @@ void_x86_64() {
 ## archlinux ##
   ##!! (arch) login user/passwd: -/-
   ##!! (artix) login user/passwd: artix/artix
+  ##!! (archlinuxarm) login user/passwd: alarm/alarm
+  ##!! (armtix) login user/passwd: armtix/armtix
 
   #sudo su
+  # ip link ; [networkctl status ; networkctl up {ifdev}]
+  #[dhcpcd {ifdev}]
+  #sed -i 's|\(^SigLevel.*\)|#\1\nSigLevel = Never|' /etc/pacman.conf
   #(arch) mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5
   #(arch) pacman-key --init ; pacman -Sy archlinux-keyring
   #(arch) pacman-key --populate archlinux
   #(artix) mount -o remount,size=1G /run/artix/cowspace ; df -h ; sleep 5
   #(artix) pacman-key --init ; pacman -Sy artix-keyring
   #(artix) pacman-key --populate artix
-  #(artix) pacman -Sy gnu-netcat parted dosfstools gptfdisk [lvm2]
-  #pacman -Sy
+  #(arch|artix) sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf
+  #(artix) pacman -Sy gnu-netcat parted dosfstools gptfdisk [lvm2 btrfs-progs]
+  #[pacman -Sy debootstrap]
 
   #------------ if using ZFS ---------------
   ## NOTE, transfer archzfs config file: init/archlinux/repo_archzfs.cfg
@@ -309,7 +319,7 @@ void_x86_64() {
   #curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg
   #pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
 
-  #pacman -Sy zfs-dkms ; pacman -Sy --needed zfs-utils
+  #pacman -Sy linux-headers zfs-dkms ; pacman -Sy --needed zfs-utils
   ##--- (arch) or retrieve archived zfs-linux package instead of zfs-dkms ---
   ## Note, xfer archived zfs-linux package matching kernel (uname -r)
   ## example kernelver -> 5.7.11-arch1-1 becomes 5.7.11.arch1.1-1
@@ -317,17 +327,17 @@ void_x86_64() {
   ## pacman -U /tmp/zfs-linux.pkg.tar.zst
   ##--- (arch)
 
-  #modprobe zfs ; zpool version ; sleep 5
+  #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
 
 archlinux_x86_64() {
-  variant=${variant:-archlinux} ; service_mgr=${service_mgr:-openrc}
-  GUEST=${1:-${variant}-x86_64-lvm}
+  variant=${variant:-archlinux} ; service_mgr=${service_mgr:-runit}
+  GUEST=${1:-${variant}-x86_64-std}
   #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'archlinux-*.iso' | tail -n1)}
   #(cd ${ISOS_PARDIR}/archlinux ; sha1sum --ignore-missing -c sha1sums.txt)
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/artix -name 'artix-*-openrc-*.iso' | tail -n1)}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/artix -name 'artix-*-runit-*.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/artix ; sha256sum --ignore-missing -c sha256sums)
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
 #----------------------------------------
@@ -342,105 +352,115 @@ archlinux_x86_64() {
   #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories
   #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories
   #apk update
-  #apk add e2fsprogs dosfstools sgdisk libffi gnupg curl util-linux multipath-tools perl [lvm2] [xbps debootstrap pacman]
+  #apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl util-linux multipath-tools perl [lvm2 btrfs-progs] [xbps debootstrap pacman[-makepkg]]
   #setup-udev
 
   #------------ if using ZFS ---------------
   #apk add zfs
 
-  #modprobe zfs ; zpool version ; sleep 5
+  #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
 
 alpine_x86_64() {
-  variant=${variant:-alpine} ; GUEST=${1:-${variant}-x86_64-lvm}
+  variant=${variant:-alpine} ; GUEST=${1:-${variant}-x86_64-std}
 
    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-extended-*-x86_64.iso" | tail -n1)}
   (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-extended-*-x86_64.iso.sha256)
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
 alpine_aarch64() {
-  variant=${variant:-alpine} ; GUEST=${1:-${variant}-aarch64-lvm}
+  variant=${variant:-alpine} ; GUEST=${1:-${variant}-aarch64-std}
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-standard-*-aarch64.iso" | tail -n1)}
   (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-standard-*-aarch64.iso.sha256)
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_aarch64
 }
 #----------------------------------------
 
 ## suse ##
   ##append to boot parameters: 3 text textmode=1
-  
+
   ##!! login user/passwd: linux/-
 
   #sudo su ; . /etc/os-release ; export MIRRORHOST=download.opensuse.org
+  #networkctl status ; networkctl up {ifdev}
+  #nmcli device status ; nmcli connection up {ifdev}
   #wicked ifstatus all ; wicked ifup {ifdev}
   #zypper --non-interactive refresh
 
-  #zypper install ca-certificates-cacert ca-certificates-mozilla efibootmgr [lvm2] [debootstrap dnf]
+  #zypper install ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr [lvm2 btrfsprogs] [debootstrap dnf dnf-plugins-core]
   #zypper --gpg-auto-import-keys refresh
   #update-ca-certificates
 
   #------------ if using ZFS ---------------
-  #zypper --non-interactive install gptfdisk dkms kernel-devel
-  #zypper --gpg-auto-import-keys addrepo http://${MIRRORHOST}/repositories/filesystems/$(echo ${PRETTY_NAME} | tr ' ' _)/filesystems.repo
+  #zypper --non-interactive install dkms kernel-devel
+  #zypper --gpg-auto-import-keys addrepo http://${MIRRORHOST}/repositories/filesystems/${VERSION_ID}/filesystems.repo
   #zypper --gpg-auto-import-keys refresh
-  #zypper --non-interactive install zfs
+  #zypper --non-interactive install zfs zfs-kmp-default
 
-  #modprobe zfs ; zpool version ; sleep 5
+  #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
 
 suse_x86_64() {
-  variant=${variant:-suse} ; GUEST=${1:-${variant}-x86_64-lvm}
+  variant=${variant:-suse} ; GUEST=${1:-${variant}-x86_64-std}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live -name "openSUSE-Leap-*-Live-x86_64*.iso" | tail -n1)}
-  (cd ${ISOS_PARDIR}/opensuse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-x86_64*.iso.sha256)
-  
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live -name "openSUSE-Leap-*-Live-x86_64*.iso" | tail -n1)}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live -name "GeckoLinux_*.x86_64*.iso" | tail -n1)}
+  #(cd ${ISOS_PARDIR}/opensuse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-x86_64*.iso.sha256)
+  (cd ${ISOS_PARDIR}/opensuse/live ; sha256sum --ignore-missing -c GeckoLinux_*.x86_64*.iso.sha256)
+
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
 suse_aarch64() {
-  variant=${variant:-suse} ; GUEST=${1:-${variant}-aarch64-lvm}
+  variant=${variant:-suse} ; GUEST=${1:-${variant}-aarch64-std}
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/opensuse/live/aarch64 -name "openSUSE-Leap-*-Live-aarch64*.iso" | tail -n1)}
   (cd ${ISOS_PARDIR}/opensuse/live/aarch64 ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-aarch64*.iso.sha256)
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_aarch64
 }
 #----------------------------------------
 
-## obsolete/non-existent CentOS [Stream] Live iso
-###redhat ##
-#  ##!! login user/passwd: liveuser/-
-#
-#  #. /etc/os-release ; export MIRRORHOST=mirror.centos.org/centos
-#  #nmcli device status ; nmcli connection up {ifdev}
-#  #[dnf | yum] -y check-update ; sestatus ; sleep 5
-#  #[dnf | yum] -y install nmap-ncat
-#
-#  #------------ if using ZFS ---------------
-#  #[dnf | yum] -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-[8 | 7].noarch.rpm
-#  #[dnf | yum] -y install kernel-headers kernel-devel
-#  #[dnf | yum] -y install http://download.zfsonlinux.org/epel/zfs-release.el[8_4 | 7_9].noarch.rpm
-#  #[dnf | yum] --enablerepo=zfs -y install zfs zfs-dracut
-#  #echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
-#
-#  #dkms status ; modprobe zfs ; zpool version ; sleep 5
-#  #-----------------------------------------
-#
-#redhat_x86_64() {
-#  RELEASE=${RELEASE:-8} ; variant=${variant:-redhat}
-#  GUEST=${1:-${variant}-x86_64-lvm}
-#  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos/live -name 'CentOS-*-x86_64-Live*.iso' | tail -n1)}
-#  (cd ${ISOS_PARDIR}/centos/live ; sha256sum --ignore-missing -c CHECKSUM)
-#
-#  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
-#}
+##redhat ##
+  ##!! login user/passwd: liveuser/-
+
+  #. /etc/os-release ; export MIRRORHOST=dl.rockylinux.org/pub/rocky
+  #networkctl status ; networkctl up {ifdev}
+  #nmcli device status ; nmcli connection up {ifdev}
+  #[dnf | yum] -y check-update ; setenforce 0 ; sestatus ; sleep 5
+  #[dnf | yum] -y install nmap-ncat [lvm2] [debootstrap]
+
+  #------------ if using ZFS ---------------
+  #[dnf | yum] -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-[8 | 7].noarch.rpm
+  #[dnf | yum] -y install kernel kernel-devel
+  #. /etc/os-release ; echo ${VERSION_ID}
+  #kver=$(dnf list --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1)
+  ##(-stream) ZFS_REL=`echo $kver | sed 's|.*\.el\(.*\)$|\1|'` ; echo $ZFS_REL
+  #[dnf | yum] -y install http://download.zfsonlinux.org/epel/zfs-release.el${ZFS_REL:-${VERSION_ID/./_}}.noarch.rpm
+  #rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux
+  #dnf config-manager --disable zfs ; dnf config-manager --enable zfs-kmod
+  #[dnf | yum] -y install zfs
+  #echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
+
+  #dkms status ; modprobe zfs ; zfs version ; sleep 5
+  #dnf config-manager --disable zfs-kmod ; dnf config-manager --enable zfs
+  #-----------------------------------------
+
+redhat_x86_64() {
+  RELEASE=${RELEASE:-8} ; variant=${variant:-redhat}
+  GUEST=${1:-${variant}-x86_64-std}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/rocky/live -name 'Rocky-*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/rocky/live ; sha256sum --ignore-missing -c CHECKSUM)
+
+  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
+}
 #redhat_aarch64() {
 #  RELEASE=${RELEASE:-8} ; variant=${variant:-redhat}
-#  GUEST=${1:-${variant}-x86_64-lvm}
-#  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/centos/live -name 'CentOS-*-x86_64-Live*.iso' | tail -n1)}
-#  (cd ${ISOS_PARDIR}/centos/live ; sha256sum --ignore-missing -c CHECKSUM)
+#  GUEST=${1:-${variant}-aarch64-std}
+#  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/rocky/live/aarch64 -name 'Rocky-*-aarch64-*.iso' | tail -n1)}
+#  (cd ${ISOS_PARDIR}/rocky/live/aarch64 ; sha256sum --ignore-missing -c CHECKSUM)
 #
 #  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
 #}
@@ -448,15 +468,16 @@ suse_aarch64() {
 
 ## mageia ##
   ##append to boot parameters: 3 text textmode=1
-  
+
   ##!! login user/passwd: live/-
 
   #su - ; export MIRRORHOST=mirrors.kernel.org/mageia
   #networkctl status ; networkctl up {ifdev}
-  #dnf -y check-update ; sleep 5
+  #nmcli device status ; nmcli connection up {ifdev}
+  #dnf -y check-update ; [dnf -y install lvm2 btrfs-progs ;] sleep 5
 
 mageia_x86_64() {
-  variant=${variant:-mageia} ; GUEST=${1:-${variant}-x86_64-lvm}
+  variant=${variant:-mageia} ; GUEST=${1:-${variant}-x86_64-std}
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia/live -name 'Mageia-*-Live-*-x86_64.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/mageia/live ; sha512sum --ignore-missing -c Mageia-*-Live-*-x86_64.iso.sha512)
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
@@ -466,27 +487,30 @@ mageia_x86_64() {
 ## pclinuxos ##
   # (PCLinuxOS distro) install using draklive-install, then post chroot cmds
   ##!! login user/passwd: guest/-
-  ## NOTE, transfer [dir(s) | file(s)]: init/common, init/pclinuxos
+  ## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/pclinuxos)
 
   #su - ; export MIRRORHOST=spout.ussg.indiana.edu/linux/pclinuxos
   #nmcli device status ; nmcli connection up {ifdev}
   #sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list
   #sed -i "/${MIRRORHOST}/ s|^.*rpm|rpm|" /etc/apt/sources.list
   #apt-get -y update ; sleep 5
-  #apt-get -y install netcat gdisk efibootmgr [lvm2]
+  #apt-get -y install netcat gdisk efibootmgr [lvm2 btrfs-progs]
   #apt-get -y --fix-broken install
 
   #[[sgdisk -p | sfdisk -l] /dev/[sv]da | parted /dev/[sv]da -s unit GiB print]
-  #sh init/common/disk_setup_vmlinux.sh part_format_vmdisk [sgdisk | sfdisk | parted] [lvm] [ .. ]
-  
+  #mkdir -p /mnt
+  #[MKFS_CMD=mkfs.ext4] sh init/common/disk_setup_vmlinux.sh part_format [sgdisk | sfdisk | parted] [std | lvm | btrfs] [ .. ]
+
+  ## (btrfs) After partitioning (by hand or script), USE Custom partitioning in
+  ## draklive-install with Mount options advanced for / (root): subvol=@
   #draklive-install --expert --noauto
-  #sh init/pclinuxos/post_drakliveinstall.sh [hostname [$PLAIN_PASSWD]]
+  #sh init/pclinuxos/[std | lvm | btrfs]-post_drakliveinstall.sh [hostname [$PLAIN_PASSWD]]
 
 pclinuxos_x86_64() {
-  variant=${variant:-pclinuxos} ; GUEST=${1:-${variant}-x86_64-lvm}
+  variant=${variant:-pclinuxos} ; GUEST=${1:-${variant}-x86_64-std}
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/pclinuxos -name 'pclinuxos64-*.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/pclinuxos ; md5sum --ignore-missing -c pclinuxos64-*.md5sum)
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
 #----------------------------------------
@@ -502,11 +526,11 @@ pclinuxos_x86_64() {
   #ifconfig ; dhcpcd {ifdev}
 
   ## (NetBSD) install via chroot
-  ## NOTE, transfer [dir(s) | file(s)]: init/common, init/netbsd
+  ## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/netbsd)
 
   #gpt show -l sd0
-  #sh init/netbsd/gpt_setup_vmnetbsd.sh part_format_vmdisk [std]
-  #sh init/netbsd/gpt_setup_vmnetbsd.sh mount_filesystems
+  #sh init/netbsd/gpt_setup_vmnetbsd.sh part_format [std]
+  #sh init/netbsd/gpt_setup_vmnetbsd.sh mount_filesystems [std]
 
   #sh init/netbsd/std-install.sh [hostname [$PLAIN_PASSWD]]
 
@@ -515,7 +539,7 @@ netbsd_x86_64() {
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-amd64.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512) ; sleep 5
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
 netbsd_aarch64() {
@@ -523,7 +547,7 @@ netbsd_aarch64() {
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-aarch64.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512)
-  
+
   sleep 5 ; _prep ; sleep 3 ; _install_aarch64
 }
 #----------------------------------------
@@ -537,10 +561,10 @@ netbsd_aarch64() {
   #ifconfig ; dhclient -L /tmp/dhclient.lease.{ifdev} {ifdev}
 
   ## (OpenBSD) install via chroot
-  ## NOTE, transfer [dir(s) | file(s)]: init/common, init/openbsd
+  ## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/openbsd)
 
   #fdisk sd0
-  #sh init/openbsd/disklabel_setup_vmopenbsd.sh part_format_vmdisk [std]
+  #sh init/openbsd/disklabel_setup_vmopenbsd.sh part_format
   #sh init/openbsd/disklabel_setup_vmopenbsd.sh mount_filesystems
 
   #sh init/openbsd/std-install.sh [hostname [$PLAIN_PASSWD]]
@@ -554,7 +578,7 @@ openbsd_x86_64() {
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/amd64 -name 'install*.img' | tail -n1)}
   (cd ${ISOS_PARDIR}/openbsd/amd64 ; sha256sum --ignore-missing -c SHA256)
-  
+
   sleep 5 ; _prep
   qemu-img convert -O qcow2 ${ISO_PATH} ${OUT_DIR}/${GUEST}.qcow2
   qemu-img resize -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M
@@ -566,7 +590,7 @@ openbsd_aarch64() {
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/arm64 -name 'install*.img' | tail -n1)}
   (cd ${ISOS_PARDIR}/openbsd/arm64 ; sha256sum --ignore-missing -c SHA256)
-  
+
   sleep 5 ; _prep
   qemu-img convert -O qcow2 ${ISO_PATH} ${OUT_DIR}/${GUEST}.qcow2
   qemu-img resize -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 30720M
@@ -574,11 +598,11 @@ openbsd_aarch64() {
 }
 
 #----------------------------------------
-${@:-freebsd_x86_64 freebsd-x86_64-zfs}
+${@:-freebsd_x86_64 freebsd-x86_64-std}
 
 
 #-----------------------------------------
-## package manager tools & config needed to install from existing Linux
+## package manager/bootstrap tools & config to install from existing Linux
 
 #variant debian - distros(debian, devuan):
   # (devuan x86_64 MIRROR: deb.devuan.org/merged, service_mgr: sysvinit)
@@ -590,7 +614,7 @@ ${@:-freebsd_x86_64 freebsd-x86_64-zfs}
   ## dnld: http://${MIRROR}/static/xbps-static-latest.<machine>-musl.tar.xz
   #  package(s): xbps[-install.static]
 
-#variant archlinux: distros(x86_64: arch, artix [service_mgr: openrc]):
+#variant archlinux: distros(x86_64: arch, artix [service_mgr: runit]):
   #  package(s): libffi, curl, pacman
 
 #variant alpine: ([x86_64|aarch64] MIRROR: dl-cdn.alpinelinux.org/alpine)
@@ -606,7 +630,7 @@ ${@:-freebsd_x86_64 freebsd-x86_64-zfs}
   # (centos[-stream] [x86_64|aarch64] MIRROR: mirror.centos.org/centos)
   #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm, ? rinse
 
-#variant mageia: (x86_64 MIRROR: mirrors.kernel.org/mageia)
+#variant mageia: ([x86_64,aarch64] MIRROR: mirrors.kernel.org/mageia)
   #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm
 
 #variant pclinuxos: (x86_64 MIRROR: spout.ussg.indiana.edu/linux/pclinuxos)
@@ -614,11 +638,11 @@ ${@:-freebsd_x86_64 freebsd-x86_64-zfs}
 
 #----------------------------------------
 ## (Linux distro) install via chroot
-## NOTE, transfer [dir(s) | file(s)]: init/common, init/<variant>
+## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/<variant>)
 
 #  [[sgdisk -p | sfdisk -l] /dev/[sv]da | parted /dev/[sv]da -s unit GiB print]
-#  sh init/common/disk_setup_vmlinux.sh part_format_vmdisk [sgdisk | sfdisk | parted] [lvm | zfs] [ .. ]
-#  sh init/common/disk_setup_vmlinux.sh mount_filesystems [ .. ]
+#  [MKFS_CMD=mkfs.ext4] sh init/common/disk_setup_vmlinux.sh part_format [sgdisk | sfdisk | parted] [std | lvm | btrfs | zfs] [ .. ]
+#  sh init/common/disk_setup_vmlinux.sh mount_filesystems [std | lvm | btrfs | zfs] [ .. ]
 
-#  sh init/<variant>/[lvm | zfs]-install.sh [hostname [$CRYPTED_PASSWD]]
+#  sh init/<variant>/[std | lvm | btrfs | zfs]-install.sh [hostname [$CRYPTED_PASSWD]]
 #----------------------------------------

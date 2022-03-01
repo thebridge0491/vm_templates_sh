@@ -4,9 +4,8 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sgdisk lvm vg0 pvol0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0 pvol0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
+#sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
+#sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -34,12 +33,12 @@ export DNFCMD="dnf --setopt=install_weak_deps=False --releasever=${RELEASE}"
 echo "Create /etc/fstab" ; sleep 3
 mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
 sh -c 'cat > /mnt/etc/fstab' << EOF
-LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
-LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
-LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+LABEL=${GRP_NM}-osRoot   /           auto    errors=remount-ro   0   1
+LABEL=${GRP_NM}-osVar    /var        auto    defaults    0   2
+LABEL=${GRP_NM}-osHome   /home       auto    defaults    0   2
 PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
-LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
+PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
@@ -47,6 +46,13 @@ sysfs                           /sys        sysfs   defaults    0   0
 #9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
 
 EOF
+
+
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# networkctl status ; networkctl up {ifdev}
+# nmcli device status ; nmcli connection up {ifdev}
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
 echo "Bootstrap base pkgs" ; sleep 3
@@ -124,11 +130,13 @@ ${DNFCMD} -y repolist enabled ; sleep 5
 
 
 echo "Add software package selection(s)" ; sleep 3
-pkgs_nms="basesystem kernel-desktop-latest microcode_ctl locales-en sudo dhcp-client man-pages dosfstools openssh-server nano mandi-ifw shorewall shorewall-ipv6 urpmi dnf dnf-plugins-core harddrake-ui grub grub2-efi efibootmgr lvm2" # task-xfce"
+pkgs_nms="basesystem kernel-desktop-latest microcode_ctl locales-en sudo dhcp-client man-pages dosfstools xfsprogs openssh-server nano mandi-ifw shorewall shorewall-ipv6 urpmi dnf dnf-plugins-core harddrake-ui grub grub2-efi efibootmgr lvm2" # task-xfce"
 #urpmi.update -a
-#urpmi --no-recommends --auto \$pkgs_nms
 ${DNFCMD} -y check-update
-${DNFCMD} -y install \$pkgs_nms
+for pkgX in \$pkgs_nms ; do
+  #urpmi --no-recommends --auto \$pkgX ;
+  ${DNFCMD} -y install \$pkgX ;
+done
 dnf -y check-update
 ${DNFCMD} -y install 'dnf-command(versionlock)'
 
@@ -215,6 +223,15 @@ echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
+echo "Config dracut"
+echo 'hostonly="yes"' >> /etc/dracut.conf
+mkdir -p /etc/dracut.conf.d
+kver="\$(ls -A /lib/modules/ | tail -1)"
+#dracut --force --kver \$(uname -r)
+dracut --force --kver \$kver
+mkinitrd
+
+
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
 if [ "aarch64" = "${UNAME_M}" ] ; then
@@ -237,8 +254,11 @@ fi
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 #echo "#GRUB_CMDLINE_LINUX='cryptdevice=/dev/sda2:cryptroot'" >> /etc/default/grub
 echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
-sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5"|'  \
+sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5 resume=/dev/foo"|'  \
   /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg

@@ -1,0 +1,24 @@
+#!/bin/sh -eux
+
+if [ "root" = "${USER}" ] || [ "${SUDO_USER}" ] ; then
+  echo ; echo "ERROR: Do not run script as root or under sudo." ;
+  echo "Re-run script as normal user with sudo access. Exiting." ;
+  echo ; exit 1 ;
+fi
+
+sudo apk add alpine-sdk
+
+## initial setup aports repo clone
+#git clone https://git.alpinelinux.org/aports.git
+#sudo nano /etc/abuild.conf
+# #edit abuild.conf, as needed, field PACKAGER
+#sudo addgroup <username> abuild
+#sudo mkdir -p /var/cache/distfiles ; sudo chmod a+w /var/cache/distfiles
+#sudo abuild-keygen -a -I
+#cd aports ; git pull
+
+cd aports/main/debootstrap
+abuild -r
+
+sudo apk add --repository $HOME/packages/main debootstrap
+apk info debootstrap ; sleep 5

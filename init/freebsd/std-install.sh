@@ -4,9 +4,8 @@
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 # ssh user@ipaddr "su -m root -c 'sh -xs - arg1 argN'" < script.sh
 
-#sh /tmp/disk_setup.sh gpart_vmdisk std
-#sh /tmp/disk_setup.sh format_partitions std
-#sh /tmp/disk_setup.sh mount_filesystems
+#sh /tmp/disk_setup.sh part_format std bsd0
+#sh /tmp/disk_setup.sh mount_filesystems std bsd0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -23,7 +22,9 @@ elif [ -e /dev/da0 ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-bsd0}
-export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/FreeBSD} ; UNAME_M=$(uname -m)
+# ftp.freebsd.org/pub/FreeBSD | mirror.math.princeton.edu/pub/FreeBSD
+export MIRROR=${MIRROR:-ftp.freebsd.org/pub/FreeBSD} ; UNAME_M=$(uname -m)
+RELEASE=${RELEASE:-$(sysctl -n kern.osrelease | cut -d- -f1)}
 
 export INIT_HOSTNAME=${1:-freebsd-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -61,9 +62,8 @@ else
 fi
 
 
-# ifconfig wlan create wlandev ath0
-# ifconfig wlan0 up scan
-# dhclient wlan0
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# dhclient [-l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev}] {ifdev}
 
 ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 #wlan_adapter=$(ifconfig | grep -B3 -i wireless) # ath0 ?
@@ -77,13 +77,12 @@ sysctl kern.geom.label.gpt.enable=1
 
 
 echo "Extracting freebsd-dist archives" ; sleep 3
-#for file in kernel base ; do
-#    (fetch -o - ftp://${MIRROR}/releases/${UNAME_M}/11.0-RELEASE/${file}.txz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt}) ;
-#done
 cd /usr/freebsd-dist
 for file in kernel base ; do
+#    (fetch -o - ftp://${MIRROR}/releases/${UNAME_M}/${RELEASE}-RELEASE/${file}.txz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt}) ;
     (cat ${file}.txz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt}) ;
 done
+sleep 5
 
 
 cat << EOFchroot | chroot /mnt /bin/sh

@@ -27,7 +27,7 @@ parttbl_bkup() {
   disklabel -E $DEVX
 }
 
-disklabel_vmdisk() {
+disklabel_disk() {
   echo "Partitioning disk" ; sleep 3
   (cd /dev ; sh MAKEDEV $DEVX)
   fdisk -iy -g -b 960 $DEVX ; sync
@@ -55,10 +55,10 @@ format_partitions() {
   sync
 }
 
-part_format_vmdisk() {
+part_format() {
   MKFS_CMD=${MKFS_CMD:-newfs} ; BSD_PARTNMS=${BSD_PARTNMS:-b a d e f}
 
-  disklabel_vmdisk ; format_partitions
+  disklabel_disk ; format_partitions
 }
 
 mount_filesystems() {
@@ -66,8 +66,8 @@ mount_filesystems() {
   mount /dev/${DEVX}a /mnt ; mkdir -p /mnt/var /mnt/usr/local /mnt/home
   mount /dev/${DEVX}d /mnt/var ; mount /dev/${DEVX}e /mnt/usr/local
   mount /dev/${DEVX}f /mnt/home
-  swapon /dev/${DEVX}b #swapctl -p 1 /dev/${DEVX}b
 
+  swapon /dev/${DEVX}b #swapctl -p 1 /dev/${DEVX}b
   swapctl -l ; sleep 3 ; mount ; sleep 3
 }
 

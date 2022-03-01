@@ -8,10 +8,10 @@
 SED_INPLACE=${SED_INPLACE:-"sed -i"}
 
 check_clamav() {
-	if command -v wget > /dev/null ; then
-    	(cd /tmp ; wget --no-check-certificate https://secure.eicar.org/eicar.com.txt)
-	elif command -v curl > /dev/null ; then
+	if command -v curl > /dev/null ; then
     	(cd /tmp ; curl --insecure --location https://secure.eicar.org/eicar.com.txt)
+	elif command -v wget > /dev/null ; then
+    	(cd /tmp ; wget --no-check-certificate https://secure.eicar.org/eicar.com.txt)
 	elif command -v aria2c > /dev/null ; then
     	(cd /tmp ; aria2c --check-certificate=false -d . https://secure.eicar.org/eicar.com.txt)
 	elif command -v fetch > /dev/null ; then

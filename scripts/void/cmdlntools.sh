@@ -33,10 +33,10 @@ fi
 
 
 set +e ; set +u
-#ln -s /etc/sv/sshd /var/service
-ln -s /etc/sv/ntpd /var/service
-#ln -s /etc/sv/freshclamd /var/service ; ln -s /etc/sv/clamd /var/service # ??
-ln -s /etc/sv/nftables /var/service
+#ln -s /etc/sv/sshd /var/service/
+ln -s /etc/sv/ntpd /var/service/
+#ln -s /etc/sv/freshclamd /var/service/ ; ln -s /etc/sv/clamd /var/service/ # ??
+ln -s /etc/sv/nftables /var/service/
 
 ntpd -u ntp:ntp ; ntpq -p ; sleep 3
 
@@ -54,7 +54,7 @@ done
 
 
 for svc in dbus avahi-daemon ; do
-    ln -s /etc/sv/$svc /var/service ;
+    ln -s /etc/sv/$svc /var/service/ ;
 done
 
 #sed -i '/hosts:/ s|files dns|files mdns_minimal \[NOTFOUND=return\] dns mdns|' /etc/nsswitch.conf
@@ -85,12 +85,12 @@ sh /root/init/common/misc_config.sh cfg_sshd /etc/skel/.ssh
 sh /root/init/common/misc_config.sh cfg_shell_keychain /etc/skel/.bashrc
 
 
-ln -s /etc/sv/rpcbind /var/service
+ln -s /etc/sv/rpcbind /var/service/
 sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
 
 
 for svc in cupsd ; do
-    ln -s /etc/sv/$svc /var/service ;
+    ln -s /etc/sv/$svc /var/service/ ;
 done
 #sh /root/init/common/misc_config.sh cfg_printer_pdf /etc/cups \
 #    /usr/share/cups/model

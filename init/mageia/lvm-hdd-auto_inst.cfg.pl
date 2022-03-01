@@ -102,9 +102,18 @@ $o = {
         },
         {
             'hd' => undef,
+            'type' => 0x82,
+            'fs_type' => 'swap',
+            'mntpoint' => 'swap',
+            'options' => 'defaults',
+            'size' => 4 * 2 << 20 # 4GB
+        },
+        
+        {
+            'hd' => undef,
             'pt_type' => 0x8e,
             'mntpoint' => 'pvol0',
-            'size' => 84 * 2 << 20, # 84GB
+            'size' => 80 * 2 << 20, # 80GB
             #'ratio' => 100 # remaining
         },
         {
@@ -121,6 +130,7 @@ $o = {
             'size' => 80 * 2 << 20, # 80GB
             #'ratio' => 100 # remaining
         },
+        
         {
             'hd' => undef,
             'pt_type' => 0xa5,
@@ -146,14 +156,7 @@ $o = {
             'size' => 2 << 20, # ~80GB
             'ratio' => 100 # remaining
         },
-        {
-			'VG_name' => 'vg0',
-            'hd' => 'vg0',
-            'fs_type' => 'swap',
-            'mntpoint' => 'swap',
-            'options' => 'defaults',
-            'size' => 4 * 2 << 20 # 4GB
-        },
+        
         {
 			'VG_name' => 'vg0',
             'hd' => 'vg0',
@@ -182,11 +185,12 @@ $o = {
 			'VG_name' => 'vg0',
             'hd' => 'vg0',
             'fs_type' => 'ext4',
-            #'mntpoint' => '/home', # free
+            #'mntpoint' => '/free', # free
             'options' => 'noatime,acl',
             'size' => 2 << 20, # ~24 GB
             'ratio' => 100 # remaining
         },
+        
         {
 			'VG_name' => 'vg1',
             'hd' => 'vg1',
@@ -215,7 +219,7 @@ $o = {
 			'VG_name' => 'vg1',
             'hd' => 'vg1',
             'fs_type' => 'ext4',
-            #'mntpoint' => '/home', # free
+            #'mntpoint' => '/free', # free
             'options' => 'noatime,acl',
             'size' => 2 << 20, # ~ 24 GB
             'ratio' => 100 # remaining
@@ -256,6 +260,8 @@ $o = {
         }
     ],
     'postInstall' => '
+		#depmod -a ; modprobe dm-mod ; modprobe dm-crypt
+
 		init_hostname=$(cat /etc/hostname)
 		sed -i "/127.0.1.1/d" /etc/hosts
         echo "127.0.1.1    ${init_hostname}.localdomain    ${init_hostname}" >> /etc/hosts

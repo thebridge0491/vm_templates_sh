@@ -4,9 +4,8 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sgdisk lvm vg0 pvol0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0 pvol0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
+#sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
+#sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -53,6 +52,13 @@ sysfs                           /sys        sysfs   defaults    0   0
 #9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
 
 EOF
+
+
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# networkctl status ; networkctl up {ifdev}
+# nmcli device status ; nmcli connection up {ifdev}
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
 echo "Bootstrap base pkgs" ; sleep 3
@@ -177,7 +183,7 @@ dnf repolist ; sleep 5
 #dnf config-manager --set-disabled zfs
 dnf --releasever=\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular --enablerepo=zfs -y install zfs zfs-dracut ; sleep 3
 echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
-dkms status ; modprobe zfs ; zpool version ; sleep 5
+dkms status ; modprobe zfs ; zfs version ; sleep 5
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -313,6 +319,9 @@ EOF
 echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay=5"|'  \
   /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub2-mkconfig -o /boot/efi/EFI/\${ID}/grub.cfg
 cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg

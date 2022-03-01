@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE profile>
+<!-- http://doc.opensuse.org/projects/autoyast/configuration.html -->
+<!-- passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
+  perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+  ruby -e "['io/console','digest/sha2'].each {|i| require i} ; puts 'Password:' ; puts STDIN.noecho(&:gets).chomp.crypt(\"\$6\$16CHARACTERSSALT\")"
+  python -c "import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"\$6\$16CHARACTERSSALT\"))" -->
+<profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
+  <bootloader t="map">
+    <global t="map">
+      <append>mitigations=auto quiet nomodeset video=1024x768</append>
+    </global>
+    <loader_type>grub2-efi</loader_type>
+  </bootloader>
+  <firewall t="map">
+    <default_zone>public</default_zone>
+    <enable_firewall t="boolean">false</enable_firewall>
+    <log_denied_packets>off</log_denied_packets>
+    <start_firewall t="boolean">false</start_firewall>
+    <!--<FW_DEV_EXT>eth0</FW_DEV_EXT>-->
+    <!--<FW_CONFIGURATIONS_EXT>sshd</FW_CONFIGURATIONS_EXT>
+    <FW_SERVICES_EXT_TCP>ssh</FW_SERVICES_EXT_TCP>-->
+  </firewall>
+  <general t="map">
+    <ask-list t="list"/>
+    <mode t="map">
+      <confirm t="boolean">false</confirm>
+      <forceboot t="boolean">true</forceboot>
+      <final_reboot t="boolean">false</final_reboot>
+    </mode>
+  </general>
+  <groups t="list">
+    <group t="map">
+      <encrypted t="boolean">true</encrypted>
+      <gid>100</gid>
+      <group_password>x</group_password>
+      <groupname>users</groupname>
+      <userlist/>
+    </group>
+  </groups>
+  <language t="map">
+    <languages>en_US</languages>
+  </language>
+  <networking t="map">
+    <dhcp_options t="map">
+      <dhclient_client_id/>
+      <dhclient_hostname_option>AUTO</dhclient_hostname_option>
+    </dhcp_options>
+    <dns t="map">
+      <dhcp_hostname t="boolean">true</dhcp_hostname>
+      <resolv_conf_policy>auto</resolv_conf_policy>
+      <!--<hostname>suse-boxp0000</hostname>-->
+    </dns>
+    <!--<interfaces t="list">
+      <interface t="map">
+        <bootproto>dhcp</bootproto>
+        <name>eth0</name>
+        <startmode>auto</startmode>
+      </interface>
+    </interfaces>-->
+    <ipv6 t="boolean">true</ipv6>
+    <keep_install_network t="boolean">true</keep_install_network>
+  </networking>
+  <ntp-client t="map">
+    <ntp_policy>auto</ntp_policy>
+    <ntp_servers t="list"/>
+    <ntp_sync>manual</ntp_sync>
+  </ntp-client>
+  <partitioning t="list">
+    <drive t="map">
+      <!--<device>/dev/[sv]da</device>-->
+      <device>ask</device>
+      <disklabel>gpt</disklabel>
+      <initialize t="boolean">true</initialize>
+      <partitions t="list">
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">1</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">bios_grub</filesystem>
+          <format t="boolean">false</format>
+          <label>bios_boot</label>
+          <!--<mount></mount>-->
+          <!--<mountby t="symbol">label</mountby>-->
+          <size>1M</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">259</partition_id>-->
+          <!--<partition_nr t="integer">2</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">vfat</filesystem>
+          <fstopt>utf8</fstopt>
+          <label>ESP</label>
+          <mount>/boot/efi</mount>
+          <mountby t="symbol">label</mountby>
+          <size>200M</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">3</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext2</filesystem>
+          <format t="boolean">false</format>
+          <label>vg0-osBoot</label>
+          <!--<mount>/boot</mount>-->
+          <!--<mountby t="symbol">label</mountby>-->
+          <size>1G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">130</partition_id>-->
+          <!--<partition_nr t="integer">4</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">swap</filesystem>
+          <format t="boolean">false</format>
+          <label>vg0-osSwap</label>
+          <mount>swap</mount>
+          <mountby t="symbol">label</mountby>
+          <size>4G</size>
+        </partition>
+        
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">5</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext4</filesystem>
+          <format t="boolean">false</format>
+          <label>vg0-osRoot</label>
+          <!--<mount>/</mount>-->
+          <!--<mountby t="symbol">label</mountby>-->
+          <size>16G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">6</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext4</filesystem>
+          <format t="boolean">false</format>
+          <label>vg0-osVar</label>
+          <!--<mount>/var</mount>-->
+          <!--<mountby t="symbol">label</mountby>-->
+          <size>8G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">7</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext4</filesystem>
+          <format t="boolean">false</format>
+          <label>vg0-osHome</label>
+          <!--<mount>/home</mount>-->
+          <!--<mountby t="symbol">label</mountby>-->
+          <size>32G</size>
+          <!--<crypt>twofish256</crypt>
+          <crypt_fs t="boolean">true</crypt_fs>
+          <loop_fs t="boolean">true</loop_fs>
+          <crypt_key>vmpacker</crypt_key>-->
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">8</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext4</filesystem>
+          <format t="boolean">false</format>
+          <label>vg0-free</label>
+          <!--<mount>/free</mount>-->
+          <!--<mountby t="symbol">label</mountby>-->
+          <size>24G</size>
+        </partition>
+        
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">9</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext2</filesystem>
+          <format t="boolean">false</format>
+          <label>vg1-osBoot</label>
+          <mount>/boot</mount>-->
+          <mountby t="symbol">label</mountby>
+          <size>1G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">10</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext4</filesystem>
+          <format t="boolean">false</format>
+          <label>vg1-osRoot</label>
+          <mount>/</mount>
+          <mountby t="symbol">label</mountby>
+          <size>16G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">11</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext4</filesystem>
+          <format t="boolean">false</format>
+          <label>vg1-osVar</label>
+          <mount>/var</mount>
+          <mountby t="symbol">label</mountby>
+          <size>8G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">12</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext4</filesystem>
+          <format t="boolean">false</format>
+          <label>vg1-osHome</label>
+          <mount>/home</mount>
+          <mountby t="symbol">label</mountby>
+          <size>32G</size>
+          <!--<crypt>twofish256</crypt>
+          <crypt_fs t="boolean">true</crypt_fs>
+          <loop_fs t="boolean">true</loop_fs>
+          <crypt_key>vmpacker</crypt_key>-->
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">13</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <filesystem t="symbol">ext4</filesystem>
+          <format t="boolean">false</format>
+          <label>vg1-free</label>
+          <mount>/free</mount>
+          <mountby t="symbol">label</mountby>
+          <size>24G</size>
+        </partition>
+        
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">14</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <!--<filesystem t="symbol">ufs</filesystem>-->
+          <format t="boolean">false</format>
+          <label>bsd0-fsSwap</label>
+          <!--<mount></mount>-->
+          <size>4G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">15</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <!--<filesystem t="symbol">zfs</filesystem>-->
+          <format t="boolean">false</format>
+          <label>bsd0-fsPool</label>
+          <!--<mount></mount>-->
+          <size>80G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">16</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <!--<filesystem t="symbol">exfat</filesystem>-->
+          <format t="boolean">false</format>
+          <label>data0</label>
+          <!--<mount></mount>-->
+          <size>120G</size>
+        </partition>
+        <partition t="map">
+          <partition_type>primary</partition_type>
+          <!--<create t="boolean">true</create>-->
+          <!--<partition_id t="integer">131</partition_id>-->
+          <!--<partition_nr t="integer">17</partition_nr>-->
+          <!--<resize t="boolean">false</resize>-->
+          <!--<filesystem config:type="symbol">exfat</filesystem>-->
+          <format config:type="boolean">false</format>
+          <label>data1</label>
+          <!--<mount></mount>-->
+          <size>max</size> <!--<size>80G</size>-->
+        </partition>
+      </partitions>
+      <use>all</use>
+    </drive>
+  </partitioning>
+  <services-manager t="map">
+	<default_target>multi-user</default_target>
+	<services t="map">
+      <enable t="list">
+        <!--<service>sshd</service>-->
+		<service>ntp</service>
+      </enable>
+      <disable t="list">
+        <!--<service></service>-->
+      </disable>
+    </services>
+  </services-manager>
+  <software t="map">
+    <install_recommended t="boolean">false</install_recommended>
+    <instsource>http://download.opensuse.org/distribution/openSUSE-current/repo/oss/</instsource>
+    <!--<instsource/>-->
+    <do_online_update t="boolean">false</do_online_update>
+    <kernel>kernel-default</kernel>
+    <patterns t="list">
+      <pattern>base</pattern>
+      <pattern>bootloader</pattern>
+      <pattern>minimal_base</pattern>
+      <pattern>yast2_basis</pattern>
+      <!--<pattern>laptop</pattern>-->
+      <!--<pattern>xfce</pattern>-->
+      <!--<pattern>generic_server</pattern>-->
+    </patterns>
+    <packages t="list">
+      <package>rpm</package>
+      <package>zypper</package>
+      <package>openSUSE-release</package>
+      <package>makedev</package>
+      <package>system-group-wheel</package>
+      <package>sudo</package>
+      <package>nano</package>
+      <package>less</package>
+      <package>grub2</package>
+      <package>shim</package>
+      <package>efibootmgr</package>
+      <package>firewalld</package>
+      <package>openssl</package>
+      <!--<package>openssh-askpass</package>-->
+      <!--<package>kernel-devel</package>-->
+    </packages>
+    <!--<products t="list">
+      <product>Leap</product>
+    </products>-->
+    <remove-packages t="list">
+	  <package>desktop-translations</package>
+      <package>kernel-firmware</package>
+      <package>yast2-branding-openSUSE</package>
+   </remove-packages>
+  </software>
+  <!--<ssh_import t="map">
+    <copy_config t="boolean">false</copy_config>
+    <import t="boolean">false</import>
+  </ssh_import>-->
+  <timezone t="map">
+    <hwclock>UTC</hwclock>
+    <timezone>UTC</timezone>
+  </timezone>
+  <user_defaults t="map">
+    <expire/>
+    <group>100</group>
+    <groups/>
+    <home>/home</home>
+    <inactive>-1</inactive>
+    <no_groups t="boolean">true</no_groups>
+    <shell>/bin/bash</shell>
+    <skel>/etc/skel</skel>
+    <umask>022</umask>
+  </user_defaults>
+  <users t="list">
+    <user t="map">
+      <encrypted t="boolean">true</encrypted>
+      <!--<user_password>abcd0123</user_password>-->
+      <user_password>$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91</user_password>
+      <username>root</username>
+    </user>
+    <user>
+      <encrypted t="boolean">true</encrypted>
+      <!--<user_password>abcd0123</user_password>-->
+      <user_password>$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91</user_password>
+      <gid>100</gid>
+      <uid>1000</uid>
+      <home>/home/packer</home>
+      <password_settings t="map">
+        <expire/>
+        <flag/>
+        <inact>-1</inact>
+        <max>99999</max>
+        <min>0</min>
+        <warn>7</warn>
+      </password_settings>
+      <shell>/bin/bash</shell>
+      <fullname>Packer User</fullname>
+      <username>packer</username>
+    </user>
+  </users>
+  <runlevel t="map">
+    <default>3</default>
+    <services t="list">
+      <!--<service>
+        <service_name>sshd</service_name>
+        <service_status>enable</service_status>
+      </service>-->
+      <service>
+        <service_name>ntp</service_name>
+        <service_status>enable</service_status>
+      </service>
+    </services>
+  </runlevel>
+  <kdump t="map">
+    <add_crash_kernel t="boolean">false</add_crash_kernel>
+  </kdump>
+  <scripts t="map">
+    <post-scripts t="list">
+      <script t="map">
+        <filename>post0.sh</filename>
+        <interpreter>shell</interpreter>
+        <source><![CDATA[
+#!/bin/sh
+
+#depmod -a ; modprobe ext4
+
+init_hostname=$(cat /etc/hostname)
+sed -i '/127.0.1.1/d' /etc/hosts
+echo "127.0.1.1    ${init_hostname}.localdomain    ${init_hostname}" >> /etc/hosts
+
+
+. /etc/os-release
+zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/oss/ repo-oss
+zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/non-oss/ repo-non-oss
+zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/oss/ update-oss
+zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/non-oss/ update-non-oss
+
+groupadd --system wheel
+usermod -aG wheel packer
+
+sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
+sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
+sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
+
+#echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
+sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rootdelay=5"|'  \
+  /etc/default/grub
+#grub2-install --target=i386-pc --recheck /dev/[sv]da
+grub2-mkconfig -o /boot/grub2/grub.cfg
+
+sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
+Defaults:packer !requiretty
+#\$(id -un packer) ALL=(ALL) NOPASSWD: ALL
+packer ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/99_packer
+
+
+zypper --non-interactive clean
+fstrim -av
+sync
+
+#systemctl enable sshd
+systemctl disable firewalld
+]]></source>
+      </script>
+    </post-scripts>
+  </scripts>
+</profile>

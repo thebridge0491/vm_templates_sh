@@ -21,12 +21,16 @@ elif [ -e /dev/sda ] ; then
 fi
 DEV_BOOT=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osBoot" | cut -d' ' -f1)
 DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
-mount /dev/mapper/${GRP_NM}-osRoot /mnt/install
-mount ${DEV_BOOT} /mnt/install/boot
+DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1)
+mount -o noatime,compress=lzo,subvol=@ ${DEV_PV} /mnt/install
+mkdir -p /mnt/install/.snapshots /mnt/install/var /mnt/install/tmp /mnt/install/home /mnt/install/boot
+mount ${DEV_BOOT} /mnt/install/boot ; mkdir -p /mnt/install/boot/EFI
 mount ${DEV_ESP} /mnt/install/boot/EFI
-mount /dev/mapper/${GRP_NM}-osVar /mnt/install/var
-mount /dev/mapper/${GRP_NM}-osHome /mnt/install/home
-mkdir -p /mnt/install/boot/EFI/EFI/BOOT
+mount -o noatime,compress=lzo,subvol=@/.snapshots ${DEV_PV} \
+  /mnt/install/.snapshots
+mount -o noatime,compress=lzo,subvol=@/var ${DEV_PV} /mnt/install/var
+mount -o noatime,compress=lzo,subvol=@/tmp ${DEV_PV} /mnt/install/tmp
+mount -o noatime,compress=lzo,subvol=@/home ${DEV_PV} /mnt/install/home
 
 echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
 cp /etc/mtab /mnt/install/etc/mtab
@@ -42,7 +46,17 @@ mount -t efivarfs efivarfs /mnt/install/sys/firmware/efi/efivars/
 echo "Fix /etc/fstab /dev/vgX/osRoot to /dev/mapper/vgX-osRoot, ..." ; sleep 3
 sed -i "s|${GRP_NM}/|mapper/${GRP_NM}-|g" /mnt/install/etc/fstab
 mkdir -p /mnt/install/media ; chmod 0755 /mnt/install/media
-sh -c 'cat >> /mnt/etc/fstab' << EOF
+cp /mnt/install/etc/fstab /mnt/install/etc/fstab.old
+sh -c 'cat >> /mnt/install/etc/fstab' << EOF
+PARTLABEL=${PV_NM:-pvol0}  /          auto    noatime,compress=lzo,subvol=/@   0   0
+PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
+PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
+PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
+
+PARTLABEL=${PV_NM:-pvol0}  /.snapshots  auto    noatime,compress=lzo,subvol=/@/.snapshots   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var  auto    noatime,compress=lzo,subvol=/@/var   0   0
+PARTLABEL=${PV_NM:-pvol0}  /tmp  auto    noatime,compress=lzo,subvol=/@/tmp   0   0
+PARTLABEL=${PV_NM:-pvol0}  /home  auto    noatime,compress=lzo,subvol=/@/home   0   0
 
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
@@ -50,6 +64,12 @@ sysfs                           /sys        sysfs   defaults    0   0
 #9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
 
 EOF
+
+
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# nmcli device status ; nmcli connection up {ifdev}
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
 mkdir -p /mnt/install/var/empty /mnt/install/var/lock/subsys /mnt/install/etc/sysconfig/network-scripts
@@ -87,13 +107,13 @@ echo "Add software package selection(s)" ; sleep 3
 apt-get -y update
 apt-get -y --fix-broken install
 
-pkgs_nms="basesystem bash apt rpm locales-en sudo dhcp-client man-pages nano dosfstools grub2 grub2-efi microcode_ctl efibootmgr lvm2" # task-xfce"
+pkgs_nms="basesystem bash apt rpm locales-en sudo dhcp-client man-pages nano dosfstools xfsprogs grub2 grub2-efi microcode_ctl efibootmgr btrfs-progs" # task-xfce"
 apt-get -y install \$pkgs_nms
 # fix AND re-attempt install for infrequent errors
 apt-get -y --fix-broken install
 apt-get -y install \$pkgs_nms
 
-modprobe dm-mod ; vgscan ; vgchange -ay ; lvs
+modprobe btrfs
 
 
 #echo "Config keyboard ; localization" ; sleep 3
@@ -135,7 +155,7 @@ sh -c "cat >> /etc/sysconfig/network-scripts/ifcfg-\$ifdev" << EOF
 #BOOTPROTO=dhcp
 #STARTMODE=auto
 #ONBOOT=yes
-#DHCP_CLIENT=dhclient
+DHCP_CLIENT=dhclient
 
 EOF
 
@@ -195,9 +215,12 @@ cp /boot/EFI/EFI/BOOT/grubx64.EFI /boot/EFI/EFI/BOOT/BOOTX64.EFI
 #sed -i -e "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 #echo "#GRUB_CMDLINE_LINUX='cryptdevice=/dev/sda2:cryptroot'" >> /etc/default/grub
-echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
+echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 nokmsboot noacpi text xdriver=vesa nomodeset rootdelay=5"|'  \
   /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
 #cp -f /boot/EFI/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 #cp -f /boot/EFI/EFI/\${ID}/grub.cfg /boot/EFI/EFI/BOOT/grub.cfg

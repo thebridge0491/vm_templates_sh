@@ -1,20 +1,20 @@
 {{! usage: cat << EOF | mustache - <template>
 ---
 author: thebridge0491
-guest: freebsd-x86_64-zfs
-datestamp: 2020.09.05
+guest: freebsd-x86_64-std
+datestamp: 2020.09
 ---
 EOF
 }}
 {
-  "name": "{{author}}{{^author}}thebridge0491{{/author}}/{{guest}}{{^guest}}freebsd-x86_64-zfs{{/guest}}",
+  "name": "{{author}}{{^author}}thebridge0491{{/author}}/{{guest}}{{^guest}}freebsd-x86_64-std{{/guest}}",
   "description": "Vagrant box (<distribution>-<machine>-<volume-manager>)",
   "versions": [
     {
-    "version": "{{datestamp}}{{^datestamp}}2020.09.05{{/datestamp}}",
+    "version": "{{datestamp}}{{^datestamp}}2020.09{{/datestamp}}",
     "providers": [{
       "name": "libvirt",
-      "url": "{{guest}}{{^guest}}freebsd-x86_64-zfs{{/guest}}-{{datestamp}}{{^datestamp}}2020.09.05{{/datestamp}}.libvirt.box"{{#checksum}},
+      "url": "{{guest}}{{^guest}}freebsd-x86_64-std{{/guest}}-{{datestamp}}{{^datestamp}}2020.09{{/datestamp}}.libvirt.box"{{#checksum}},
       "checksum_type": "sha256",
       "checksum": "{{checksum}}"{{/checksum}}
       }]

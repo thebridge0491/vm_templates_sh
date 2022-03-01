@@ -38,7 +38,7 @@ parttbl_bkup() {
   echo "            gpart bootcode -b /boot/pmbr $DEVX"
 }
 
-gpart_hddisk() {
+gpart_disk() {
   VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0}
 
   echo "Partitioning disk" ; sleep 3
@@ -103,7 +103,8 @@ gpart_hddisk() {
 zfspart_create() {
   GRP_NM=${1:-bsd0} ; ZPARTNM_ZPOOLNM=${2:-${GRP_NM}-fsPool:fspool0}
 
-  kldload opensolaris ; kldload zfs
+  kldload opensolaris ; kldload zfs ; zfs version
+  kldstat -h -v -m zfs ; sleep 5
   sysctl vfs.zfs.min_auto_ashift=12
 
   zpartnm=$(echo $ZPARTNM_ZPOOLNM | cut -d: -f1)
@@ -166,6 +167,8 @@ format_partitions() {
 
     gpart modify -l $zpartnm -i $idx $DEVX ;
   else
+    kldstat -h -v -m ufs ; sleep 5 ;
+    
     for partnm in ${BSD_PARTNMS} ; do
 	  idx=$(gpart show -l | grep -e "$partnm" | cut -w -f4) ;
       if [ ! "${GRP_NM}-fsSwap" = "$partnm" ] ; then
@@ -178,20 +181,23 @@ format_partitions() {
   sync ; gpart show -p ; sleep 3 ; gpart show -l ; sleep 3
 }
 
-part_format_hddisk() {
+part_format() {
   VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
 
-  gpart_hddisk $VOL_MGR $GRP_NM
+  gpart_disk $VOL_MGR $GRP_NM
   format_partitions $VOL_MGR $GRP_NM $ZPARTNM_ZPOOLNM
 }
 
 mount_filesystems() {
-  GRP_NM=${1:-bsd0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0}
   echo "Mounting file systems" ; sleep 3
-  mount /dev/gpt/${GRP_NM}-fsRoot /mnt ; mkdir -p /mnt/var /mnt/usr/home
-  mount /dev/gpt/${GRP_NM}-fsVar /mnt/var
-  mount /dev/gpt/${GRP_NM}-fsHome /mnt/usr/home
-  zfs mount -a
+  if [ "zfs" = "$VOL_MGR" ] ; then
+    zfs mount -a ;
+  else
+    mount /dev/gpt/${GRP_NM}-fsRoot /mnt ; mkdir -p /mnt/var /mnt/usr/home ;
+    mount /dev/gpt/${GRP_NM}-fsVar /mnt/var ;
+    mount /dev/gpt/${GRP_NM}-fsHome /mnt/usr/home ;
+  fi
   swapon /dev/gpt/${GRP_NM}-fsSwap
 }
 

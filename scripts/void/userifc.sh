@@ -21,12 +21,12 @@ done
 sleep 3
 
 case $CHOICE_DESKTOP in
-	lxqt) ln -s /etc/sv/sddm /etc/runit/runsvdir/default/sddm ;;
+	lxqt) ln -s /etc/sv/sddm /etc/runit/runsvdir/default/ ;;
 	*) #mv /etc/lightdm /etc/lightdm.old ;
-	  ln -s /etc/sv/lightdm /etc/runit/runsvdir/default/lightdm ;;
+	  ln -s /etc/sv/lightdm /etc/runit/runsvdir/default/ ;;
 esac
-ln -s /etc/sv/dbus /etc/runit/runsvdir/default/dbus
-ln -s /etc/sv/polkitd /etc/runit/runsvdir/default/polkitd
+ln -s /etc/sv/dbus /etc/runit/runsvdir/default/
+ln -s /etc/sv/polkitd /etc/runit/runsvdir/default/
 chmod 1777 /tmp
 
 # enable touchpad tapping

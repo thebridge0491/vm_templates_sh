@@ -4,9 +4,8 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sgdisk lvm vg0 pvol0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0 pvol0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
+#sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
+#sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -43,12 +42,12 @@ export DNFCMD="dnf --setopt=install_weak_deps=False --releasever=${RELEASE}"
 echo "Create /etc/fstab" ; sleep 3
 mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
 sh -c 'cat > /mnt/etc/fstab' << EOF
-LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
-LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
-LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+LABEL=${GRP_NM}-osRoot   /           auto    errors=remount-ro   0   1
+LABEL=${GRP_NM}-osVar    /var        auto    defaults    0   2
+LABEL=${GRP_NM}-osHome   /home       auto    defaults    0   2
 PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
-LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
+PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
@@ -56,6 +55,13 @@ sysfs                           /sys        sysfs   defaults    0   0
 #9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
 
 EOF
+
+
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# networkctl status ; networkctl up {ifdev}
+# nmcli device status ; nmcli connection up {ifdev}
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
 echo "Bootstrap base pkgs" ; sleep 3
@@ -138,7 +144,7 @@ echo "Add software package selection(s)" ; sleep 3
 if [ "aarch64" = "${UNAME_M}" ] ; then
   ${DNFCMD} -y install @core linux-firmware sudo tar kbd openssl grub2-efi-aa64 grub2 efibootmgr lvm2
 else
-  ${DNFCMD} -y install @core linux-firmware microcode_ctl sudo tar kbd openssl grub2-pc grub2-efi-x64 grub2 efibootmgr
+  ${DNFCMD} -y install @core linux-firmware microcode_ctl sudo tar kbd openssl grub2-pc grub2-efi-x64 grub2 efibootmgr lvm2
 fi
 ${DNFCMD} -y install network-scripts dhcp-client
 #${DNFCMD} -y install dracut-tools dracut-config-generic dracut-config-rescue
@@ -146,6 +152,8 @@ ${DNFCMD} -y install network-scripts dhcp-client
 # @^minimal @minimal-environment redhat-lsb-core dracut-tools dracut-config-generic dracut-config-rescue
 dnf -y check-update
 ${DNFCMD} -y install 'dnf-command(versionlock)'
+
+modprobe dm-mod ; vgscan ; vgchange -ay ; lvs
 
 
 # Use EL release kernel packages (avoid dkms build errors)
@@ -272,6 +280,9 @@ EOF
 echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5"|'  \
   /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub2-mkconfig -o /boot/efi/EFI/\${ID}/grub.cfg
 cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg

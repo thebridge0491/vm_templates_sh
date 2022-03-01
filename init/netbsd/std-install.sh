@@ -4,9 +4,8 @@
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 # ssh user@ipaddr "su -m root -c 'sh -xs - arg1 argN'" < script.sh
 
-#sh /tmp/disk_setup.sh gpt_vmdisk std
-#sh /tmp/disk_setup.sh format_partitions std
-#sh /tmp/disk_setup.sh mount_filesystems
+#sh /tmp/disk_setup.sh part_format std bsd1
+#sh /tmp/disk_setup.sh mount_filesystems std bsd1
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -64,9 +63,8 @@ fdesc              /dev        fdesc   ro,-o=union    0   0
 EOF
 
 
-# ifconfig wlan create wlandev ath0
-# ifconfig wlan0 up scan
-# dhclient wlan0
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# dhcpcd {ifdev}
 
 ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 #wlan_adapter=$(ifconfig | grep -B3 -i wireless) # ath0 ?
@@ -74,16 +72,16 @@ ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 
 
 echo "Extracting netbsd dist archives" ; sleep 3
-#for file in kern-GENERIC base comp etc man misc modules tests text ; do
-#    (ftp -o - http://${MIRROR}/NetBSD-${REL}/${MACHINE}/binary/sets/${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
-#done
+for file in kern-GENERIC base comp etc man misc modules tests text ; do
+    (ftp -o - http://${MIRROR}/NetBSD-${REL}/${MACHINE}/binary/sets/${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
+done
 #cd /${MACHINE}/binary/kernel
 #(cd /mnt ; tar -xpJf /${MACHINE}/binary/kernel/netbsd-GENERIC.tar.xz ; mv netbsd-GENERIC netbsd)
-cd /${MACHINE}/binary/sets
-for file in kern-GENERIC base comp etc man misc modules tests text ; do
-    (cat ${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
-done
-#cd /mnt ; mv netbsd netbsd.gen ; ln -fh netbsd.gen netbsd
+#cd /${MACHINE}/binary/sets
+#for file in kern-GENERIC base comp etc man misc modules tests text ; do
+#    (cat ${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
+#done
+##cd /mnt ; mv netbsd netbsd.gen ; ln -fh netbsd.gen netbsd
 
 
 (cd /mnt/dev ; sh MAKEDEV all)

@@ -18,7 +18,7 @@ sudo apt-get -y install build-essential fakeroot devscripts
 #deb-src http://${MIRROR} stable main
 #
 #EOF
-sudo apt-get -y update
+sudo apt-get -y update --allow-releaseinfo-change
 
 mkdir -p debian-packages ; cd debian-packages
 apt-get source debootstrap

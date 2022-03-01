@@ -4,9 +4,8 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sfdisk lvm vg0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
+#sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
+#sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -53,9 +52,15 @@ sysfs                           /sys        sysfs   defaults    0   0
 EOF
 
 
+# ip link ; dhclient {ifdev} #; iw dev
+# networkctl status ; networkctl up {ifdev}
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
+
+
 echo "Bootstrap base pkgs" ; sleep 3
-#debootstrap --no-check-gpg --arch ${MACHINE} --variant minbase ${RELEASE:-beowulf} /mnt file:/cdrom/debian/
-debootstrap --verbose --no-check-gpg --arch ${MACHINE} ${RELEASE:-beowulf} /mnt http://${MIRROR}
+#debootstrap --no-check-gpg --arch ${MACHINE} --variant minbase ${RELEASE:-stable} /mnt file:/cdrom/debian/
+debootstrap --verbose --no-check-gpg --arch ${MACHINE} ${RELEASE:-stable} /mnt http://${MIRROR}
 
 echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
 cp /etc/mtab /mnt/etc/mtab
@@ -106,24 +111,26 @@ cd /dev ; MAKEDEV generic
 
 
 echo "Config pkg repo components(main contrib non-free)" ; sleep 3
+sed -i 's|VERSION_CODENAME="\(.*\) .*"|VERSION_CODENAME="\1"|' /etc/os-release
 . /etc/os-release
-sed -i "s| stable| \$VERSION_CODENAME|" /etc/apt/sources.list
+sed -i "s| stable| \${VERSION_CODENAME}|" /etc/apt/sources.list
 sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
 sed -i '/^#[ ]*deb/ s|^#||' /etc/apt/sources.list
 sed -i '/^[ ]*deb cdrom:/ s|^|#|' /etc/apt/sources.list
 cat /etc/apt/sources.list ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
-apt-get --yes update
-for pkgX in linux-image-${MACHINE} grub-efi-${MACHINE} efibootmgr grub-pc-bin sudo linux-headers-${MACHINE} dkms spl-dkms dpkg-dev ; do
+apt-get --yes update --allow-releaseinfo-change
+for pkgX in linux-image-${MACHINE} grub-efi-${MACHINE} efibootmgr grub-pc-bin sudo curl linux-headers-${MACHINE} dkms spl-dkms dpkg-dev ; do
   apt-get --yes install --no-install-recommends \$pkgX
 done
 # xfce4
 tasksel install standard
 
-apt-get --yes install -t \${VERSION_CODENAME}-backports zfs-dkms zfsutils-linux zfs-initramfs
+apt-get --yes install -t \${VERSION_CODENAME}-backports zfs-dkms
+apt-get --yes install -t \${VERSION_CODENAME}-backports zfsutils-linux zfs-initramfs
 echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
-modprobe zfs ; zpool version ; sleep 5
+modprobe zfs ; zfs version ; sleep 5
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -245,6 +252,9 @@ fi
 echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay=5"|'  \
   /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then

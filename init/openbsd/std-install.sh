@@ -4,8 +4,7 @@
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 # ssh user@ipaddr "su -m root -c 'sh -xs - arg1 argN'" < script.sh
 
-#sh /tmp/disk_setup.sh disklabel_vmdisk std
-#sh /tmp/disk_setup.sh format_partitions std
+#sh /tmp/disk_setup.sh part_format
 #sh /tmp/disk_setup.sh mount_filesystems
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
@@ -48,9 +47,8 @@ EOF
 sed -i 's|rw|rw,noatime|' /mnt/etc/fstab
 
 
-# ifconfig wlan create wlandev ath0
-# ifconfig wlan0 up scan
-# dhclient wlan0
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# dhclient [-L /tmp/dhclient.lease.{ifdev}] {ifdev}
 
 #ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 #wlan_adapter=$(ifconfig | grep -B3 -i wireless) # ath0 ?
@@ -59,17 +57,17 @@ sed -i 's|rw|rw,noatime|' /mnt/etc/fstab
 
 echo "Extracting openbsd dist archives" ; sleep 3
 SUF=$(echo ${REL} | sed 's|\.||g')
-#for file in man${SUF} comp${SUF} base${SUF} ; do
-#    (ftp -o - http://${MIRROR}/${REL}/${ARCH_S}/${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
-#done
-#ftp -o ${DESTDIR:-/mnt}/bsd http://${MIRROR}/${REL}/${ARCH_S}/bsd
-#ftp -o ${DESTDIR:-/mnt}/bsd.rd http://${MIRROR}/${REL}/${ARCH_S}/bsd.rd
-#ftp -o ${DESTDIR:-/mnt}/bsd.mp http://${MIRROR}/${REL}/${ARCH_S}/bsd.mp
-mount_cd9660 /dev/cd0a /mnt2 ; sync ; cd /mnt2/${REL}/${ARCH_S}
 for file in man${SUF} comp${SUF} base${SUF} ; do
-    (cat ${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
+    (ftp -o - http://${MIRROR}/${REL}/${ARCH_S}/${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
 done
-cp /mnt2/${REL}/${ARCH_S}/bsd* ${DESTDIR:-/mnt}
+ftp -o ${DESTDIR:-/mnt}/bsd http://${MIRROR}/${REL}/${ARCH_S}/bsd
+ftp -o ${DESTDIR:-/mnt}/bsd.rd http://${MIRROR}/${REL}/${ARCH_S}/bsd.rd
+ftp -o ${DESTDIR:-/mnt}/bsd.mp http://${MIRROR}/${REL}/${ARCH_S}/bsd.mp
+#mount_cd9660 /dev/cd0a /mnt2 ; sync ; cd /mnt2/${REL}/${ARCH_S}
+#for file in man${SUF} comp${SUF} base${SUF} ; do
+#    (cat ${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
+#done
+#cp /mnt2/${REL}/${ARCH_S}/bsd* ${DESTDIR:-/mnt}
 
 
 (cd /mnt/dev ; sh MAKEDEV all)
@@ -204,11 +202,11 @@ tar -xf /tmp/init.tar -C /mnt/root/ ; sleep 5
 mkdir -p /mnt/efi ; mount -t msdos /dev/${DEVX}i /mnt/efi
 (cd /mnt/efi ; mkdir -p EFI/openbsd EFI/BOOT)
 if [ "arm64" = "${ARCH_S}" ] || [ "aarch64" = "${ARCH_S}" ] ; then
-  #ftp -o /mnt/efi/EFI/BOOT/BOOTAA64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTAA64.EFI ;
+  ftp -o /mnt/usr/mdec/BOOTAA64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTAA64.EFI ;
   cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
   cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
 else
-  #ftp -o /mnt/efi/EFI/BOOT/BOOTX64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTX64.EFI ;
+  ftp -o /mnt/usr/mdec/BOOTX64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTX64.EFI ;
   cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
   cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
 fi

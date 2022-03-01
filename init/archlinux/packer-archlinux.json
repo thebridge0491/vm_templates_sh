@@ -27,15 +27,17 @@
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
-    "shutdown_command": "sudo shutdown -hP +3",
+    "shutdown_command": "sudo shutdown -hP +3 || sudo poweroff",
     "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/artix/sha256sums",
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/artix/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
-      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10>artix<enter>artix<enter><wait10>sudo su<enter><wait>mount -o remount,size=1G /run/artix/cowspace ; mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5 ; pacman -Sy ; sleep 3 ; pacman -Sy --noconfirm gnu-netcat parted glibc dosfstools gptfdisk lvm2 ; sleep 5 ; ",
-      "cd /tmp ; curl -o /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; curl -o /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; env service_mgr={{user `service_mgr`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10>artix<enter>artix<enter><wait10>sudo su<enter><wait>systemctl stop sshd ; mount -o remount,size=1G /run/artix/cowspace ; mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5 ; pacman -Sy ; sleep 3 ; pacman -Sy --needed --noconfirm gnu-netcat parted glibc dosfstools gptfdisk lvm2 btrfs-progs {{user `foreign_pkgmgr`}} ; sleep 5 ; ",
+      "cd /tmp ; curl -o /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; curl -o /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; curl -o /tmp/repo_archzfs.cfg 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/repo_archzfs.cfg' ; ",
+      "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then cat /tmp/repo_archzfs.cfg >> /etc/pacman.conf ; curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg ; pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76 ; pacman -Sy --noconfirm zfs-dkms ; pacman -Sy --noconfirm zfs-utils ; sleep 5 ; fi ; ",
+      "mv /etc/pacman.conf /etc/pacman.conf.old ; env MKFS_CMD={{user `mkfs_cmd`}} sh -x /tmp/disk_setup.sh part_format sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} service_mgr={{user `service_mgr`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
     ]
   },
   {
@@ -65,15 +67,17 @@
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
-    "shutdown_command": "sudo shutdown -hP +3",
+    "shutdown_command": "sudo shutdown -hP +3 || sudo poweroff",
     "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/artix/sha256sums",
     "iso_url": "",
     "iso_urls": "file://{{user `isos_pardir`}}/artix/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
     "boot_command": [
-      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10>artix<enter>artix<enter><wait10>sudo su<enter><wait>mount -o remount,size=1G /run/artix/cowspace ; mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5 ; pacman -Sy ; sleep 3 ; pacman -Sy --noconfirm gnu-netcat parted glibc dosfstools gptfdisk lvm2 ; sleep 5 ; ",
-      "cd /tmp ; curl -o /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; curl -o /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; sh -x /tmp/disk_setup.sh part_format_vmdisk sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems ; env service_mgr={{user `service_mgr`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10>artix<enter>artix<enter><wait10>sudo su<enter><wait>systemctl stop sshd ; mount -o remount,size=1G /run/artix/cowspace ; mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5 ; pacman -Sy ; sleep 3 ; pacman -Sy --needed --noconfirm gnu-netcat parted glibc dosfstools gptfdisk lvm2 btrfs-progs {{user `foreign_pkgmgr`}} ; sleep 5 ; ",
+      "cd /tmp ; curl -o /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; curl -o /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; curl -o /tmp/repo_archzfs.cfg 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/repo_archzfs.cfg' ; ",
+      "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then cat /tmp/repo_archzfs.cfg >> /etc/pacman.conf ; curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg ; pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76 ; pacman -Sy --noconfirm zfs-dkms ; pacman -Sy --noconfirm zfs-utils ; sleep 5 ; fi ; ",
+      "mv /etc/pacman.conf /etc/pacman.conf.old ; env MKFS_CMD={{user `mkfs_cmd`}} sh -x /tmp/disk_setup.sh part_format sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} service_mgr={{user `service_mgr`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
     ]
   }],
 
@@ -90,9 +94,9 @@
     "type": "shell-local",
     "inline": [
       "if command -v erb > /dev/null ; then",
-      "erb author={{user `author`}} guest={{user `variant`}}-x86_64-{{user `vol_mgr`}} datestamp={{user `datestamp`}} init/common/catalog.json.erb > output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}_catalog.json",
+      "erb author={{user `author`}} guest={{user `variant`}}-x86_64-{{user `vol_mgr`}} datestamp={{user `build_timestamp`}} init/common/catalog.json.erb > output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}_catalog.json",
       "elif command -v pystache > /dev/null ; then",
-      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-x86_64-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `datestamp`}}\"}' > output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}_catalog.json",
+      "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-x86_64-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' > output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}_catalog.json",
       "fi"
     ],
     "only": ["qemu_x86_64"]
@@ -151,7 +155,7 @@
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
         "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
         "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_x64_firmware`}}"],
-      "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}-{{user `datestamp`}}.{{.Provider}}.box",
+      "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}-{{user `build_timestamp`}}.{{.Provider}}.box",
       "only": ["qemu_x86_64"]
     },
     {
@@ -166,16 +170,19 @@
 
   "variables": {
     "variant": "archlinux",
-    "vol_mgr": "lvm",
+    "vol_mgr": "std",
+    "mkfs_cmd": "mkfs.ext4",
     "init_hostname": "{{user `variant`}}-boxv0000",
-    "service_mgr": "openrc",
+    "foreign_pkgmgr": "debootstrap",
+    "service_mgr": "",
     "boot_cmdln_options": " quiet video=1024x768 ",
     "virtfs_opts": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
     "isos_pardir": "/mnt/Data0/distros",
+    "RELEASE": "",
 
     "iso_url_mirror": "https://iso.artixlinux.org",
     "iso_url_directory": "artix",
-    "iso_x64_name": "artix-base-openrc-20210726-x86_64",
+    "iso_x64_name": "artix-base-runit-20210726-x86_64",
     "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
 
     "_iso_url_mirror_archlinux": "https://mirror.math.princeton.edu/pub/archlinux",
@@ -184,9 +191,9 @@
 
     "disk_size": "30720",
     "headless": "",
-    "plain_passwd": null,
-    "crypted_passwd": null,
-    "build_timestamp": "{{isotime \"20160912153000\"}}",
+    "plain_passwd": "abcd0123",
+    "crypted_passwd": "$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91",
+    "build_timestamp": "{{isotime \"2016.09\"}}",
     "author": "thebridge0491",
     "datestamp": "{{isotime \"2006.01.02\"}}",
     "home": "{{env `HOME`}}"

@@ -46,7 +46,7 @@ start svc       s6-rc -u change dhcpcd            66-start -t default dhcpcd
                 systemctl (Debian,Arch)           OpenBSD rc.d (OpenBSD)
                 ------------------------------    ------------------------------
 list services   systemctl list-units \            rcctl ls all
-                  --type=service [--state=active] 
+                  --type=service [--state=active]
 enable svc      systemctl enable ssh              rcctl enable sshd
   (Arch)          systemctl enable sshd
 disable svc     systemctl disable ssh             rcctl disable sshd
@@ -55,3 +55,34 @@ svc status      systemctl status networking       rcctl get sshd
   (Arch)          systemctl status dhcpcd[@eth0]
 start svc       systemctl start networking        rcctl start sshd
   (Arch)          systemctl start dhcpcd[@eth0]
+
+
+----------------------- firewall management info ---------------------------------------
+                pf (FreeBSD,NetBSD,OpenBSD)       firewalld (RedHat,SUSE)
+                ------------------------------    ------------------------------
+fw status       pfctl -s info                     firewall-cmd --state
+fw rules        pfctl -s rules -a '*'             firewall-cmd --list-all \
+                                                    [--zone=public]
+fw flush        pfctl -F all                      <svcmgr> disable firewalld
+fw load         pfctl -vf /etc/pf.conf            <svcmgr> enable firewalld
+fw messages     tcpdump -nettr /var/log/pflog     less /var/log/firewall
+                  [tcpdump -nett -i pflog0]
+########################################################################################
+########################################################################################
+                nftables (Debian,Arch,Void,..)    iptables (Linux: varies)
+                ------------------------------    ------------------------------
+fw status       ?                                 ?
+fw rules        nft list ruleset                  ip[6]tables -L
+fw flush        nft flush ruleset                 ip[6]tables -F
+fw load         nft -f /etc/nftables.conf         ip[6]tables-restore \
+                                                    /etc/iptables/ip[6]tables.rules
+fw messages     cat /var/log/messages | grep FW   cat /var/log/messages | grep FW
+########################################################################################
+########################################################################################
+                ufw (Debian)                      shorewall (Mageia,PCLinuxOS)
+                ------------------------------    ------------------------------
+fw status       ufw status verbose                shorewall[6] status
+fw rules        ufw show user-rules               shorewall[6] show [-bxl] net-fw
+fw flush        ufw disable                       shorewall[6] clear
+fw load         ufw enable                        shorewall[6] start
+fw messages     less /var/log/ufw.log             cat /var/log/messages | grep FW

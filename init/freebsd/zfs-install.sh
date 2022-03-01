@@ -4,9 +4,8 @@
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 # ssh user@ipaddr "su -m root -c 'sh -xs - arg1 argN'" < script.sh
 
-#sh /tmp/disk_setup.sh gpart_vmdisk zfs bsd0
-#sh /tmp/disk_setup.sh format_partitions zfs bsd0
-#sh /tmp/disk_setup.sh mount_filesystems
+#sh /tmp/disk_setup.sh part_format std bsd0
+#sh /tmp/disk_setup.sh mount_filesystems std bsd0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -23,7 +22,9 @@ elif [ -e /dev/da0 ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-bsd0} ; export ZPOOLNM=${ZPOOLNM:-fspool0}
-export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/FreeBSD} ; UNAME_M=$(uname -m)
+# ftp.freebsd.org/pub/FreeBSD | mirror.math.princeton.edu/pub/FreeBSD
+export MIRROR=${MIRROR:-ftp.freebsd.org/pub/FreeBSD} ; UNAME_M=$(uname -m)
+RELEASE=${RELEASE:-$(sysctl -n kern.osrelease | cut -d- -f1)}
 
 export INIT_HOSTNAME=${1:-freebsd-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -55,9 +56,8 @@ else
 fi
 
 
-# ifconfig wlan create wlandev ath0
-# ifconfig wlan0 up scan
-# dhclient wlan0
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# dhclient [-l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev}] {ifdev}
 
 ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 #wlan_adapter=$(ifconfig | grep -B3 -i wireless) # ath0 ?
@@ -71,13 +71,12 @@ sysctl kern.geom.label.gpt.enable=1
 
 
 echo "Extracting freebsd-dist archives" ; sleep 3
-#for file in kernel base ; do
-#    (fetch -o - ftp://${MIRROR}/releases/${UNAME_M}/11.0-RELEASE/${file}.txz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt}) ;
-#done
 cd /usr/freebsd-dist
 for file in kernel base ; do
+#    (fetch -o - ftp://${MIRROR}/releases/${UNAME_M}/${RELEASE}-RELEASE/${file}.txz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt}) ;
     (cat ${file}.txz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt}) ;
 done
+sleep 5
 
 
 mkdir -p /mnt/boot /mnt/etc
@@ -161,26 +160,6 @@ ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
 ABI=\$(pkg config abi)
 #pkg install -y nano sudo xfce
 pkg install -y nano sudo
-#pkg install -y openzfs
-
-## Differentiate names: /usr/local/sbin/({zpool,zfs} -> {zpool,zfs}-ng)
-#ln -s /usr/local/sbin/zpool /usr/local/sbin/zpool-ng
-#ln -s /usr/local/sbin/zfs /usr/local/sbin/zfs-ng
-
-## FreeBSD 12.2-RELEASE KLD openzfs.ko - unsupported file type error
-#sysrc -f /boot/loader.conf openzfs_load="YES"
-#sysrc -f /boot/loader.conf zfs_load="NO"
-#sysrc openzfs_enable="YES"
-#LINENO_START_MAIN=\$(grep -n 'zfs_start_main()' /etc/rc.d/zfs | cut -f1 -d:)
-#sed -i '' "\$(expr \$LINENO_START_MAIN + 1)a \\
-#        local cachefile
-#        for cachefile in /boot/zfs/zpool.cache /etc/zfs/zpool.cache ; do
-#          if [ -f $cachefile ] ; then
-#            zpool import -c $cachefile -a ;
-#          fi ;
-#        done
-#" /etc/rc.d/zfs
-#grep -B2 -A10 -e 'zfs_start_main()' /etc/rc.d/zfs ; sleep 5
 
 
 echo "Set root passwd ; add user" ; sleep 3
@@ -229,7 +208,6 @@ EOF
 
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
 ASSUME_ALWAYS_YES=yes pkg clean -y
-#zpool-ng trim ${ZPOOLNM} ; zpool-ng set autotrim=on ${ZPOOLNM}
 zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM}
 sync
 

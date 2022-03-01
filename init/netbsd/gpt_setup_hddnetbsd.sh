@@ -30,7 +30,7 @@ parttbl_bkup() {
   echo "            gpt bootcode -b /boot/pmbr $DEVX"
 }
 
-gpt_hddisk() {
+gpt_disk() {
   VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1}
 
   echo "Partitioning disk" ; sleep 3
@@ -97,6 +97,7 @@ zfspart_create() {
   GRP_NM=${1:-bsd1} ; ZPARTNM_ZPOOLNM=${2:-${GRP_NM}-fsPool:fspool0}
 
   modload solaris ; modload zfs
+  modstat -n zfs ; sleep 5
 
   zpartnm=$(echo $ZPARTNM_ZPOOLNM | cut -d: -f1)
   zpoolnm=$(echo $ZPARTNM_ZPOOLNM | cut -d: -f2)
@@ -159,6 +160,8 @@ format_partitions() {
 
     gpt label -l "$zpartnm" -i $idx $DEVX ;
   else
+    modstat -n ffs ; sleep 5
+    
     for partnm in ${BSD_PARTNMS} ; do
 	  idx=$(echo $(gpt show -l $DEVX | grep -e "$partnm") | cut -d' ' -f3) ;
 	  dkX=$(dkctl $DEVX listwedges | grep -e $partnm | cut -d: -f1) ;
@@ -176,24 +179,27 @@ format_partitions() {
   sync ; gpt show $DEVX ; sleep 3 ; gpt show -l $DEVX ; sleep 3
 }
 
-part_format_hddisk() {
+part_format() {
   VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
 
-  gpt_hddisk $VOL_MGR $GRP_NM
+  gpt_disk $VOL_MGR $GRP_NM
   format_partitions $VOL_MGR $GRP_NM $ZPARTNM_ZPOOLNM
 }
 
 mount_filesystems() {
-  GRP_NM=${1:-bsd1}
+  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1}
   echo "Mounting file systems" ; sleep 3
-  dkRoot=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsRoot" | cut -d: -f1)
-  dkVar=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsVar" | cut -d: -f1)
-  dkHome=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsHome" | cut -d: -f1)
-  dkSwap=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsSwap" | cut -d: -f1)
+  if [ "zfs" = "$VOL_MGR" ] ; then
+    zfs mount -a ;
+  else
+    dkRoot=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsRoot" | cut -d: -f1) ;
+    dkVar=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsVar" | cut -d: -f1) ;
+    dkHome=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsHome" | cut -d: -f1) ;
 
-  mount /dev/$dkRoot /mnt ; mkdir -p /mnt/var /mnt/usr/home
-  mount /dev/$dkVar /mnt/var ; mount /dev/$dkHome /mnt/usr/home
-  zfs mount -a
+    mount /dev/$dkRoot /mnt ; mkdir -p /mnt/var /mnt/usr/home ;
+    mount /dev/$dkVar /mnt/var ; mount /dev/$dkHome /mnt/usr/home ;
+  fi
+  dkSwap=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsSwap" | cut -d: -f1)
   swapon /dev/$dkSwap # OR: swapctl -a -p 1 $dkSwap
 
   cp /mnt2/usr/mdec/boot /mnt/

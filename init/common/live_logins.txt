@@ -2,26 +2,30 @@ live logins:
 
   distro		root/login		user/login
   ------		----------		----------
-  FreeBSD		root/-			
-  Arch			root/-			
+  FreeBSD		root/-
+  Devuan		root/toor		devuan/devuan
   Debian						user/live
+  Ubuntu						user/-
   GParted						user/live
-  
+  Tails
+  heads			root/toor		luther/luther
+  Void			root/voidlinux	anon/voidlinux
+
+  Artix			root/artix		artix/artix
+  Armtix		root/armtix		armtix/armtix
+  Arch			root/-
+  ArchLinuxArm			        alarm/alarm
+  Alpine		root/-
+  openSUSE		root/-			linux/-
+  GeckoLinux	root/-			linux/-
+
+  Rocky		    root/-			liveuser/-
   CentOS		root/-			liveuser/-
   PCLinuxOS		root/-			guest/-
-  openSUSE		root/-			linux/-
   Mageia		root/-			live/-
-  
-  OpenBSD		root/-			
-  Alpine		root/-			
-  Void			root/voidlinux	anon/voidlinux
-  
-  NetBSD		
-  Devuan		root/toor		devuan/devuan
-  Artix			root/artix		artix/artix
-  
-  Ubuntu						user/-
-  Tails			
-  heads			root/toor		luther/luther
+
+  NetBSD
+  OpenBSD		root/-
+
   Whonix		root/-			user/changeme
-  Qubes			
+  Qubes

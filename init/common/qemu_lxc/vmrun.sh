@@ -20,7 +20,7 @@ QEMU_AA64_FIRMWARE=${QEMU_AA64_FIRMWARE:-/usr/share/AAVMF/AAVMF_CODE.fd}
 #-------- create Vagrant ; use box image --------
 box_vagrant() {
   GUEST=${1:-freebsd-${MACHINE}-zfs} ; PROVIDER=${PROVIDER:-libvirt}
-  author=${author:-thebridge0491} ; datestamp=${datestamp:-`date +"%Y.%m.%d"`}
+  author=${author:-thebridge0491} ; build_timestamp=${build_timestamp:-`date +"%Y.%m"`}
   if [ ! -e ${STORAGE_DIR}/metadata.json ] ; then
     if [ "libvirt" = "${PROVIDER}" ] ; then
       echo '{"provider":"libvirt","virtual_size":30,"format":"qcow2"}' > \
@@ -115,31 +115,37 @@ EOF
     mv ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img ;
     cp ${BHYVE_X64_FIRMWARE} ${STORAGE_DIR}/ ;
   fi
-  (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${datestamp}.${PROVIDER}.box metadata.json info.json Vagrantfile `ls vmrun* *_CODE.fd` box.img)
+  (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${build_timestamp}.${PROVIDER}.box metadata.json info.json Vagrantfile `ls vmrun* *_CODE.fd` box.img)
 
   if command -v erb > /dev/null ; then
-    erb author=${author} guest=${GUEST} datestamp=${datestamp} \
+    erb author=${author} guest=${GUEST} datestamp=${build_timestamp} \
       ${STORAGE_DIR}/catalog.json.erb > ${STORAGE_DIR}/${GUEST}_catalog.json ;
+  elif command -v chevron > /dev/null ; then
+    echo "{
+      \"author\":\"${author}\",
+      \"guest\":\"${GUEST}\",
+      \"datestamp\":\"${build_timestamp}\"
+    }" | chevron -d /dev/stdin ${STORAGE_DIR}/catalog.json.mustache > ${STORAGE_DIR}/${GUEST}_catalog.json ;
   elif command -v pystache > /dev/null ; then
     pystache ${STORAGE_DIR}/catalog.json.mustache "{
       \"author\":\"${author}\",
       \"guest\":\"${GUEST}\",
-      \"datestamp\":\"${datestamp}\"
+      \"datestamp\":\"${build_timestamp}\"
     }" > ${STORAGE_DIR}/${GUEST}_catalog.json ;
   elif command -v mustache > /dev/null ; then
     cat << EOF >> mustache - ${STORAGE_DIR}/catalog.json.mustache > ${STORAGE_DIR}/${GUEST}_catalog.json ;
 ---
 author: ${author}
 guest: ${GUEST}
-datestamp: ${datestamp}
+datestamp: ${build_timestamp}
 ---
 EOF
   fi
 }
 
 diff_qemuimage() {
-  GUEST=${1:-freebsd-${MACHINE}-zfs} ; BOXPREFIX=${BOXPREFIX:-${GUEST}}
-  qemu-img create -f qcow2 -o backing_file=$(cd ${STORAGE_DIR} ; find ${BOXPREFIX}*libvirt.box -name box.img | tail -n1) \
+  GUEST=${1:-freebsd-${MACHINE}-zfs} ; BOXPREFIX=${BOXPREFIX:-${GUEST}*/}
+  qemu-img create -f qcow2 -o backing_file=$(cd ${STORAGE_DIR} ; find . -path "*${BOXPREFIX}*.${IMGFMT}" | tail -n1) \
     ${STORAGE_DIR}/${GUEST}.${IMGFMT}
   echo ''
   qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}.${IMGFMT} ; sleep 5
@@ -231,7 +237,7 @@ run_bhyve() {
 #------------ using qemu-system-* ---------------
 run_qemu() {
   GUEST=${1:-freebsd-${MACHINE}-zfs} ; IMGFILE=${IMGFILE:-${GUEST}.${IMGFMT}}
-  ${VIRTFS_OPTS:--virtfs local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough}
+  VIRTFS_OPTS=${VIRTFS_OPTS:--virtfs local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough}
 
   if [ "aarch64" = "${MACHINE}" ] ; then
     QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"}
@@ -252,7 +258,7 @@ run_qemu() {
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
       -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
       -drive file=${STORAGE_DIR}/${IMGFILE},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-      -display default,show-cursor=on \
+      -display default,show-cursor=on -vga none -device qxl-vga,vgamem_mb=64 \
       ${QUEFI_OPTS} ${VIRTFS_OPTS} &
   fi
 }

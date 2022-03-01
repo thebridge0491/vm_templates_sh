@@ -4,9 +4,8 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sgdisk lvm vg0 pvol0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0 pvol0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
+#sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
+#sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -22,6 +21,7 @@ fi
 
 export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
 export MIRROR=${MIRROR:-dl-cdn.alpinelinux.org/alpine} ; UNAME_M=$(uname -m)
+RELEASE=${RELEASE:-latest-stable}
 
 export INIT_HOSTNAME=${1:-alpine-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -44,18 +44,17 @@ EOF
 
 
 # ip link ; udhcpc -i eth0 #; iw dev
-#if [[ ! -z wlan0 ]] ; then      # wlan_ifc: wlan0, wlp2s0
-#    wifi-menu wlan0 ;
-#fi
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
 echo "Bootstrap base pkgs" ; sleep 3
 if command -v apk > /dev/null ; then
-  #apk --arch ${UNAME_M} --repository http://${MIRROR}/v${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
-  apk --arch ${UNAME_M} --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
+  apk --arch ${UNAME_M} --repository http://${MIRROR}/${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
 else
-  #./sbin/apk.static --arch ${UNAME_M} --repository http://${MIRROR}/v${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo
-  ./sbin/apk.static --arch ${UNAME_M} --repository http://${MIRROR}/latest-stable/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
+  curl -LO http://dl-cdn.alpinelinux.org/alpine/v3.15/main/${UNAME_M}/apk-tools-static-2.12.7-r3.apk ;
+  tar -xf apk-tools-static-*.apk ;
+  ./sbin/apk.static --arch ${UNAME_M} --repository http://${MIRROR}/${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
 fi
 
 
@@ -88,24 +87,24 @@ ls /proc ; sleep 5 ; ls /dev ; sleep 5
 
 
 . /etc/os-release
-RELEASE=\$(cat /etc/alpine-release | cut -d. -f1-2)
-#echo "http://${MIRROR}/v\${RELEASE}/main" >> /etc/apk/repositories
+#RELEASE=\$(cat /etc/alpine-release | cut -d. -f1-2)
 sed -i '/cdrom/ s|^|#|' /etc/apk/repositories
-echo "http://${MIRROR}/latest-stable/main" >> /etc/apk/repositories
-echo "http://${MIRROR}/latest-stable/community" >> /etc/apk/repositories
+#echo "http://${MIRROR}/v\${RELEASE}/main" >> /etc/apk/repositories
+echo "http://${MIRROR}/${RELEASE}/main" >> /etc/apk/repositories
+echo "http://${MIRROR}/${RELEASE}/community" >> /etc/apk/repositories
 apk --arch ${UNAME_M} update
 cat /etc/apk/repositories ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
-apk --arch ${UNAME_M} add tzdata sudo linux-lts linux-lts-dev dosfstools e2fsprogs mkinitfs dhcp bash util-linux shadow openssh grub-efi efibootmgr multipath-tools cryptsetup
+apk --arch ${UNAME_M} add tzdata sudo linux-lts linux-lts-dev dosfstools e2fsprogs xfsprogs mkinitfs dhcp bash util-linux shadow openssh grub-efi efibootmgr multipath-tools cryptsetup
 #apk --arch ${UNAME_M} add xfce4
 if [ "x86_64" = "${UNAME_M}" ] ; then
-  apk --arch ${UNAME_M} grub-bios
+  apk --arch ${UNAME_M} add grub-bios
 fi
 sleep 5
 
 apk --arch ${UNAME_M} add zfs
-modprobe zfs ; zpool version ; sleep 3
+modprobe zfs ; zfs version ; sleep 3
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -184,7 +183,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
 echo "Config Linux kernel"
-features="ata base cdrom ext4 keymap kms mmc raid scsi usb virtio zfs network"
+features="ata base cdrom ext4 xfs keymap kms mmc raid scsi usb virtio zfs network"
 echo features=\""\${features}"\" > /etc/mkinitfs/mkinitfs.conf
 kernel="\$(ls -A /lib/modules/ | tail -1)"
 mkinitfs "\${kernel}"
@@ -216,6 +215,9 @@ fi
 #sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
 echo 'GRUB_CMDLINE_LINUX_DEFAULT="rd.auto=1 text nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay=5 modules=sd-mod,usb-storage,ext4,zfs"' >> /etc/default/grub
 echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "aarch64" = "${UNAME_M}" ] ; then

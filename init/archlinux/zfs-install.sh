@@ -4,9 +4,8 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sgdisk lvm vg0 pvol0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0 pvol0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
+#sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
+#sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -21,7 +20,7 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0} ; UNAME_M=$(uname -m)
-service_mgr=${service_mgr:-openrc} # openrc | runit | s6
+service_mgr=${service_mgr:-runit} # runit | openrc | s6
 
 export INIT_HOSTNAME=${1:-archlinux-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -49,10 +48,13 @@ sysfs                           /sys        sysfs   defaults    0   0
 
 EOF
 
-# ip link ; dhcpcd #; iw dev
+# ip link ; dhcpcd {ifdev} #; iw dev
+# networkctl status ; networkctl up {ifdev}
 #if [[ ! -z wlan0 ]] ; then      # wlan_ifc: wlan0, wlp2s0
 #    wifi-menu wlan0 ;
 #fi
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
 echo "Config pkg repo mirror(s)" ; sleep 3
@@ -81,17 +83,37 @@ else
 #Include = /etc/pacman.d/mirrorlist
 #
 #EOF
-  curl -s "https://gitea.artixlinux.org/packagesP/pacman/raw/branch/master/trunk/pacman.conf" | tee /etc/pacman.conf ;
+  if [ "aarch64" = "${UNAME_M}" ] ; then
+    #curl -LO http://mirror.archlinuxarm.org/aarch64/core/pacman-6.0.1-3.1-aarch64.pkg.tar.xz ;
+    curl -LO https://repo.armtixlinux.org/system/os/aarch64/pacman-6.0.1-3-aarch64.pkg.tar.xz ;
+    tar -xf pacman*.pkg.tar.xz etc ;
+    cat ./etc/pacman.conf | tee /etc/pacman.conf ;
+  else
+    curl -s "https://gitea.artixlinux.org/packagesP/pacman/raw/branch/master/trunk/pacman.conf" | tee /etc/pacman.conf ;
+  fi ;
   cp /etc/pacman.conf /mnt/etc/pacman.conf ;
 fi
 ## fetch cmd: [curl -s | wget -qO -]
-#reflector --verbose --country ${LOCALE_COUNTRY:-US} --sort rate --fastest 10 --save /etc/pacman.d/mirrorlist-arch
-curl -s "https://archlinux.org/mirrorlist/?country=${LOCALE_COUNTRY:-US}&use_mirror_status=on" | sed -e 's|^#Server|Server|' -e '/^#/d' | tee /etc/pacman.d/mirrorlist-arch
-curl -s "https://gitea.artixlinux.org/packagesA/artix-mirrorlist/raw/branch/master/trunk/mirrorlist" | tee /etc/pacman.d/mirrorlist-artix
-cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirrorlist
+if [ "aarch64" = "${UNAME_M}" ] ; then
+  curl -LO http://mirror.archlinuxarm.org/aarch64/core/pacman-mirrorlist-20211120-1-any.pkg.tar.xz ;
+  tar -xf pacman-mirrorlist*.pkg.tar.xz ;
+  cat ./etc/pacman.d/mirrorlist | tee /etc/pacman.d/mirrorlist-archlinuxarm ;
+  curl -LO https://repo.armtixlinux.org/system/os/aarch64/artix-mirrorlist-20220117-1-any.pkg.tar.xz ;
+  tar -xf artix-mirrorlist*.pkg.tar.xz ;
+  cat ./etc/pacman.d/mirrorlist | tee /etc/pacman.d/mirrorlist-armtix ;
 
-#cp /etc/pacman.d/mirrorlist-arch /etc/pacman.d/mirrorlist-arch.bak
-#rankmirrors -vn 10 /etc/pacman.d/mirrorlist-arch.bak | tee /etc/pacman.d/mirrorlist-arch
+  cp /etc/pacman.d/mirrorlist-armtix /etc/pacman.d/mirrorlist ;
+  #cp /etc/pacman.d/mirrorlist-archlinuxarm /etc/pacman.d/mirrorlist-archlinuxarm.bak
+  #rankmirrors -vn 10 /etc/pacman.d/mirrorlist-archlinuxarm.bak | tee /etc/pacman.d/mirrorlist-archlinuxarm
+else
+  #reflector --verbose --country ${LOCALE_COUNTRY:-US} --sort rate --fastest 10 --save /etc/pacman.d/mirrorlist-arch
+  curl -s "https://archlinux.org/mirrorlist/?country=${LOCALE_COUNTRY:-US}&use_mirror_status=on" | sed -e 's|^#Server|Server|' -e '/^#/d' | tee /etc/pacman.d/mirrorlist-arch
+  curl -s "https://gitea.artixlinux.org/packagesA/artix-mirrorlist/raw/branch/master/trunk/mirrorlist" | tee /etc/pacman.d/mirrorlist-artix
+
+  cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirrorlist
+  #cp /etc/pacman.d/mirrorlist-arch /etc/pacman.d/mirrorlist-arch.bak
+  #rankmirrors -vn 10 /etc/pacman.d/mirrorlist-arch.bak | tee /etc/pacman.d/mirrorlist-arch
+fi
 
 sleep 5 ; cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.old
 cp `ls /etc/pacman.d/mirrorlist*` /mnt/etc/pacman.d/
@@ -105,10 +127,15 @@ done
 
 
 ## init [artix | archlinux] pacman keyring
-pacman-key --init ; pacman -Sy artix-keyring
+sed -i 's|\(^SigLevel.*\)|#\1\nSigLevel = Never|' /etc/pacman.conf
+pacman-key --init ; pacman -Sy --noconfirm artix-keyring
 pacman -U --noconfirm `ls /var/cache/pacman/pkg/artix-keyring*`
 pacman-key --populate artix
-pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
+#pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
+#pacman-key --lsign-key 53C01BC2 ; pacman-key --lsign-key F165BBAC
+if [ "x86_64" = "${UNAME_M}" ] ; then
+  sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf ;
+fi
 #cat $(dirname $0)/repo_archzfs.cfg | tee -a /mnt/etc/pacman.conf
 cat << EOF >> /mnt/etc/pacman.conf
 [archzfs]
@@ -121,22 +148,30 @@ Server = https://zxcvfdsa.com/archzfs/\$repo/\$arch
 EOF
 
 
+if [ "aarch64" = "${UNAME_M}" ] ; then
+  LINSUF=-aarch64-lts ;
+else
+  LINSUF=-lts ;
+fi
+
 echo "Bootstrap base pkgs" ; sleep 3
 zfs umount $ZPOOLNM/var/mail ; zfs destroy $ZPOOLNM/var/mail
-pkg_list="base base-devel intel-ucode amd-ucode linux-firmware dosfstools e2fsprogs xfsprogs reiserfsprogs jfsutils sysfsutils grub efibootmgr usbutils inetutils logrotate which dialog man-db man-pages less perl s-nail texinfo diffutils vi nano sudo elogind-${service_mgr} mkinitcpio"
+pkg_list="base base-devel amd-ucode linux-firmware dosfstools e2fsprogs xfsprogs sysfsutils grub efibootmgr usbutils inetutils logrotate which dialog man-db man-pages less perl s-nail texinfo diffutils vi nano sudo elogind-${service_mgr} mkinitcpio"
 # ifplugd # wpa_actiond iw wireless_tools
-#pacman -Sg base | cut -d' ' -f2 | sed 's|^linux$|linux-lts|g' | pacstrap /mnt -
+#pacman -Sg base | cut -d' ' -f2 | sed "s|^linux$|linux${LINSUF}|g" | pacstrap /mnt -
 if command -v pacstrap > /dev/null ; then
-  pacstrap /mnt --noconfirm $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
+  pacstrap /mnt --noconfirm $(pacman -Sqg base | sed "s|^linux$|&${LINSUF}|") $pkg_list linux${LINSUF} ;
 elif command -v basestrap > /dev/null ; then
-  basestrap /mnt --noconfirm $(pacman -Sqg base | sed 's|^linux$|&-lts|') $pkg_list linux-lts ;
+  basestrap /mnt --noconfirm $(pacman -Sqg base | sed "s|^linux$|&${LINSUF}|") $pkg_list linux${LINSUF} ;
 else
-  pacman --root /mnt -Sy --noconfirm $pkg_list linux-lts ;
+  pacman --root /mnt -Sy --noconfirm $pkg_list linux${LINSUF} ;
 fi
 
 echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
 #if command -v arch-chroot > /dev/null ; then
 #  CHROOT_CMD=arch-chroot ;
+#elif command -v artix-chroot > /dev/null ; then
+#  CHROOT_CMD=artix-chroot ;
 #elif command -v artools-chroot > /dev/null ; then
 #  CHROOT_CMD=artools-chroot ;
 #fi
@@ -175,21 +210,26 @@ elif [ -f /usr/lib/os-release ] ; then
 fi
 cat /etc/pacman.conf ; sleep 5
 
+sed -i 's|\(^SigLevel.*\)|#\1\nSigLevel = Never|' /etc/pacman.conf
 pacman-key --init
-if [ "arch" = "\${ID}" ] ; then
+if [ "arch" = "\${ID}" ] || [ "archarm" = "\${ID}" ] ; then
   pacman --needed -Sy --noconfirm archlinux-keyring ;
   pacman -U --noconfirm \$(ls /var/cache/pacman/pkg/archlinux-keyring*) ;
   pacman-key --populate archlinux ;
-elif [ "artix" = "\${ID}" ] ; then
+elif [ "artix" = "\${ID}" ] || [ "armtix" = "\${ID}" ] ; then
   pacman --needed -Sy --noconfirm artix-keyring ;
   pacman -U --noconfirm \$(ls /var/cache/pacman/pkg/artix-keyring*) ;
   pacman-key --populate artix ;
 fi
-pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
-pacman --noconfirm --needed -S linux-lts ; pacman --noconfirm -S linux-lts-headers
-if [ "arch" = "\${ID}" ] ; then
+#pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
+#pacman-key --lsign-key 53C01BC2 ; pacman-key --lsign-key F165BBAC
+if [ "x86_64" = "${UNAME_M}" ] ; then
+  sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf
+fi
+pacman --noconfirm --needed -S linux${LINSUF} ; pacman --noconfirm -S linux${LINSUF}-headers
+if [ "arch" = "\${ID}" ] || [ "archarm" = "\${ID}" ] ; then
   pacman --noconfirm --needed -S cryptsetup device-mapper mdadm dhcpcd openssh ;
-elif [ "artix" = "\${ID}" ] ; then
+elif [ "artix" = "\${ID}" ] || [ "armtix" = "\${ID}" ] ; then
   if command -v rc-update > /dev/null ; then
     service_mgr=openrc ;
   elif command -v sv > /dev/null ; then
@@ -207,16 +247,17 @@ curl -o /tmp/archzfs.gpg https://archzfs.com/archzfs.gpg
 pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
 pacman -Syu
 
-pacman --noconfirm -Sy --needed linux-lts-headers zfs-dkms # archzfs-linux-lts
+pacman --noconfirm -Sy --needed linux${LINSUF}-headers zfs-dkms # archzfs-linux-lts
+pacman --noconfirm -Sy --needed zfs-utils
 echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
 sh -c 'cat >> /etc/modules-load.d/zfs.conf' << EOF
 # load zfs.ko at boot
 zfs
 
 EOF
-modprobe zfs ; zpool version ; sleep 5
+modprobe zfs ; zfs version ; sleep 5
 #pacman --noconfirm -Sy zfs-linux-lts zfs-utils
-
+pacman --noconfirm -Sy linux${LINSUF}
 
 echo "Config keyboard ; localization" ; sleep 3
 kbd_mode -u ; loadkeys us
@@ -278,12 +319,12 @@ elif command -v s6-rc > /dev/null ; then
   s6-rc-bundle -c /etc/s6/rc/compiled add default sshd ;
 elif command -v sv > /dev/null ; then
   ## IP address config options: dhcpcd, dhclient
-  ln -s /etc/runit/sv/dhcpcd /run/runit/service ;
+  ln -s /etc/runit/sv/dhcpcd /etc/runit/runsvdir/default/ ;
 
-  #ln -s /etc/runit/sv/dhclient /run/runit/service ;
+  #ln -s /etc/runit/sv/dhclient /etc/runit/runsvdir/default/ ;
   #sv up dhclient ;
 
-  ln -s /etc/runit/sv/sshd /run/runit/service ;
+  ln -s /etc/runit/sv/sshd /etc/runit/runsvdir/default/ ;
 elif command -v rc-update > /dev/null ; then
   ## IP address config options: dhcpcd, dhclient
   rc-update add dhcpcd default ;
@@ -334,11 +375,11 @@ echo "Customize initial ramdisk (hooks: zfs)" ; sleep 3
 sed -i '/^HOOK/ s| keyboard||' /etc/mkinitcpio.conf
 #sed -i '/^HOOK/ s|filesystems|encrypt zfs usr filesystems|' /etc/mkinitcpio.conf	# encrypt hook only if crypted root partition
 sed -i '/^HOOK/ s|filesystems|keyboard zfs usr filesystems|' /etc/mkinitcpio.conf
-mkinitcpio -p linux-lts ; mkinitcpio -P
+mkinitcpio -p linux${LINSUF} #; mkinitcpio -P
 
 echo "Hold zfs & kernel package upgrades (require manual upgrade)"
 sed -i 's|#IgnorePkg|IgnorePkg|' /etc/pacman.conf
-for pkgX in zfs-dkms zfs-utils linux-lts linux-lts-headers ; do
+for pkgX in zfs-dkms zfs-utils linux${LINSUF} linux${LINSUF}-headers ; do
   sed -i "/^IgnorePkg/ s|\$| \${pkgX}|" /etc/pacman.conf
 done
 grep -e '^IgnorePkg' /etc/pacman.conf ; sleep 3
@@ -346,18 +387,31 @@ grep -e '^IgnorePkg' /etc/pacman.conf ; sleep 3
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable
-grub-install --target=i386-pc --recheck /dev/$DEVX
-cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI
+if [ "aarch64" = "${UNAME_M}" ] ; then
+  grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+else
+  grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  grub-install --target=i386-pc --recheck /dev/$DEVX ;
+  cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+fi
 
 #sed -i -e "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
 sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset zfs=${ZPOOLNM}/ROOT/default rootdelay=10"|' /etc/default/grub
 #sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
 echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+if [ "aarch64" = "${UNAME_M}" ] ; then
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+else
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+fi
 efibootmgr -v ; sleep 3
 
 

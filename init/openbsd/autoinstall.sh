@@ -21,7 +21,7 @@ fdisk -iy -g -b 960 $DEVX ; sync ; fdisk $DEVX ; sleep 3
 # https://github.com/openbsd/src/commit/bf983825822b119e4047eb99486f18c58351f347
 #sed -i 's/\[\[ -z $_l \]\] && //' /install.sub
 
-/install -a -f /tmp/install.conf ; sync
+/install -a -f /tmp/install.resp ; sync
 
 cat << EOFchroot | chroot /mnt /bin/sh
 set -x
@@ -86,7 +86,8 @@ exit
 EOFchroot
 # end chroot commands
 
-for fileX in /tmp/*.disklabel /tmp/install.conf /tmp/autoinstall.sh /tmp/i/install.resp ; do
+cp /tmp/install.resp /mnt/root/install.resp.orig
+for fileX in /tmp/*.disklabel /tmp/autoinstall.sh /tmp/i/install.resp ; do
   cp $fileX /mnt/root/ ;
 done
 sync

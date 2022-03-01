@@ -36,8 +36,8 @@ parttbl_bkup() {
   esac
 }
 
-_sgdisk_vmpartzfs() {
-  GRP_NM=${1:-vg0}
+_sgdisk_part() {
+  VOL_MGR=${1:-lvm} ; GRP_NM=${2:-vg0}
 
   sgdisk --zap --clear --mbrtogpt /dev/${DEVX} ; sync
   # typecode: f/ BIOS 1M fat|ef02 (bios_boot) ; f/ EFI 200M efi|ef00 (ESP)
@@ -47,13 +47,30 @@ _sgdisk_vmpartzfs() {
 
   sgdisk --new 3:0:+1G --typecode 3:8300 --change-name 3:"${GRP_NM}-osBoot" /dev/${DEVX}
   sgdisk --new 4:0:+4G --typecode 4:8200 --change-name 4:"${GRP_NM}-osSwap" /dev/${DEVX}
-  sgdisk --new 5:0:+0G --typecode 5:BF00 --change-name 5:"${GRP_NM}-osPool" /dev/${DEVX}
+
+  if [ "zfs" = "$VOL_MGR" ] ; then
+    sgdisk --new 5:0:+0G --typecode 5:BF00 --change-name 5:"${GRP_NM}-osPool" \
+      /dev/${DEVX} ;
+  elif [ "lvm" = "$VOL_MGR" ] ; then
+    sgdisk --new 5:0:+0G --typecode 5:8e00 --change-name 5:"${PV_NM}" \
+      /dev/${DEVX} ;
+  elif [ "btrfs" = "$VOL_MGR" ] ; then
+    sgdisk --new 5:0:+0G --typecode 5:8300 --change-name 5:"${PV_NM}" \
+      /dev/${DEVX} ;
+  elif [ "std" = "$VOL_MGR" ] ; then
+    sgdisk --new 5:0:+11776M --typecode 5:8300 \
+      --change-name 5:"${GRP_NM}-osRoot" /dev/${DEVX} ;
+    sgdisk --new 6:0:+5G --typecode 6:8300 --change-name 6:"${GRP_NM}-osVar" \
+      /dev/${DEVX} ;
+    sgdisk --new 7:0:+0G --typecode 7:8300 --change-name 7:"${GRP_NM}-osHome" \
+      /dev/${DEVX} ;
+  fi
 
   sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
 }
-_sfdisk_vmpartzfs() {
-  GRP_NM=${1:-vg0}
+_sfdisk_part() {
+  VOL_MGR=${1:-lvm} ; GRP_NM=${2:-vg0}
 
   sfdisk --delete --wipe always /dev/${DEVX} ; sync
   echo -n 'label: gpt' | sfdisk /dev/${DEVX}
@@ -69,13 +86,23 @@ _sfdisk_vmpartzfs() {
 
   echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM}-osBoot" | sfdisk -N 3 /dev/${DEVX}
   echo -n size=4GiB,type=0657FD6D-A4AB-43C4-84E5-0933C84B4F4F,name="${GRP_NM}-osSwap" | sfdisk -N 4 /dev/${DEVX}
-  echo -n type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM}-osPool" | sfdisk -N 5 /dev/${DEVX}
+
+  if [ "zfs" = "$VOL_MGR" ] ; then
+    echo -n type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM}-osPool" | \
+      sfdisk -N 5 /dev/${DEVX} ;
+  elif [ "lvm" = "$VOL_MGR" ] || [ "btrfs" = "$VOL_MGR" ] ; then
+    echo -n name=${PV_NM} | sfdisk -N 5 /dev/${DEVX} ;
+  elif [ "std" = "$VOL_MGR" ] ; then
+    echo -n size=11776MiB,name="${GRP_NM}-osRoot" | sfdisk -N 5 /dev/${DEVX} ;
+    echo -n size=5GiB,name="${GRP_NM}-osVar" | sfdisk -N 6 /dev/${DEVX} ;
+    echo -n name="${GRP_NM}-osHome" | sfdisk -N 7 /dev/${DEVX} ;
+  fi
 
   sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary
 }
-_parted_vmpartzfs() {
-  GRP_NM=${1:-vg0}
+_parted_part() {
+  VOL_MGR=${1:-lvm} ; GRP_NM=${2:-vg0}
 
   parted --script /dev/${DEVX} mklabel gpt
   DIFF=1 ; END='-0'
@@ -93,72 +120,30 @@ _parted_vmpartzfs() {
   DIFF=$END ; END=$(( 4 * 1024 + $DIFF ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
     mkpart primary ext2 $DIFF $END name 4 ${GRP_NM}-osSwap
-  DIFF=$END ; END=100%
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary $DIFF $END name 5 ${GRP_NM}-osPool
 
-  parted -s /dev/${DEVX} set 1 bios_grub on
-  parted -s /dev/${DEVX} set 2 esp on
-
-  sync ; parted -s /dev/${DEVX} unit GiB print ; sleep 3
-  parted -s /dev/${DEVX} align-check optimal 1 ; sleep 3
-  sleep 3 ; partprobe --summary
-}
-
-_sgdisk_vmpartlvm() {
-  GRP_NM=${1:-vg0} ; PV_NM=${2:-pvol0}
-
-  sgdisk --zap --clear --mbrtogpt /dev/${DEVX} ; sync
-  # typecode: f/ BIOS 1M fat|ef02 (bios_boot) ; f/ EFI 200M efi|ef00 (ESP)
-  sgdisk --new 1:1M:+1M --typecode 1:ef02 --change-name 1:"bios_boot" \
-    /dev/${DEVX}
-  sgdisk --new 2:0:+200M --typecode 2:ef00 --change-name 2:"ESP" /dev/${DEVX}
-
-  sgdisk --new 3:0:+1G --typecode 3:8300 --change-name 3:"${GRP_NM}-osBoot" /dev/${DEVX}
-  sgdisk --new 4:0:+0G --typecode 4:8e00 --change-name 4:"${PV_NM}" /dev/${DEVX}
-
-  sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
-  sleep 3 ; partprobe --summary
-}
-_sfdisk_vmpartlvm() {
-  GRP_NM=${1:-vg0} ; PV_NM=${2:-pvol0}
-
-  sfdisk --delete --wipe always /dev/${DEVX} ; sync
-  echo -n 'label: gpt' | sfdisk /dev/${DEVX}
-  # [s]fdisk type(s) (fdisk /dev/sdX; l):
-  # shortcut | MBR | GPT
-  #          |  4  | 21686148-6449-6E6F-744E-656564454649 (BIOS boot)
-  #  U(EFI)  | EF  | C12A7328-F81F-11D2-BA4B-00A0C93EC93B
-  #  L(inux) default | 83 | 0FC63DAF-8483-4772-8E79-3D69D8477DE4
-  echo -n start=1MiB,size=1MiB,bootable,type=21686148-6449-6E6F-744E-656564454649,name=bios_boot | sfdisk -N 1 /dev/${DEVX}
-  echo -n size=200MiB,bootable,type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,name=ESP | sfdisk -N 2 \
-    /dev/${DEVX}
-
-  echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM}-osBoot" | sfdisk -N 3 /dev/${DEVX}
-  echo -n name=${PV_NM} | sfdisk -N 4 /dev/${DEVX}
-
-  sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
-  sleep 3 ; partprobe --summary
-}
-_parted_vmpartlvm() {
-  GRP_NM=${1:-vg0} ; PV_NM=${2:-pvol0}
-
-  parted --script /dev/${DEVX} mklabel gpt
-  DIFF=1 ; END='-0'
-  # /dev/${DEVX}: f/ BIOS 1M none (bios_boot) ; f/ EFI 200M fat32 (ESP)
-  END=$(( 1 + $DIFF ))
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary $DIFF $END name 1 bios_boot
-  DIFF=$END ; END=$(( 200 + $DIFF ))
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary fat32 $DIFF $END name 2 ESP
-
-  DIFF=$END ; END=$(( 1 * 1024 + $DIFF ))
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 3 ${GRP_NM}-osBoot
-  DIFF=$END ; END=100%
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 4 ${PV_NM}
+  if [ "zfs" = "$VOL_MGR" ] ; then
+    DIFF=$END ; END=100% ;
+    parted -s -a optimal /dev/${DEVX} unit MiB \
+      mkpart primary $DIFF $END name 5 ${GRP_NM}-osPool ;
+  elif [ "lvm" = "$VOL_MGR" ] ; then
+    DIFF=$END ; END=100% ;
+    parted -s -a optimal /dev/${DEVX} unit MiB \
+      mkpart primary ext2 $DIFF $END name 5 ${PV_NM} ;
+  elif [ "btrfs" = "$VOL_MGR" ] ; then
+    DIFF=$END ; END=100% ;
+    parted -s -a optimal /dev/${DEVX} unit MiB \
+      mkpart primary btrfs $DIFF $END name 5 ${PV_NM} ;
+  elif [ "std" = "$VOL_MGR" ] ; then
+    DIFF=$END ; END=$(( 11776 + $DIFF )) ;
+    parted -s -a optimal /dev/${DEVX} unit MiB \
+      mkpart primary ext2 $DIFF $END name 5 ${GRP_NM}-osRoot ;
+    DIFF=$END ; END=$(( 5 * 1024 + $DIFF )) ;
+    parted -s -a optimal /dev/${DEVX} unit MiB \
+      mkpart primary ext2 $DIFF $END name 6 ${GRP_NM}-osVar ;
+    DIFF=$END ; END=100% ;
+    parted -s -a optimal /dev/${DEVX} unit MiB \
+      mkpart primary ext2 $DIFF $END name 7 ${GRP_NM}-osHome ;
+  fi
 
   parted -s /dev/${DEVX} set 1 bios_grub on
   parted -s /dev/${DEVX} set 2 esp on
@@ -169,114 +154,21 @@ _parted_vmpartlvm() {
 }
 
 
-_sgdisk_vmpartstd() {
-  GRP_NM=${1:-vg0}
-
-  sgdisk --zap --clear --mbrtogpt /dev/${DEVX} ; sync
-  # typecode: f/ BIOS 1M fat|ef02 (bios_boot) ; f/ EFI 200M efi|ef00 (ESP)
-  sgdisk --new 1:1M:+1M --typecode 1:ef02 --change-name 1:"bios_boot" \
-    /dev/${DEVX}
-  sgdisk --new 2:0:+200M --typecode 2:ef00 --change-name 2:"ESP" /dev/${DEVX}
-
-  sgdisk --new 3:0:+1G --typecode 3:8300 --change-name 3:"${GRP_NM}-osBoot" /dev/${DEVX}
-  sgdisk --new 4:0:+4G --typecode 4:8200 --change-name 4:"${GRP_NM}-osSwap" /dev/${DEVX}
-  sgdisk --new 5:0:+11776M --typecode 5:8300 --change-name 5:"${GRP_NM}-osRoot" /dev/${DEVX}
-  sgdisk --new 6:0:+6G --typecode 6:8300 --change-name 6:"${GRP_NM}-osVar" /dev/${DEVX}
-  sgdisk --new 7:0:+0G --typecode 7:8300 --change-name 7:"${GRP_NM}-osHome" /dev/${DEVX}
-
-  sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
-  sleep 3 ; partprobe --summary
-}
-_sfdisk_vmpartstd() {
-  GRP_NM=${1:-vg0}
-
-  sfdisk --delete --wipe always /dev/${DEVX} ; sync
-  echo -n 'label: gpt' | sfdisk /dev/${DEVX}
-  # [s]fdisk type(s) (fdisk /dev/sdX; l):
-  # shortcut | MBR | GPT
-  #          |  4  | 21686148-6449-6E6F-744E-656564454649 (BIOS boot)
-  #  U(EFI)  | EF  | C12A7328-F81F-11D2-BA4B-00A0C93EC93B
-  #  Linux swap | 82 | 0657FD6D-A4AB-43C4-84E5-0933C84B4F4F
-  #  L(inux) default | 83 | 0FC63DAF-8483-4772-8E79-3D69D8477DE4
-  echo -n start=1MiB,size=1MiB,bootable,type=21686148-6449-6E6F-744E-656564454649,name=bios_boot | sfdisk -N 1 /dev/${DEVX}
-  echo -n size=200MiB,bootable,type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,name=ESP | sfdisk -N 2 \
-    /dev/${DEVX}
-
-  echo -n size=1GiB,name="${GRP_NM}-osBoot" | sfdisk -N 3 /dev/${DEVX}
-  echo -n size=4GiB,type=0657FD6D-A4AB-43C4-84E5-0933C84B4F4F,name="${GRP_NM}-osSwap" | sfdisk -N 4 /dev/${DEVX}
-  echo -n size=11776MiB,name="${GRP_NM}-osRoot" | sfdisk -N 5 /dev/${DEVX}
-  echo -n size=6GiB,name="${GRP_NM}-osVar" | sfdisk -N 6 /dev/${DEVX}
-  echo -n name="${GRP_NM}-osHome" | sfdisk -N 7 /dev/${DEVX}
-
-  sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
-  sleep 3 ; partprobe --summary
-}
-_parted_vmpartstd() {
-  GRP_NM=${1:-vg0}
-
-  parted --script /dev/${DEVX} mklabel gpt
-  DIFF=1 ; END='-0'
-  # /dev/${DEVX}: f/ BIOS 1M none (bios_boot) ; f/ EFI 200M fat32 (ESP)
-  END=$(( 1 + $DIFF ))
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary $DIFF $END name 1 bios_boot
-  DIFF=$END ; END=$(( 200 + $DIFF ))
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary fat32 $DIFF $END name 2 ESP
-
-  DIFF=$END ; END=$(( 1 * 1024 + $DIFF ))
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 3 ${GRP_NM}-osBoot
-  DIFF=$END ; END=$(( 4 * 1024 + $DIFF ))
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 4 ${GRP_NM}-osSwap
-  DIFF=$END ; END=$(( 11776 + $DIFF ))
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 5 ${GRP_NM}-osRoot
-  DIFF=$END ; END=$(( 6 * 1024 + $DIFF ))
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 6 ${GRP_NM}-osVar
-  DIFF=$END ; END=100%
-  parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 7 ${GRP_NM}-osHome
-
-  parted -s /dev/${DEVX} set 1 bios_grub on
-  parted -s /dev/${DEVX} set 2 esp on
-
-  sync ; parted -s /dev/${DEVX} unit GiB print ; sleep 3
-  parted -s /dev/${DEVX} align-check optimal 1 ; sleep 3
-  sleep 3 ; partprobe --summary
-}
-
-
-part_vmdisk() {
+part_disk() {
   TOOL=${1:-sgdisk} ; VOL_MGR=${2:-lvm} ; GRP_NM=${3:-vg0} ; PV_NM=${4:-pvol0}
 
   echo "Partitioning disk" ; sleep 3
-  if [ "${VOL_MGR}" = "zfs" ] ; then
-    case $TOOL in
-      'sfdisk') _sfdisk_vmpartzfs $GRP_NM ;;
-      'parted') _parted_vmpartzfs $GRP_NM ;;
-      *) _sgdisk_vmpartzfs $GRP_NM ;;
-    esac ;
-  elif [ "${VOL_MGR}" = "lvm" ] ; then
-    case $TOOL in
-      'sfdisk') _sfdisk_vmpartlvm ${GRP_NM} ${PV_NM} ;;
-      'parted') _parted_vmpartlvm ${GRP_NM} ${PV_NM} ;;
-      *) _sgdisk_vmpartlvm ${GRP_NM} ${PV_NM} ;;
-    esac ;
-  else
-    case $TOOL in
-      'sfdisk') _sfdisk_vmpartstd $GRP_NM ;;
-      'parted') _parted_vmpartstd $GRP_NM ;;
-      *) _sgdisk_vmpartstd $GRP_NM ;;
-    esac ;
-  fi
+  case $TOOL in
+    'sfdisk') _sfdisk_part ${VOL_MGR} ${GRP_NM} ${PV_NM} ;;
+    'parted') _parted_part ${VOL_MGR} ${GRP_NM} ${PV_NM} ;;
+    *) _sgdisk_part ${VOL_MGR} ${GRP_NM} ${PV_NM} ;;
+  esac
 }
 
 zfspart_create() {
   ZPARTNM_ZPOOLNM=${1:-vg0-osPool:ospool0}
-  modprobe zfs
+  modprobe zfs ; zfs version
+  modinfo zfs | grep -e name -e version
   lsmod | grep -e zfs ; sleep 5
 
   zpartnm=$(echo $ZPARTNM_ZPOOLNM | cut -d: -f1)
@@ -284,7 +176,7 @@ zfspart_create() {
   idx=$(lsblk -nlpo name,label,partlabel | sed -n "/${zpartnm}/ s|.*[sv]da\([0-9]*\).*|\1|p")
 
   zpool destroy $zpoolnm ;
-  zpool labelclear -f /dev/${DEVX}${idx} ;
+  zpool labelclear -f /dev/${DEVX}${idx} ; mkdir -p /mnt
 
   #zpool create -R /mnt -O mountpoint=none -o ashift=12 -O compress=lz4 \
   zpool create -R /mnt -O mountpoint=/ -o ashift=12 -d \
@@ -317,7 +209,7 @@ zfspart_create() {
   zfs create -o mountpoint=/opt $zpoolnm/opt
 
   zfs set quota=8G $zpoolnm/home
-  zfs set quota=6G $zpoolnm/var
+  zfs set quota=5G $zpoolnm/var
   zfs set quota=2G $zpoolnm/tmp
   #zfs set mountpoint=/$zpoolnm $zpoolnm
 
@@ -337,9 +229,10 @@ zfspart_create() {
 }
 
 lvmpv_create() {
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:11776M osVar:5G osHome:7680M}
   GRP_NM=${1:-vg0} ; PV_NM=${2:-pvol0}
-  modprobe dm-mod ; modprobe dm-crypt
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:11776M osVar:5G osHome:7680M}
+  modprobe dm-mod ; modprobe dm-crypt ; lvm version
+  modinfo dm_mod dm_crypt | grep -e name -e version
   lsmod | grep -e dm_mod -e dm_crypt ; sleep 5
 
   #DEV_PV=$(blkid | grep -e ${PV_NM} | cut -d: -f1)
@@ -356,66 +249,112 @@ lvmpv_create() {
   vgscan ; vgchange -ay ; sleep 3 ; lvs ; sleep 3
 }
 
+btrfspart_create() {
+  GRP_NM=${1:-vg0} ; PV_NM=${2:-pvol0}
+  modprobe btrfs
+  modinfo btrfs | grep -e name -e version
+  lsmod | grep -e btrfs ; sleep 5
+
+  #DEV_PV=$(blkid | grep -e ${PV_NM} | cut -d: -f1)
+  DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM} | cut -d' ' -f1)
+  mkfs.btrfs -L ${PV_NM} ${DEV_PV}
+  mkdir -p /mnt ; mount -t btrfs ${DEV_PV} /mnt ; sync
+  
+  btrfs quota enable /mnt
+  btrfs subvolume create /mnt/@
+  btrfs subvolume create /mnt/@/.snapshots
+  btrfs subvolume create /mnt/@/var
+  btrfs subvolume create /mnt/@/tmp
+  btrfs subvolume create /mnt/@/home
+  btrfs subvolume set-default 257 /mnt
+  
+  btrfs subvolume list /mnt | cut -d' ' -f2 | xargs -I{} -n1 btrfs qgroup create 0/{} /mnt
+  sleep 3 ; btrfs quota rescan /mnt
+  btrfs qgroup limit 8G /mnt/@/home
+  btrfs qgroup limit 5G /mnt/@/var
+  btrfs qgroup limit 2G /mnt/@/tmp
+  btrfs qgroup show -re /mnt ; sleep 5
+  
+  btrfs device scan
+  btrfs filesystem show ; btrfs subvolume list /mnt ; sleep 5
+  umount /mnt ; sync
+}
+
 format_partitions() {
-  MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:11776M osVar:5G osHome:7680M}
   VOL_MGR=${1:-lvm} ; GRP_NM=${2:-vg0} ; PV_NM=${3:-pvol0}
+  MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:11776M osVar:5G osHome:7680M}
 
   echo "Formatting file systems" ; sleep 3
   if [ "${VOL_MGR}" = "zfs" ] ; then
     ZPARTNM_ZPOOLNM=${ZPARTNM_ZPOOLNM:-${GRP_NM}-osPool:ospool0}
     zfspart_create $ZPARTNM_ZPOOLNM ;
 
-    DEV_SWAP=$(blkid | grep -e "${GRP_NM}-osSwap" | cut -d: -f1) ;
+    DEV_SWAP=$(blkid | grep -e "osSwap" | cut -d: -f1) ;
     yes | mkswap -L "${GRP_NM}-osSwap" ${DEV_SWAP} ;
+  elif [ "${VOL_MGR}" = "btrfs" ] ; then
+    btrfspart_create $GRP_NM $PV_NM ;
   else
     if [ "${VOL_MGR}" = "lvm" ] ; then
       lvmpv_create $GRP_NM $PV_NM ;
     fi ;
     for nm_sz in ${PARTS_NM_SZ} ; do
       lv_nm=$(echo $nm_sz | cut -d: -f1) ; lv_sz=$(echo $nm_sz | cut -d: -f2) ;
-      #DEV_LV=$(blkid | grep -e "${GRP_NM}-${lv_nm}" | cut -d: -f1) ;
-      DEV_LV=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-${lv_nm}" | cut -d' ' -f1) ;
+      #DEV_LV=$(blkid | grep -e "${lv_nm}" | cut -d: -f1) ;
+      DEV_LV=$(lsblk -nlpo name,label,partlabel | grep -e "${lv_nm}" | cut -d' ' -f1) ;
       if [ "osSwap" = "$lv_nm" ] ; then
-        yes | mkswap -L "${GRP_NM}-osSwap" ${DEV_LV} ;
+        yes | mkswap -L "${GRP_NM}-${lv_nm}" ${DEV_LV} ;
       else
         yes | ${MKFS_CMD} -L "${GRP_NM}-${lv_nm}" ${DEV_LV} ;
       fi ;
     done ;
   fi
+  DEV_SWAP=$(lsblk -nlpo name,label,partlabel | grep -e "osSwap" | cut -d' ' -f1)
   #DEV_ESP=$(blkid | grep -e ESP | cut -d: -f1)
   DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)
-  DEV_BOOT=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osBoot" | cut -d' ' -f1)
-  sleep 3 ; yes | mkfs.fat -n ESP ${DEV_ESP} ; sleep 3
+  DEV_BOOT=$(lsblk -nlpo name,label,partlabel | grep -e "osBoot" | cut -d' ' -f1)
+  sleep 3 ; yes | mkswap -L "${GRP_NM}-osSwap" ${DEV_SWAP}
+  sleep 3 ; yes | mkfs.fat -n ESP ${DEV_ESP}
   sleep 3 ; yes | mkfs.ext2 -L "${GRP_NM}-osBoot" ${DEV_BOOT}
   sync
 }
 
-part_format_vmdisk() {
-  MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osSwap:4G osRoot:11776M osVar:5G osHome:7680M}
+part_format() {
   TOOL=${1:-sgdisk} ; VOL_MGR=${2:-lvm} ; GRP_NM=${3:-vg0} ; PV_NM=${4:-pvol0}
+  MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:11776M osVar:5G osHome:7680M}
 
-  part_vmdisk $TOOL $VOL_MGR $GRP_NM $PV_NM
+  part_disk $TOOL $VOL_MGR $GRP_NM $PV_NM
   format_partitions $VOL_MGR $GRP_NM $PV_NM
 }
 
 mount_filesystems() {
-  GRP_NM=${1:-vg0}
-
-  DEV_BOOT=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osBoot" | cut -d' ' -f1)
-  DEV_ROOT=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osRoot" | cut -d' ' -f1)
-  DEV_VAR=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osVar" | cut -d' ' -f1)
-  DEV_HOME=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osHome" | cut -d' ' -f1)
-  DEV_SWAP=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osSwap" | cut -d' ' -f1)
+  VOL_MGR=${1:-lvm} ; GRP_NM=${2:-vg0}
 
   echo "Mounting file systems" ; sync ; sleep 3
-  mkdir -p /mnt ; mount ${DEV_ROOT} /mnt
-  mkdir -p /mnt/root /mnt/var /mnt/home
-  mount ${DEV_VAR} /mnt/var ; mount ${DEV_HOME} /mnt/home
-  zfs mount -a ; mkdir -p /mnt/etc/zfs
+  if [ "zfs" = "$VOL_MGR" ] ; then
+    zfs mount -a ; mkdir -p /mnt/etc/zfs ;
+  elif [ "btrfs" = "$VOL_MGR" ] ; then
+    DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
+    mount -o noatime,compress=lzo,subvol=@ ${DEV_PV} /mnt ;
+    mkdir -p /mnt/.snapshots /mnt/var /mnt/tmp /mnt/home ;
+    mount -o noatime,compress=lzo,subvol=@/.snapshots ${DEV_PV} \
+      /mnt/.snapshots ;
+    mount -o noatime,compress=lzo,subvol=@/var ${DEV_PV} /mnt/var ;
+    mount -o noatime,compress=lzo,subvol=@/tmp ${DEV_PV} /mnt/tmp ;
+    mount -o noatime,compress=lzo,subvol=@/home ${DEV_PV} /mnt/home ;
+  else
+    DEV_ROOT=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osRoot" | cut -d' ' -f1) ;
+    DEV_VAR=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osVar" | cut -d' ' -f1) ;
+    DEV_HOME=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osHome" | cut -d' ' -f1) ;
+    mkdir -p /mnt ; mount ${DEV_ROOT} /mnt ;
+    mkdir -p /mnt/root /mnt/var /mnt/home ;
+    mount ${DEV_VAR} /mnt/var ; mount ${DEV_HOME} /mnt/home ;
+  fi
+  DEV_SWAP=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osSwap" | cut -d' ' -f1)
   swapon ${DEV_SWAP}
 
+  DEV_BOOT=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osBoot" | cut -d' ' -f1)
   mkdir -p /mnt/boot ; mount ${DEV_BOOT} /mnt/boot
   #DEV_ESP=$(blkid | grep -e ESP | cut -d: -f1)
   DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e ESP | cut -d' ' -f1)

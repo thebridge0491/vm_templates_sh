@@ -1,0 +1,17 @@
+[options]
+HoldPkg = pacman glibc
+Architecture = auto
+
+CheckSpace
+SigLevel = Required DatabaseOptional
+#SigLevel = Never
+LocalFileSigLevel = Optional
+
+[system]
+Include = /etc/pacman.d/mirrorlist
+[world]
+Include = /etc/pacman.d/mirrorlist
+[galaxy]
+Include = /etc/pacman.d/mirrorlist
+[lib32]
+Include = /etc/pacman.d/mirrorlist

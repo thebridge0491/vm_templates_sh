@@ -169,7 +169,7 @@ EOF
     concat_sep "geom $g_type status -as" ;
   done
   printf "${sep}\nZFS info\n"
-  concat_sep 'zpool version' ; concat_sep 'zpool list -v'
+  concat_sep 'zfs version' ; concat_sep 'zpool list -v'
   concat_sep 'zfs list'
 
   concat_sep /etc/fstab
@@ -292,7 +292,7 @@ $(lsblk -nlpo label | column -xc 78)
 EOF
 
   printf "${sep}\nZFS info\n"
-  concat_sep 'sudo zpool version' ; concat_sep 'sudo zpool list -v'
+  concat_sep 'sudo zfs version' ; concat_sep 'sudo zpool list -v'
   concat_sep 'sudo zfs list'
   echo "LVM info"
   concat_sep 'sudo pvs' ; concat_sep 'sudo vgs'

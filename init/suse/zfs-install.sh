@@ -4,9 +4,8 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sgdisk lvm vg0 pvol0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0 pvol0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
+#sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
+#sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -22,6 +21,7 @@ fi
 
 export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
 export MIRROR=${MIRROR:-download.opensuse.org} ; UNAME_M=$(uname -m)
+RELEASE=${RELEASE:-openSUSE-current}
 
 export INIT_HOSTNAME=${1:-suse-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -43,18 +43,26 @@ sysfs                           /sys        sysfs   defaults    0   0
 EOF
 
 
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# networkctl status ; networkctl up {ifdev}
+# nmcli device status ; nmcli connection up {ifdev}
+# wicked ifstatus all ; wicked up {ifdev}
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
+
+
 echo "Bootstrap base pkgs" ; sleep 3
 zfs umount $ZPOOLNM/var/mail ; zfs destroy $ZPOOLNM/var/mail
 #rm -r /mnt/var/lib/rpm /mnt/var/cache/zypp
 #mkdir -p /mnt/var/lib/rpm /mnt/var/cache/zypp
 #rpm -v --root /mnt --initdb
 # [wget -O file url | curl -L -o file url]
-#wget -O /tmp/release.rpm http://${MIRROR}/distribution/openSUSE-current/repo/oss/${UNAME_M}/openSUSE-release-15.2-lp152.575.1.${UNAME_M}.rpm
+#wget -O /tmp/release.rpm http://${MIRROR}/distribution/${RELEASE}/repo/oss/${UNAME_M}/openSUSE-release-15.2-lp152.575.1.${UNAME_M}.rpm
 #rpm -v -qip /tmp/release.rpm ; sleep 5
 #rpm -v --root /mnt --nodeps -i /tmp/release.rpm
-zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/openSUSE-current/repo/oss/ repo-oss
+zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/${RELEASE}/repo/oss/ repo-oss
 zypper --non-interactive --root /mnt --gpg-auto-import-keys refresh
-zypper --non-interactive --root /mnt install --no-recommends patterns-base-base makedev
+zypper --non-interactive --root /mnt install --no-recommends patterns-base-base makedev system-group-wheel
 zypper --non-interactive --root /mnt repos ; sleep 5
 
 
@@ -111,17 +119,22 @@ zypper --non-interactive install --no-recommends --type pattern base bootloader 
 zypper --non-interactive install ca-certificates-cacert ca-certificates-mozilla
 zypper --gpg-auto-import-keys refresh
 update-ca-certificates
-zypper --non-interactive install kernel-default makedev sudo nano less dosfstools gptfdisk grub2 shim efibootmgr firewalld openssl openssh-askpass kernel-default-devel dkms
+zypper --non-interactive install kernel-default kernel-firmware makedev system-group-wheel sudo nano less dosfstools xfsprogs gptfdisk grub2 shim efibootmgr firewalld openssl openssh-askpass kernel-default-devel dkms
 
 ## temp downgrade grub2[x86_64-efi|i386-pc] due to unknown filesystem error (ZFS)
 #zypper --non-interactive install --from repo-oss --from repo-non-oss --oldpackage grub2-i386-pc grub2-x86_64-efi shim grub2
 #zypper addlock grub2-i386-pc grub2-x86_64-efi shim grub2
 
-zypper --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/openSUSE_Leap_\${VERSION_ID}/filesystems.repo
+zypper --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/\${VERSION_ID}/filesystems.repo
 zypper --gpg-auto-import-keys refresh
+
+# ?? Error - no zfs.ko module, just binaries zfs, zpool, etc (zfs ver 2.1.2)
 zypper --non-interactive install zfs
+find /lib/modules -type f -name '*zfs.ko*'
+sleep 30 # ?? missing zfs.ko (zfs ver 2.1.2)
+
 mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
-modprobe zfs ; sleep 5 ; zpool version
+modprobe zfs ; zfs version ; sleep 5
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -158,15 +171,19 @@ echo "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hos
 ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 sh -c "cat >> /etc/sysconfig/network/ifcfg-\${ifdev}" << EOF
-#BOOTPROTO='dhcp'
-#STARTMODE='auto'
-#ONBOOT='yes'
+BOOTPROTO='dhcp'
+STARTMODE='auto'
+ONBOOT='yes'
 
 EOF
-#echo "NETWORKING=yes" >> /etc/sysconfig/network
+echo "NETWORKING=yes" >> /etc/sysconfig/network
 
 
-systemctl enable zfs-import-cache ; systemctl enable zfs-import.target
+sed -i '/^\[Unit\]/,/^$/!b;/^$/i\Requires=systemd-modules-load.service\nAfter=systemd-modules-load.service' /etc/systemd/system/zfs-import.target.wants/zfs-import-cache.service
+sed -i '/^\[Service\]/,/^$/!b;/^$/i\ExecStartPre=/usr/bin/sleep 30' /etc/systemd/system/zfs-import.target.wants/zfs-import-cache.service
+
+systemctl enable zfs-import-scan ; systemctl enable zfs-import-cache
+systemctl enable systemd-modules-load #; systemctl enable zfs-import.target
 systemctl enable zfs-mount ; systemctl enable zfs.target
 sleep 10
 
@@ -181,11 +198,12 @@ DIR_MODE=0750 useradd -m -G wheel -s /bin/bash -c 'Packer User' packer
 echo -n 'packer:${CRYPTED_PASSWD}' | chpasswd -e
 chown -R packer:\$(id -gn packer) /home/packer
 
-#sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
-#Defaults:packer !requiretty
+sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
+Defaults:packer !requiretty
 #\$(id -un packer) ALL=(ALL) NOPASSWD: ALL
-#EOF
-#chmod 0440 /etc/sudoers.d/99_packer
+packer ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/99_packer
 
 
 sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
@@ -194,21 +212,33 @@ echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
-echo "Config dracut"
-echo 'hostonly="yes"' >> /etc/dracut.conf
+echo "Config dracut ; Linux kernel"
 mkdir -p /etc/dracut.conf.d
+
+echo 'hostonly="yes"' >> /etc/dracut.conf
 echo 'nofsck="yes"' >> /etc/dracut.conf.d/zol.conf
 echo 'add_dracutmodules+=" zfs "' >> /etc/dracut.conf.d/zol.conf
 echo 'omit_dracutmodules+=" btrfs resume "' >> /etc/dracut.conf.d/zol.conf
 
+echo "zfs" >> /etc/modules-load.d/zfs.conf
+
+sleep 10 ; echo 'First try'
+kernel-install add \$(uname -r) /boot/vmlinuz-\$(uname -r)
+dracut --kver \$(uname -r) --force --add-drivers "zfs"
+mkinitrd /boot/initrd-\$(uname -r) \$(uname -r)
+
+sleep 10 ; echo 'Try again'
+kver="\$(ls -A /lib/modules/ | tail -1)"
+kernel-install add \$kver /boot/vmlinuz-\$kver
+dracut --kver \$kver --force --add-drivers "zfs"
+mkinitrd /boot/initrd-\$kver \$kver
+
+#zypper --non-interactive install -f kernel-default
 
 grub2-probe /boot
 
-echo "Config Linux kernel"
-zypper --non-interactive install -f kernel-default
-
 echo "Hold zfs & kernel package upgrades (require manual upgrade)"
-zypper addlock zfs zfs-kmp-default zfs-sudo kernel-default kernel-default-devel
+zypper addlock zfs zfs-sudo kernel-default kernel-default-devel
 zypper locks ; sleep 3
 
 
@@ -236,6 +266,9 @@ fi
 echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay=5"|'  \
   /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg

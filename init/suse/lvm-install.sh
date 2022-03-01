@@ -4,9 +4,8 @@
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 
-#sh /tmp/disk_setup.sh part_vmdisk sgdisk lvm vg0 pvol0
-#sh /tmp/disk_setup.sh format_partitions lvm vg0 pvol0
-#sh /tmp/disk_setup.sh mount_filesystems vg0
+#sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
+#sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
 # perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
@@ -22,6 +21,7 @@ fi
 
 export GRP_NM=${GRP_NM:-vg0}
 export MIRROR=${MIRROR:-download.opensuse.org} ; UNAME_M=$(uname -m)
+RELEASE=${RELEASE:-openSUSE-current}
 
 export INIT_HOSTNAME=${1:-suse-boxv0000}
 #export PLAIN_PASSWD=${2:-abcd0123}
@@ -31,12 +31,12 @@ export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlA
 echo "Create /etc/fstab" ; sleep 3
 mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
 sh -c 'cat > /mnt/etc/fstab' << EOF
-LABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
-LABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
-LABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+LABEL=${GRP_NM}-osRoot   /           auto    errors=remount-ro   0   1
+LABEL=${GRP_NM}-osVar    /var        auto    defaults    0   2
+LABEL=${GRP_NM}-osHome   /home       auto    defaults    0   2
 PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
-LABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
+PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
@@ -46,17 +46,25 @@ sysfs                           /sys        sysfs   defaults    0   0
 EOF
 
 
+# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# networkctl status ; networkctl up {ifdev}
+# nmcli device status ; nmcli connection up {ifdev}
+# wicked ifstatus all ; wicked up {ifdev}
+
+#ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
+
+
 echo "Bootstrap base pkgs" ; sleep 3
 #rm -r /mnt/var/lib/rpm /mnt/var/cache/zypp
 #mkdir -p /mnt/var/lib/rpm /mnt/var/cache/zypp
 #rpm -v --root /mnt --initdb
 # [wget -O file url | curl -L -o file url]
-#wget -O /tmp/release.rpm http://${MIRROR}/distribution/openSUSE-current/repo/oss/${UNAME_M}/openSUSE-release-15.2-lp152.575.1.${UNAME_M}.rpm
+#wget -O /tmp/release.rpm http://${MIRROR}/distribution/${RELEASE}/repo/oss/${UNAME_M}/openSUSE-release-15.2-lp152.575.1.${UNAME_M}.rpm
 #rpm -v -qip /tmp/release.rpm ; sleep 5
 #rpm -v --root /mnt --nodeps -i /tmp/release.rpm
-zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/openSUSE-current/repo/oss/ repo-oss
+zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/${RELEASE}/repo/oss/ repo-oss
 zypper --non-interactive --root /mnt --gpg-auto-import-keys refresh
-zypper --non-interactive --root /mnt install --no-recommends patterns-base-base makedev
+zypper --non-interactive --root /mnt install --no-recommends patterns-base-base makedev system-group-wheel
 zypper --non-interactive --root /mnt repos ; sleep 5
 
 
@@ -93,6 +101,7 @@ ls /proc ; sleep 5 ; ls /dev ; sleep 5
 #mount -t proc none /proc
 cd /dev ; MAKEDEV generic
 
+systemctl stop sshd ; systemctl disable sshd
 
 echo "Config pkg repo mirror(s)" ; sleep 3
 . /etc/os-release
@@ -113,7 +122,9 @@ zypper --non-interactive install --no-recommends --type pattern base bootloader 
 zypper --non-interactive install ca-certificates-cacert ca-certificates-mozilla
 zypper --gpg-auto-import-keys refresh
 update-ca-certificates
-zypper --non-interactive install kernel-default makedev sudo nano less dosfstools grub2 shim efibootmgr firewalld openssl openssh-askpass lvm2
+zypper --non-interactive install kernel-default makedev system-group-wheel sudo nano less dosfstools xfsprogs grub2 shim efibootmgr firewalld openssl openssh-askpass lvm2
+
+modprobe dm-mod ; vgscan ; vgchange -ay ; lvs
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -150,12 +161,12 @@ echo "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hos
 ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 sh -c "cat >> /etc/sysconfig/network/ifcfg-\${ifdev}" << EOF
-#BOOTPROTO='dhcp'
-#STARTMODE='auto'
-#ONBOOT='yes'
+BOOTPROTO='dhcp'
+STARTMODE='auto'
+ONBOOT='yes'
 
 EOF
-#echo "NETWORKING=yes" >> /etc/sysconfig/network
+echo "NETWORKING=yes" >> /etc/sysconfig/network
 
 
 echo "Set root passwd ; add user" ; sleep 3
@@ -168,17 +179,35 @@ DIR_MODE=0750 useradd -m -G wheel -s /bin/bash -c 'Packer User' packer
 echo -n 'packer:${CRYPTED_PASSWD}' | chpasswd -e
 chown -R packer:\$(id -gn packer) /home/packer
 
-#sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
-#Defaults:packer !requiretty
+sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
+Defaults:packer !requiretty
 #\$(id -un packer) ALL=(ALL) NOPASSWD: ALL
-#EOF
-#chmod 0440 /etc/sudoers.d/99_packer
+packer ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/99_packer
 
 
 sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
 sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
 echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
+
+
+echo "Config dracut ; Linux kernel"
+mkdir -p /etc/dracut.conf.d
+
+echo 'hostonly="yes"' >> /etc/dracut.conf
+
+sleep 10 ; echo 'First try'
+kernel-install add \$(uname -r) /boot/vmlinuz-\$(uname -r)
+dracut --kver \$(uname -r) --force
+mkinitrd /boot/initrd-\$(uname -r) \$(uname -r)
+
+sleep 10 ; echo 'Try again'
+kver="\$(ls -A /lib/modules/ | tail -1)"
+kernel-install add \$kver /boot/vmlinuz-\$kver
+dracut --kver \$kver --force
+mkinitrd /boot/initrd-\$kver \$kver
 
 
 echo "Bootloader installation & config" ; sleep 3
@@ -205,6 +234,9 @@ fi
 echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5"|'  \
   /etc/default/grub
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg

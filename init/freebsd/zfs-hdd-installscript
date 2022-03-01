@@ -14,7 +14,7 @@ elif [ -e /dev/da0 ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-bsd0} ; export UNAME_M=$(uname -m)
-export INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxv0000}
+export INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxp0000}
 
 export nonInteractive="YES"
 #PARTITIONS="${DEVX} gpt { 200m efi, 512k freebsd-boot, 4g freebsd-swap, auto freebsd-zfs }"
@@ -71,7 +71,7 @@ elif [ -e /dev/da0 ] ; then
 fi
 
 GRP_NM=${GRP_NM:-bsd0}
-INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxv0000}
+INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxp0000}
 
 sysctl kern.geom.debugflags ; sysctl kern.geom.debugflags=16
 sysctl kern.geom.label.disk_ident.enable=0
@@ -149,6 +149,9 @@ sh -c 'cat >> /etc/fstab' << EOF
 procfs              /proc       procfs  rw      0   0
 linprocfs           /compat/linux/proc  linprocfs   rw  0   0
 
+#/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,gid=wheel,uid=0,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
+#/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,dmask=0000,fmask=0111,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
+
 EOF
 
 
@@ -180,8 +183,8 @@ EOF
 sysrc zfs_enable="YES"
 
 zfs set dedup=off $ZFSBOOT_POOL_NAME
-zfs set quota=8G $ZFSBOOT_POOL_NAME/usr/home
-zfs set quota=6G $ZFSBOOT_POOL_NAME/var
+zfs set quota=32G $ZFSBOOT_POOL_NAME/usr/home
+zfs set quota=8G $ZFSBOOT_POOL_NAME/var
 zfs set quota=2G $ZFSBOOT_POOL_NAME/tmp
 
 
@@ -240,26 +243,6 @@ dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.${ifdev} ${ifdev}
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
 #pkg install -y nano sudo xfce
 pkg install -y nano sudo
-#pkg install -y openzfs
-
-## Differentiate names: /usr/local/sbin/({zpool,zfs} -> {zpool,zfs}-ng)
-#ln -s /usr/local/sbin/zpool /usr/local/sbin/zpool-ng
-#ln -s /usr/local/sbin/zfs /usr/local/sbin/zfs-ng
-
-## FreeBSD 12.2-RELEASE KLD openzfs.ko - unsupported file type error
-#sysrc -f /boot/loader.conf openzfs_load="YES"
-#sysrc -f /boot/loader.conf zfs_load="NO"
-#sysrc openzfs_enable="YES"
-#LINENO_START_MAIN=$(grep -n 'zfs_start_main()' /etc/rc.d/zfs | cut -f1 -d:)
-#sed -i '' "$(expr $LINENO_START_MAIN + 1)a \\
-#        local cachefile
-#        for cachefile in /boot/zfs/zpool.cache /etc/zfs/zpool.cache ; do
-#          if [ -f $cachefile ] ; then
-#            zpool import -c $cachefile -a ;
-#          fi ;
-#        done
-#" /etc/rc.d/zfs
-#grep -B2 -A10 -e 'zfs_start_main()' /etc/rc.d/zfs ; sleep 5
 
 #echo -n "${PLAIN_PASSWD:-abcd0123}" | pw usermod root -h 0
 echo -n "${CRYPTED_PASSWD:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}" | pw usermod root -H 0
@@ -301,7 +284,6 @@ EOF
 
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
 ASSUME_ALWAYS_YES=yes pkg clean -y
-#zpool-ng trim ${ZFSBOOT_POOL_NAME} ; zpool-ng set autotrim=on ${ZFSBOOT_POOL_NAME}
 zpool trim ${ZFSBOOT_POOL_NAME} ; zpool set autotrim=on ${ZFSBOOT_POOL_NAME}
 sync
 
