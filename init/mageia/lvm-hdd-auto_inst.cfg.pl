@@ -108,7 +108,7 @@ $o = {
             'options' => 'defaults',
             'size' => 4 * 2 << 20 # 4GB
         },
-        
+
         {
             'hd' => undef,
             'pt_type' => 0x8e,
@@ -130,7 +130,7 @@ $o = {
             'size' => 80 * 2 << 20, # 80GB
             #'ratio' => 100 # remaining
         },
-        
+
         {
             'hd' => undef,
             'pt_type' => 0xa5,
@@ -156,14 +156,14 @@ $o = {
             'size' => 2 << 20, # ~80GB
             'ratio' => 100 # remaining
         },
-        
+
         {
 			'VG_name' => 'vg0',
             'hd' => 'vg0',
             'fs_type' => 'ext4',
             #'mntpoint' => '/',
             'options' => 'noatime,acl',
-            'size' => 16 * 2 << 20 # 16GB
+            'size' => 20 * 2 << 20 # 20GB
         },
         {
 			'VG_name' => 'vg0',
@@ -187,17 +187,17 @@ $o = {
             'fs_type' => 'ext4',
             #'mntpoint' => '/free', # free
             'options' => 'noatime,acl',
-            'size' => 2 << 20, # ~24 GB
+            'size' => 2 << 20, # ~20 GB
             'ratio' => 100 # remaining
         },
-        
+
         {
 			'VG_name' => 'vg1',
             'hd' => 'vg1',
             'fs_type' => 'ext4',
             'mntpoint' => '/',
             'options' => 'noatime,acl',
-            'size' => 16 * 2 << 20 # 16GB
+            'size' => 20 * 2 << 20 # 20GB
         },
         {
 			'VG_name' => 'vg1',
@@ -221,7 +221,7 @@ $o = {
             'fs_type' => 'ext4',
             #'mntpoint' => '/free', # free
             'options' => 'noatime,acl',
-            'size' => 2 << 20, # ~ 24 GB
+            'size' => 2 << 20, # ~ 20 GB
             'ratio' => 100 # remaining
         }
     ],

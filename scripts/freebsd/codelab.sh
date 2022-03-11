@@ -49,7 +49,8 @@ for pkgX in xauth xterm ; do
 done
 
 echo "Fix .NET access problem SSL CA cert path" >> /dev/stderr ; sleep 3
-ln -s /usr/local/share/certs/ca-root-nss.crt
+mkdir -p /compat/linux/etc/pki/tls/certs
+ln -s /usr/local/share/certs/ca-root-nss.crt \
   /compat/linux/etc/pki/tls/certs/ca-bundle.crt
 
 set +e

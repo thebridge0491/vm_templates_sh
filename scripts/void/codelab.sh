@@ -39,6 +39,8 @@ mkdir -p ${default_java_home}
 if [ -z "$(grep '^JAVA_VERSION' ${default_java_home}/release)" ] ; then
   echo JAVA_VERSION="${default_java_version}" >> ${default_java_home}/release ;
 fi
+#xbps-alternatives -g [java | jdk] -s openjdk11
+#xbps-alternatives -g python -s python3
 
 echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
 for pkgX in xauth xterm ; do

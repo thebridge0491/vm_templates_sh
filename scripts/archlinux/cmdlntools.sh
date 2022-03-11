@@ -66,10 +66,13 @@ fi
 
 #svc_enable sshd #; svc_enable sshd.socket
 
-#dbus-uuidgen --ensure[=/etc/machine-id]
+#dbus-uuidgen --ensure[=/var/lib/dbus/machine-id]
 if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
-	#last4=$(cat /etc/machine-id | cut -b29-32) ;
-	last4=$(cat /var/lib/dbus/machine-id | cut -b29-32) ;
+	if [ -f /etc/machine-id ] ; then
+	    last4=$(cat /etc/machine-id | cut -b29-32) ;
+	else
+	    last4=$(cat /var/lib/dbus/machine-id | cut -b29-32) ;
+	fi ;
 	init_hostname=$(cat /etc/hostname) ;
 	NAME=$(echo ${init_hostname} | sed "s|0000|${last4}|") ;
 	echo "${NAME}" > /etc/hostname ;

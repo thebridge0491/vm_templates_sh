@@ -98,10 +98,10 @@ else
 fi
 ## fetch cmd: [curl -s | wget -qO -]
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  curl -LO http://mirror.archlinuxarm.org/aarch64/core/pacman-mirrorlist-20211120-1-any.pkg.tar.xz ;
-  tar -xf pacman-mirrorlist*.pkg.tar.xz ;
-  cat ./etc/pacman.d/mirrorlist | tee /etc/pacman.d/mirrorlist-archlinuxarm ;
-  curl -LO https://repo.armtixlinux.org/system/os/aarch64/artix-mirrorlist-20220117-1-any.pkg.tar.xz ;
+  #curl -LO http://mirror.archlinuxarm.org/aarch64/core/pacman-mirrorlist-20220222-1-any.pkg.tar.xz ;
+  #tar -xf pacman-mirrorlist*.pkg.tar.xz ;
+  #cat ./etc/pacman.d/mirrorlist | tee /etc/pacman.d/mirrorlist-archlinuxarm ;
+  curl -LO https://repo.armtixlinux.org/system/os/aarch64/artix-mirrorlist-20220301-1-any.pkg.tar.xz ;
   tar -xf artix-mirrorlist*.pkg.tar.xz ;
   cat ./etc/pacman.d/mirrorlist | tee /etc/pacman.d/mirrorlist-armtix ;
 
@@ -348,11 +348,30 @@ else
 fi
 
 #sed -i -e "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
-sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5"|' /etc/default/grub
+#sed -i -e "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
+#echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
+sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset resume=/dev/foo rootdelay=5"|' /etc/default/grub
 #sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
 echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
 if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+fi
+if [ "aarch64" = "${UNAME_M}" ] ; then
+  sed -i -e "/GRUB_DEFAULT/ s|=.*$|=1|" /etc/default/grub ;
+  cat << EOF >> /etc/grub.d/40_custom ;
+    menuentry "(aarch64) Arch Linux variant" {
+        terminal_output gfxterm
+
+        probe --set=bootdev --label "vg0-osBoot"
+        probe --set=rootdev --label "vg0-osRoot"
+        #set bootdev='hd0,gpt3' ; set rootdev='/dev/vda5'
+        echo $bootdev ; echo $rootdev ; sleep 5
+
+        linux (hd0,gpt3)/ltsImage root=/dev/vda5
+        initrd (hd0,gpt3)/initramfs-linux-lts.img
+    }
+EOF
+
 fi
 grub-mkconfig -o /boot/grub/grub.cfg
 

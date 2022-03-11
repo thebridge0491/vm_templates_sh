@@ -137,7 +137,7 @@
           <label>vg0-osRoot</label>
           <mount>/</mount>
           <mountby t="symbol">label</mountby>
-          <size>11776M</size>
+          <size>12G</size>
         </partition>
         <partition t="map">
           <partition_type>primary</partition_type>

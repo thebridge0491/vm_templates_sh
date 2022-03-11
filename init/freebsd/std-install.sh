@@ -54,7 +54,7 @@ EOF
 echo "Setup EFI boot" ; sleep 3
 mkdir -p /mnt/boot/efi ; mount -t msdosfs /dev/${DEVX}p2 /mnt/boot/efi
 (cd /mnt/boot/efi ; mkdir -p EFI/freebsd EFI/BOOT)
-cp /boot/loader.efi /boot/zfsloader /mnt/boot/efi/EFI/freebsd/
+cp /boot/loader.efi /mnt/boot/efi/EFI/freebsd/
 if [ "arm64" = "${UNAME_M}" ] || [ "aarch64" = "${UNAME_M}" ] ; then
   cp /boot/loader.efi /mnt/boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
@@ -146,6 +146,9 @@ echo "Update services" ; sleep 3
 sysrc ntpd_enable="YES"
 sysrc ntpd_sync_on_start="YES"
 sysrc sshd_enable="YES"
+
+#service netif restart
+dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.${ifdev} ${ifdev}
 
 
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f

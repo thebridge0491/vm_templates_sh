@@ -65,8 +65,8 @@
     "bhyve_x64_firmware": "/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd",
     "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
     "qemu_aa64_firmware": "/usr/share/AAVMF/AAVMF_CODE.fd",
-    "build_timestamp": "{{isotime \"2016.09\"}}",
+    "build_timestamp": "{{isotime `2006.01`}}",
     "author": "thebridge0491",
-    "datestamp": "{{isotime \"2006.01\"}}"
+    "datestamp": "{{isotime `2006.01.02`}}"
   }
 }

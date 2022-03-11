@@ -125,7 +125,7 @@
           <mountby t="symbol">label</mountby>
           <size>4G</size>
         </partition>
-        
+
         <partition t="map">
           <partition_type>primary</partition_type>
           <!--<create t="boolean">true</create>-->
@@ -137,7 +137,7 @@
           <label>vg0-osRoot</label>
           <!--<mount>/</mount>-->
           <!--<mountby t="symbol">label</mountby>-->
-          <size>16G</size>
+          <size>20G</size>
         </partition>
         <partition t="map">
           <partition_type>primary</partition_type>
@@ -180,9 +180,9 @@
           <label>vg0-free</label>
           <!--<mount>/free</mount>-->
           <!--<mountby t="symbol">label</mountby>-->
-          <size>24G</size>
+          <size>20G</size>
         </partition>
-        
+
         <partition t="map">
           <partition_type>primary</partition_type>
           <!--<create t="boolean">true</create>-->
@@ -207,7 +207,7 @@
           <label>vg1-osRoot</label>
           <mount>/</mount>
           <mountby t="symbol">label</mountby>
-          <size>16G</size>
+          <size>20G</size>
         </partition>
         <partition t="map">
           <partition_type>primary</partition_type>
@@ -250,9 +250,9 @@
           <label>vg1-free</label>
           <mount>/free</mount>
           <mountby t="symbol">label</mountby>
-          <size>24G</size>
+          <size>20G</size>
         </partition>
-        
+
         <partition t="map">
           <partition_type>primary</partition_type>
           <!--<create t="boolean">true</create>-->

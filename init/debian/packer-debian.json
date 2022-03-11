@@ -286,9 +286,9 @@
     "headless": "",
     "plain_passwd": "abcd0123",
     "crypted_passwd": "$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91",
-    "build_timestamp": "{{isotime \"2016.09\"}}",
+    "build_timestamp": "{{isotime `2006.01`}}",
     "author": "thebridge0491",
-    "datestamp": "{{isotime \"2006.01.02\"}}",
+    "datestamp": "{{isotime `2006.01.02`}}",
     "home": "{{env `HOME`}}"
   }
 }

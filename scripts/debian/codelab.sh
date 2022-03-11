@@ -31,6 +31,7 @@ mkdir -p ${default_java_home}
 if [ -z "$(grep '^JAVA_VERSION' ${default_java_home}/release)" ] ; then
   echo JAVA_VERSION="${default_java_version}" >> ${default_java_home}/release ;
 fi
+#update-alternatives --config [java | javac | jar | javadoc | javap | jdb | keytool]
 
 echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
 for pkgX in xauth xterm ; do

@@ -21,10 +21,10 @@ for langX in ${LANGS} ; do
   case ${langX} in
     py) pkgs_var=${pkgs_lang_py} ;;
     c) pkgs_var=${pkgs_lang_c} ;;
-    java) pkgs_var=${pkgs_lang_java} ;;
+    java) rm -r ${default_java_home} ; pkgs_var=${pkgs_lang_java} ;;
     scm) pkgs_var=${pkgs_lang_scm} ;;
     hs) pkgs_var=${pkgs_lang_hs} ;;
-    scala) pkgs_var=${pkgs_lang_scala} ;;
+    scala) rm -r ${default_java_home} ; pkgs_var=${pkgs_lang_scala} ;;
     ml) pkgs_var=${pkgs_lang_ml} ;;
     lisp) pkgs_var=${pkgs_lang_lisp} ;;
     cs) pkgs_var=${pkgs_lang_cs} ;;

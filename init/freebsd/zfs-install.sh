@@ -153,7 +153,7 @@ sysrc ntpd_sync_on_start="YES"
 sysrc sshd_enable="YES"
 
 #service netif restart
-#dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.${ifdev} ${ifdev}
+dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.${ifdev} ${ifdev}
 
 
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f

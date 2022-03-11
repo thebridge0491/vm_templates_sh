@@ -17,7 +17,9 @@ export GRP_NM=${GRP_NM:-bsd0} ; export UNAME_M=$(uname -m)
 export INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxp0000}
 
 export nonInteractive="YES"
-#PARTITIONS="${DEVX} gpt { 200m efi, 512k freebsd-boot, 4g freebsd-swap, auto freebsd-zfs }"
+PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 1G linux, 4G linux,
+  80G linux, 1G linux, 80G linux, 4G freebsd-swap, 80G freebsd-ufs /,
+  120G fat, auto fat }"
 DISTRIBUTIONS="kernel.txz base.txz "
 export ZFSBOOT_POOL_NAME=fspool0
 #export ZFSBOOT_BEROOT_NAME=ROOT
@@ -82,7 +84,9 @@ sysctl kern.geom.label.gpt.enable=1
 #bsdinstall preamble
 #--------------------
 #export nonInteractive="YES"
-##PARTITIONS="${DEVX} gpt { 200m efi, 512k freebsd-boot, 4g freebsd-swap, auto freebsd-zfs }"
+##PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 1G linux, 4G linux,
+##  80G linux, 1G linux, 80G linux, 4G freebsd-swap, 80G freebsd-ufs /,
+##  120G fat, auto fat }"
 #DISTRIBUTIONS="kernel.txz base.txz "
 #export ZFSBOOT_POOL_NAME=fspool0
 ##export ZFSBOOT_BEROOT_NAME=ROOT
@@ -273,7 +277,7 @@ FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
 	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$(pkg config abi)/quarterly",
+	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/$(pkg config abi)/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
 	fingerprints: "/usr/share/keys/pkg",

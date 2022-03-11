@@ -42,9 +42,9 @@ export DNFCMD="dnf --setopt=install_weak_deps=False --releasever=${RELEASE}"
 echo "Create /etc/fstab" ; sleep 3
 mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
 sh -c 'cat > /mnt/etc/fstab' << EOF
-PARTLABEL=${GRP_NM}-osRoot   /           ext4    errors=remount-ro   0   1
-PARTLABEL=${GRP_NM}-osVar    /var        ext4    defaults    0   2
-PARTLABEL=${GRP_NM}-osHome   /home       ext4    defaults    0   2
+PARTLABEL=${GRP_NM}-osRoot   /           auto    errors=remount-ro   0   1
+PARTLABEL=${GRP_NM}-osVar    /var        auto    defaults    0   2
+PARTLABEL=${GRP_NM}-osHome   /home       auto    defaults    0   2
 PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0

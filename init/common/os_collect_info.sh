@@ -44,7 +44,8 @@ concat_sep_head1() {
 }
 
 lang_devel_versions() {
-  echo "lang_devel_versions" ; echo "" ; echo "lang_c" ; echo ""
+  echo "($NAME ${MACHINE})" 'lang_devel_versions' ; echo $sep
+  echo "" ; echo "lang_c" ; echo ""
   for cmd in 'gcc --version' 'clang --version' 'cmake --version' \
       'automake --version' ; do
     concat_sep_head1 "$cmd" ;
@@ -111,6 +112,7 @@ lang_devel_versions() {
 }
 
 bsd_info() {
+  echo "($NAME ${MACHINE})" 'collect_info'
   concat_sep 'uname -a' ; concat_sep 'freebsd-version'
   if [ -f /etc/os-release ] ; then
     concat_sep '/etc/os-release' ;
@@ -199,6 +201,7 @@ EOF
 }
 
 linux_info() {
+  echo "($NAME ${MACHINE})" 'collect_info'
   concat_sep 'uname -a' ; concat_sep 'lsb_release -a'
   concat_sep '/proc/version'
   if [ -f /etc/os-release ] ; then
@@ -217,6 +220,12 @@ $sep
 sudo find / -ipath /boot/efi/*/*.efi
 $(sudo find / -ipath /boot/efi/*/*.efi)
 EOF
+  cat << EOF
+$sep
+sudo dmesg | grep -ie "command line:"
+$(sudo dmesg | grep -ie "command line:")
+EOF
+
   concat_sep 'sudo grep NOPASSWD /etc/sudoers'
   if sudo -i command -v systemctl > /dev/null ; then # systemd
     concat_sep 'sudo systemctl list-units --type=service --state=active' ;
@@ -291,12 +300,22 @@ lsblk -nlpo label
 $(lsblk -nlpo label | column -xc 78)
 EOF
 
-  printf "${sep}\nZFS info\n"
-  concat_sep 'sudo zfs version' ; concat_sep 'sudo zpool list -v'
-  concat_sep 'sudo zfs list'
-  echo "LVM info"
-  concat_sep 'sudo pvs' ; concat_sep 'sudo vgs'
-  concat_sep 'sudo lvs -o vg_name,lv_name,lv_attr,lv_size'
+  if sudo -i command -v zfs > /dev/null ; then
+    printf "${sep}\nZFS info\n" ;
+    concat_sep 'sudo zfs version' ; concat_sep 'sudo zpool list -v' ;
+    concat_sep 'sudo zfs list' ;
+  fi
+  if sudo -i command -v btrfs > /dev/null ; then
+    printf "${sep}\nBtrfs info\n" ;
+    concat_sep 'sudo btrfs filesystem show' ;
+    concat_sep 'sudo btrfs subvolume list /' ;
+  fi
+  if sudo -i command -v lvm > /dev/null ; then
+    printf "${sep}\nLVM info\n" ;
+    concat_sep 'sudo lvm version' ;
+    concat_sep 'sudo pvs' ; concat_sep 'sudo vgs' ;
+    concat_sep 'sudo lvs -o vg_name,lv_name,lv_attr,lv_size' ;
+  fi
   for file in /etc/crypttab /etc/fstab ; do
     concat_sep "sudo cat $file" ;
   done
@@ -331,6 +350,7 @@ EOF
 }
 
 macos_info() {
+  echo "($NAME ${MACHINE})" 'collect_info'
   concat_sep 'uname -a' ; concat_sep 'sw_vers'
 
   concat_sep 'date'
@@ -369,8 +389,7 @@ collect_all() {
 
   case $OS_NAME in
     'Darwin')
-      #msgfile="msg5-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'lang_devel_versions' > $msgfile ;
-      #lang_devel_versions >> $msgfile ;
+      #msgfile="msg5-${MACHINE}.txt" ; lang_devel_versions > $msgfile ;
       msgfile="msg4-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'desktop applications' > $msgfile ;
       ls -p /Applications | column >> $msgfile ;
       msgfile="msg2-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'leaf_pkgs' > $msgfile ;
@@ -378,11 +397,9 @@ collect_all() {
 	    concat_sep 'brew list --cask' | column ;
 	    echo "==================") >> $msgfile ;
 
-	    msgfile="msg1-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'collect_info' > $msgfile ;
-      macos_info >> $msgfile ;;
-	  'FreeBSD'|'OpenBSD'|'NetBSD'|'Linux')
-	    #msgfile="msg5-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'lang_devel_versions' > $msgfile ;
-      #lang_devel_versions >> $msgfile ;
+	  msgfile="msg1-${MACHINE}.txt" ; macos_info > $msgfile ;;
+	'FreeBSD'|'OpenBSD'|'NetBSD'|'Linux')
+	  #msgfile="msg5-${MACHINE}.txt" ; lang_devel_versions > $msgfile ;
       msgfile="msg4-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'desktop applications' > $msgfile ;
       if [ -f /usr/local/share/applications ] ; then
         ls /usr/local/share/applications | column >> $msgfile ;
@@ -394,11 +411,11 @@ collect_all() {
       msgfile="msg2-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'leaf_pkgs' > $msgfile ;
       pkgs_installed leaf >> $msgfile ;
 
-      msgfile="msg1-${MACHINE}.txt" ; echo "($NAME ${MACHINE})" 'collect_info' > $msgfile ;
+      msgfile="msg1-${MACHINE}.txt" ;
       if [ "Linux" = "$OS_NAME" ] ; then
-        linux_info >> $msgfile ;
+        linux_info > $msgfile ;
       else
-        bsd_info >> $msgfile ;
+        bsd_info > $msgfile ;
       fi ;;
     *) echo 'ERROR: OS is not Linux | [Free | Open | Net]BSD | Darwin(MacOS)' ;
       echo '...exiting...' ; exit ;;

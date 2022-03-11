@@ -180,8 +180,8 @@ EOF
 sysrc zfs_enable="YES"
 
 zfs set dedup=off $ZFSBOOT_POOL_NAME
-zfs set quota=8G $ZFSBOOT_POOL_NAME/usr/home
-zfs set quota=6G $ZFSBOOT_POOL_NAME/var
+zfs set quota=7680M $ZFSBOOT_POOL_NAME/usr/home
+zfs set quota=5G $ZFSBOOT_POOL_NAME/var
 zfs set quota=2G $ZFSBOOT_POOL_NAME/tmp
 
 
@@ -270,7 +270,7 @@ FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
 	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$(pkg config abi)/quarterly",
+	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/$(pkg config abi)/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
 	fingerprints: "/usr/share/keys/pkg",

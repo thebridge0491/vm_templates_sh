@@ -18,8 +18,8 @@ portsnap cron update                    # (interactive: fetch, else cron)
 (cd /usr/ports ; make search name=debootstrap)
 
 # use pkg to install dependencies binary pkgs, if available
-#(cd /usr/ports/sysutils/debootstrap ; make all-depends-list | cut -c 12- | xargs pkg install -y)
-pkgs_var=`cd /usr/ports/sysutils/debootstrap ; make package-depends-list | cut -d' ' -f3`
+#(cd /usr/ports/sysutils/debootstrap ; make package-depends-list | cut -d' ' -f3 | xargs pkg install -y)
+pkgs_var=`cd /usr/ports/sysutils/debootstrap ; make run-depends-list build-depends-list | cut -c 12-`
 for pkgX in $pkgs_var ; do
 	pkg fetch -Udy $pkgX ;
 done
@@ -29,5 +29,5 @@ done
 
 #portmaster sysutils/debootstrap                             # install using portmaster
 #portmaster -L ; sleep 5
-(cd /usr/ports/sysutils/debootstrap ; make install clean)     # install manually
+(cd /usr/ports/sysutils/debootstrap ; make WITHOUT=X11 install clean)     # install manually
 pkg info debootstrap ; sleep 5

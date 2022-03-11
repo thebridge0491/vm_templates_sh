@@ -108,14 +108,14 @@ $o = {
             'options' => 'defaults',
             'size' => 4 * 2 << 20 # 4GB
         },
-        
+
         {
 			'hd' => undef,
             'type' => 0x83,
             'fs_type' => 'ext4',
             #'mntpoint' => '/',
             'options' => 'noatime,acl',
-            'size' => 16 * 2 << 20 # 16GB
+            'size' => 20 * 2 << 20 # 20GB
         },
         {
 			'hd' => undef,
@@ -139,9 +139,9 @@ $o = {
             'fs_type' => 'ext4',
             #'mntpoint' => '/free', # free
             'options' => 'noatime,acl',
-            'size' => 24 * 2 << 20 # 24 GB
+            'size' => 20 * 2 << 20 # 20 GB
         },
-        
+
         {
             'hd' => undef,
             'type' => 0x83,
@@ -155,7 +155,7 @@ $o = {
             'fs_type' => 'ext4',
             'mntpoint' => '/',
             'options' => 'noatime,acl',
-            'size' => 16 * 2 << 20 # 16GB
+            'size' => 20 * 2 << 20 # 20GB
         },
         {
 			'hd' => undef,
@@ -179,9 +179,9 @@ $o = {
             'fs_type' => 'ext4',
             #'mntpoint' => '/free', # free
             'options' => 'noatime,acl',
-            'size' => 24 * 2 << 20 # 24 GB
+            'size' => 20 * 2 << 20 # 20 GB
         },
-        
+
         {
             'hd' => undef,
             'pt_type' => 0xa5,

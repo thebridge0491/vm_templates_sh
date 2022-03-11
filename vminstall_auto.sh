@@ -306,7 +306,7 @@ debian_aarch64() {
 
   echo '?? Unknown error - must enter grub command-line manually for reboots: '
   echo '#NOTE: (std) rootdev=/dev/vda5  OR  (lvm) rootdev=/dev/mapper/vg0-osRoot'
-  echo '  linux (hd0,gpt3)/vmlinuz resume=/dev/foo root=$rootdev'
+  echo '  linux (hd0,gpt3)/vmlinuz root=$rootdev resume=/dev/foo'
   echo '  initrd (hd0,gpt3)/initrd.img'
   echo '  boot'
 

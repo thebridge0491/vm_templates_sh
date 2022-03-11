@@ -229,7 +229,7 @@
           <label>vg0-osRoot</label>
           <!--<mount>/</mount>-->
           <!--<mountby t="symbol">label</mountby>-->
-          <size>16G</size>
+          <size>20G</size>
         </partition>
         <partition t="map">
           <!--<create t="boolean">true</create>-->
@@ -299,7 +299,7 @@
           <label>vg1-osRoot</label>
           <mount>/</mount>
           <mountby t="symbol">label</mountby>
-          <size>16G</size>
+          <size>20G</size>
         </partition>
         <partition t="map">
           <!--<create t="boolean">true</create>-->

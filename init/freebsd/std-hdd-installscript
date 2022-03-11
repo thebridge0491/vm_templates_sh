@@ -17,9 +17,10 @@ export GRP_NM=${GRP_NM:-bsd0} ; export UNAME_M=$(uname -m)
 export INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxp0000}
 
 export nonInteractive="YES"
-PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 84G linux, 80G linux,
-  4G freebsd-swap, 16G freebsd-ufs /, 8G freebsd-ufs /var,
-  32G freebsd-ufs /usr/home, 24G freebsd-ufs , 120G fat, auto fat }"
+PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 1G linux, 4G linux,
+  20G linux, 8G linux, 32G linux, 20G linux, 1G linux, 20G linux, 8G linux,
+  32G linux, 20G linux, 80G linux, 4G freebsd-swap, 80G freebsd-ufs /,
+  120G fat, auto fat }"
 DISTRIBUTIONS="kernel.txz base.txz "
 
 
@@ -45,9 +46,10 @@ sysctl kern.geom.label.gpt.enable=1
 #bsdinstall preamble
 #--------------------
 #export nonInteractive="YES"
-#PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 84G linux, 80G linux,
-#  4G freebsd-swap, 16G freebsd-ufs /, 8G freebsd-ufs /var,
-#  32G freebsd-ufs /usr/home, 24G freebsd-ufs , 120G fat, auto fat }"
+#PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 1G linux, 4G linux,
+#  20G linux, 8G linux, 32G linux, 20G linux, 1G linux, 20G linux, 8G linux,
+#  32G linux, 20G linux, 80G linux, 4G freebsd-swap, 80G freebsd-ufs /,
+#  120G fat, auto fat }"
 #DISTRIBUTIONS="kernel.txz base.txz "
 
 
@@ -65,7 +67,6 @@ tunefs -n enable -t enable /dev/gpt/${GRP_NM}-fsVar
 tunefs -n enable -t enable /dev/gpt/${GRP_NM}-fsHome
 
 sync ; gpart show -p ; sleep 3 ; gpart show -l ; sleep 3
-zpool list -v ; sleep 3 ; zfs list ; sleep 3
 glabel status ; sleep 3 ; geli status ; sleep 3
 
 
@@ -87,7 +88,7 @@ EOF
 
 mkdir -p boot/efi ; mount -t msdosfs /dev/${DEVX}p2 boot/efi
 (cd boot/efi ; mkdir -p efi/freebsd efi/BOOT)
-cp boot/loader.efi boot/zfsloader boot/efi/efi/freebsd/
+cp boot/loader.efi boot/efi/efi/freebsd/
 if [ "arm64" = "${UNAME_M}" ] || [ "aarch64" = "${UNAME_M}" ] ; then
   cp /boot/loader.efi boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
@@ -151,6 +152,9 @@ sysrc ntpd_enable="YES"
 sysrc ntpd_sync_on_start="YES"
 sysrc sshd_enable="YES"
 
+#service netif restart
+dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.${ifdev} ${ifdev}
+
 
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
 #pkg install -y nano sudo xfce
@@ -186,7 +190,7 @@ FreeBSD: { enabled: false }
 
 FreeBSD-nearby: {
 	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$(pkg config abi)/quarterly",
+	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/$(pkg config abi)/quarterly",
 	mirror_type: "srv",
 	signature_type: "fingerprints",
 	fingerprints: "/usr/share/keys/pkg",

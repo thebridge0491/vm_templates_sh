@@ -127,7 +127,7 @@ cat /etc/apt/sources.list ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
 apt-get --yes update --allow-releaseinfo-change
-for pkgX in linux-image-${MACHINE} grub-efi-${MACHINE} efibootmgr grub-pc-bin sudo curl linux-headers-${MACHINE} btrfs-progs ; do
+for pkgX in linux-image-${MACHINE} grub-efi-${MACHINE} efibootmgr grub-pc-bin sudo curl tasksel bsdextrautils linux-headers-${MACHINE} btrfs-progs ; do
   apt-get --yes install --no-install-recommends \$pkgX
 done
 # xfce4

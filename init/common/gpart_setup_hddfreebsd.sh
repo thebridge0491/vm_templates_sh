@@ -48,25 +48,26 @@ gpart_disk() {
   gpart add -b 1M -a 1M -s 512K -t freebsd-boot -l bios_boot $DEVX
   gpart add -a 1M -s 200M -t efi -l ESP $DEVX
 
-  gpart add -a 1M -s 1G -t linux-data -l "pvol0-osBoot" $DEVX
-  gpart add -a 1M -s 84G -t linux-lvm -l "pvol0" $DEVX
+  gpart add -a 1M -s 1G -t linux-data -l "vg0-osBoot" $DEVX
+  gpart add -a 1M -s 4G -t linux-swap -l "vg0-osSwap" $DEVX
+  gpart add -a 1M -s 80G -t linux-lvm -l "pvol0" $DEVX
 
-  gpart add -a 1M -s 1G -t linux-data -l "pvol1-osBoot" $DEVX
+  gpart add -a 1M -s 1G -t linux-data -l "vg1-osBoot" $DEVX
   gpart add -a 1M -s 80G -t linux-lvm -l "pvol1" $DEVX
 
+  gpart add -a 1M -s 4G -t freebsd-swap -l "${GRP_NM}-fsSwap" $DEVX
+
   if [ "zfs" = "$VOL_MGR" ] ; then
-    gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 $DEVX ;
-
-    gpart add -a 1M -s 4G -t freebsd-swap -l "${GRP_NM}-fsSwap" $DEVX ;
     gpart add -a 1M -s 80G -t freebsd-zfs -l "${GRP_NM}-fsPool" $DEVX ;
-  else
-    gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 $DEVX ;
 
-    gpart add -a 1M -s 4G -t freebsd-swap -l "${GRP_NM}-fsSwap" $DEVX ;
-    gpart add -a 1M -s 16G -t freebsd-ufs -l "${GRP_NM}-fsRoot" $DEVX ;
+    gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 $DEVX ;
+  else
+    gpart add -a 1M -s 20G -t freebsd-ufs -l "${GRP_NM}-fsRoot" $DEVX ;
     gpart add -a 1M -s 8G -t freebsd-ufs -l "${GRP_NM}-fsVar" $DEVX ;
     gpart add -a 1M -s 32G -t freebsd-ufs -l "${GRP_NM}-fsHome" $DEVX ;
-    gpart add -a 1M -s 24G -t freebsd-ufs -l "${GRP_NM}-free" $DEVX ;
+    gpart add -a 1M -s 20G -t freebsd-ufs -l "${GRP_NM}-free" $DEVX ;
+
+    gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 $DEVX ;
   fi
 
   gpart add -a 1M -s 120G -t ms-basic-data -l data0 $DEVX
@@ -120,12 +121,12 @@ zfspart_create() {
   zfs create -o canmount=noauto -o mountpoint=/ $zpoolnm/ROOT/default
   zfs mount $zpoolnm/ROOT/default
 
-  zfs create -o mountpoint=/tmp -o exec=on -o setuid=off $zpoolnm/tmp
-  zfs create -o mountpoint=/usr -o canmount=off $zpoolnm/usr
-  zfs create $zpoolnm/usr/home
+  zfs create -o exec=on -o setuid=off -o mountpoint=/tmp $zpoolnm/tmp
+  zfs create -o canmount=off -o mountpoint=/usr $zpoolnm/usr
+  zfs create -o mountpoint=/usr/home $zpoolnm/usr/home
   zfs create -o setuid=off $zpoolnm/usr/ports
   zfs create $zpoolnm/usr/src
-  zfs create -o mountpoint=/var -o canmount=off $zpoolnm/var
+  zfs create -o canmount=off -o mountpoint=/var $zpoolnm/var
   zfs create -o exec=off -o setuid=off $zpoolnm/var/audit
   zfs create -o exec=off -o setuid=off $zpoolnm/var/crash
   zfs create -o exec=off -o setuid=off $zpoolnm/var/log
@@ -135,7 +136,6 @@ zfspart_create() {
   zfs set quota=32G $zpoolnm/usr/home
   zfs set quota=8G $zpoolnm/var
   zfs set quota=2G $zpoolnm/tmp
-  #zfs set mountpoint=/$zpoolnm $zpoolnm
 
   zpool set bootfs=$zpoolnm/ROOT/default $zpoolnm # ??
   zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm ; sync
@@ -144,9 +144,11 @@ zfspart_create() {
   zpool import -R /mnt -N $zpoolnm
   zpool import -d /dev/${DEVX}p${idx} -R /mnt -N $zpoolnm
   zfs mount $zpoolnm/ROOT/default ; zfs mount -a ; sync
+  mkdir -p /mnt/etc/zfs
+  
   zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm
-  sync ; cat /etc/zfs/zpool.cache ; sleep 3
-  mkdir -p /mnt/etc/zfs ; cp /etc/zfs/zpool.cache /mnt/etc/zfs/
+  #mkdir -p /mnt/etc/zfs ; cp /etc/zfs/zpool.cache /mnt/etc/zfs/
+  sync ; cat /mnt/etc/zfs/zpool.cache ; cat /etc/zfs/zpool.cache ; sleep 3
 
   zpool list -v ; sleep 3 ; zfs list ; sleep 3
   zfs mount ; sleep 5
@@ -168,7 +170,7 @@ format_partitions() {
     gpart modify -l $zpartnm -i $idx $DEVX ;
   else
     kldstat -h -v -m ufs ; sleep 5 ;
-    
+
     for partnm in ${BSD_PARTNMS} ; do
 	  idx=$(gpart show -l | grep -e "$partnm" | cut -w -f4) ;
       if [ ! "${GRP_NM}-fsSwap" = "$partnm" ] ; then
@@ -193,6 +195,7 @@ mount_filesystems() {
   echo "Mounting file systems" ; sleep 3
   if [ "zfs" = "$VOL_MGR" ] ; then
     zfs mount -a ;
+    zpool set cachefile=/etc/zfs/zpool.cache ${ZPOOLNM:-fspool0} ;
   else
     mount /dev/gpt/${GRP_NM}-fsRoot /mnt ; mkdir -p /mnt/var /mnt/usr/home ;
     mount /dev/gpt/${GRP_NM}-fsVar /mnt/var ;

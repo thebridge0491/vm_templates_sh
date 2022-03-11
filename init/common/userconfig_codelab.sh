@@ -56,12 +56,12 @@ _alias_lang_jvm() {
   fi
 
   for cmd_mainclass in checkstyle:com.puppycrawl.tools.checkstyle.Main \
-      scalastyle:org.scalastyle.Main CodeNarc:org.codenarc.CodeNarc \
-      scalac:scala.tools.nsc.Main scala:scala.tools.nsc.MainGenericRunner \
-      scaladoc:scala.tools.nsc.ScalaDoc scalap:scala.tools.scalap.Main \
-      fsc:scala.tools.nsc.fsc.CompileClient \
+      CodeNarc:org.codenarc.CodeNarc scala:scala.tools.nsc.MainGenericRunner \
+      scalac:scala.tools.nsc.Main scaladoc:scala.tools.nsc.ScalaDoc \
+      scalap:scala.tools.scalap.Main fsc:scala.tools.nsc.fsc.CompileClient \
+      scalastyle:org.scalastyle.Main groovy:groovy.ui.GroovyMain \
       groovyc:org.codehaus.groovy.tools.FileSystemCompiler \
-      groovy:groovy.ui.GroovyMain groovydoc:org.codehaus.groovy.tools.groovydoc.Main \
+      groovydoc:org.codehaus.groovy.tools.groovydoc.Main \
       groovysh:org.codehaus.groovy.tools.shell.Main \
       grape:org.codehaus.groovy.tools.GrapeMain clojure:clojure.main ; do
     cmd=`echo $cmd_mainclass | cut -d: -f1` ;
@@ -326,7 +326,7 @@ _prep_lang_ml() {
 
 _prep_lang_go() {
   echo "Configuring for Go language ..." >> /dev/stderr ; sleep 3
-  mkdir -p $HOME/go/src/bitbucket.org/${BBUSER:-imcomputer}
+  mkdir -p $HOME/go/src/${VCSHOST:-bitbucket.org}/${VCSUSER:-imcomputer}
 }
 
 _prep_lang_rs() {

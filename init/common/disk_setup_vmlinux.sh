@@ -58,7 +58,7 @@ _sgdisk_part() {
     sgdisk --new 5:0:+0G --typecode 5:8300 --change-name 5:"${PV_NM}" \
       /dev/${DEVX} ;
   elif [ "std" = "$VOL_MGR" ] ; then
-    sgdisk --new 5:0:+11776M --typecode 5:8300 \
+    sgdisk --new 5:0:+12G --typecode 5:8300 \
       --change-name 5:"${GRP_NM}-osRoot" /dev/${DEVX} ;
     sgdisk --new 6:0:+5G --typecode 6:8300 --change-name 6:"${GRP_NM}-osVar" \
       /dev/${DEVX} ;
@@ -93,7 +93,7 @@ _sfdisk_part() {
   elif [ "lvm" = "$VOL_MGR" ] || [ "btrfs" = "$VOL_MGR" ] ; then
     echo -n name=${PV_NM} | sfdisk -N 5 /dev/${DEVX} ;
   elif [ "std" = "$VOL_MGR" ] ; then
-    echo -n size=11776MiB,name="${GRP_NM}-osRoot" | sfdisk -N 5 /dev/${DEVX} ;
+    echo -n size=12GiB,name="${GRP_NM}-osRoot" | sfdisk -N 5 /dev/${DEVX} ;
     echo -n size=5GiB,name="${GRP_NM}-osVar" | sfdisk -N 6 /dev/${DEVX} ;
     echo -n name="${GRP_NM}-osHome" | sfdisk -N 7 /dev/${DEVX} ;
   fi
@@ -134,7 +134,7 @@ _parted_part() {
     parted -s -a optimal /dev/${DEVX} unit MiB \
       mkpart primary btrfs $DIFF $END name 5 ${PV_NM} ;
   elif [ "std" = "$VOL_MGR" ] ; then
-    DIFF=$END ; END=$(( 11776 + $DIFF )) ;
+    DIFF=$END ; END=$(( 12 * 1024 + $DIFF )) ;
     parted -s -a optimal /dev/${DEVX} unit MiB \
       mkpart primary ext2 $DIFF $END name 5 ${GRP_NM}-osRoot ;
     DIFF=$END ; END=$(( 5 * 1024 + $DIFF )) ;
@@ -190,15 +190,14 @@ zfspart_create() {
     -O normalization=formD -O relatime=on -O xattr=sa $zpoolnm /dev/${DEVX}${idx}
   zfs create -o mountpoint=none -o canmount=off $zpoolnm/ROOT
   zfs create -o canmount=noauto -o mountpoint=/ $zpoolnm/ROOT/default
-  #zfs create -o mountpoint=/ $zpoolnm/ROOT/default
   zfs mount -o exec,dev $zpoolnm/ROOT/default
 
-  zfs create -o mountpoint=/tmp -o com.sun:auto-snapshot=false $zpoolnm/tmp
-  zfs create -o mountpoint=/usr -o canmount=off $zpoolnm/usr
+  zfs create -o com.sun:auto-snapshot=false $zpoolnm/tmp
+  zfs create -o canmount=off $zpoolnm/usr
   zfs create $zpoolnm/usr/local
-  zfs create -o mountpoint=/home -o canmount=off $zpoolnm/home
+  zfs create $zpoolnm/home
   zfs create -o mountpoint=/root $zpoolnm/root
-  zfs create -o mountpoint=/var -o canmount=off $zpoolnm/var
+  zfs create -o canmount=off $zpoolnm/var
   zfs create -o canmount=off $zpoolnm/var/lib
   zfs create -o exec=off -o setuid=off -o acltype=posixacl -o xattr=sa \
     $zpoolnm/var/log
@@ -206,12 +205,11 @@ zfspart_create() {
   zfs create -o com.sun:auto-snapshot=false $zpoolnm/var/cache
   zfs create -o setuid=off -o com.sun:auto-snapshot=false $zpoolnm/var/tmp
   zfs create -o atime=on $zpoolnm/var/mail
-  zfs create -o mountpoint=/opt $zpoolnm/opt
+  zfs create $zpoolnm/opt
 
-  zfs set quota=8G $zpoolnm/home
+  zfs set quota=7680M $zpoolnm/home
   zfs set quota=5G $zpoolnm/var
   zfs set quota=2G $zpoolnm/tmp
-  #zfs set mountpoint=/$zpoolnm $zpoolnm
 
   zpool set bootfs=$zpoolnm/ROOT/default $zpoolnm # ??
   zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm ; sync
@@ -230,7 +228,7 @@ zfspart_create() {
 
 lvmpv_create() {
   GRP_NM=${1:-vg0} ; PV_NM=${2:-pvol0}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:11776M osVar:5G osHome:7680M}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:12G osVar:5G osHome:7680M}
   modprobe dm-mod ; modprobe dm-crypt ; lvm version
   modinfo dm_mod dm_crypt | grep -e name -e version
   lsmod | grep -e dm_mod -e dm_crypt ; sleep 5
@@ -259,7 +257,7 @@ btrfspart_create() {
   DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM} | cut -d' ' -f1)
   mkfs.btrfs -L ${PV_NM} ${DEV_PV}
   mkdir -p /mnt ; mount -t btrfs ${DEV_PV} /mnt ; sync
-  
+
   btrfs quota enable /mnt
   btrfs subvolume create /mnt/@
   btrfs subvolume create /mnt/@/.snapshots
@@ -267,14 +265,14 @@ btrfspart_create() {
   btrfs subvolume create /mnt/@/tmp
   btrfs subvolume create /mnt/@/home
   btrfs subvolume set-default 257 /mnt
-  
+
   btrfs subvolume list /mnt | cut -d' ' -f2 | xargs -I{} -n1 btrfs qgroup create 0/{} /mnt
   sleep 3 ; btrfs quota rescan /mnt
-  btrfs qgroup limit 8G /mnt/@/home
+  btrfs qgroup limit 7680M /mnt/@/home
   btrfs qgroup limit 5G /mnt/@/var
   btrfs qgroup limit 2G /mnt/@/tmp
   btrfs qgroup show -re /mnt ; sleep 5
-  
+
   btrfs device scan
   btrfs filesystem show ; btrfs subvolume list /mnt ; sleep 5
   umount /mnt ; sync
@@ -283,7 +281,7 @@ btrfspart_create() {
 format_partitions() {
   VOL_MGR=${1:-lvm} ; GRP_NM=${2:-vg0} ; PV_NM=${3:-pvol0}
   MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:11776M osVar:5G osHome:7680M}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:12G osVar:5G osHome:7680M}
 
   echo "Formatting file systems" ; sleep 3
   if [ "${VOL_MGR}" = "zfs" ] ; then
@@ -322,7 +320,7 @@ format_partitions() {
 part_format() {
   TOOL=${1:-sgdisk} ; VOL_MGR=${2:-lvm} ; GRP_NM=${3:-vg0} ; PV_NM=${4:-pvol0}
   MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:11776M osVar:5G osHome:7680M}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:12G osVar:5G osHome:7680M}
 
   part_disk $TOOL $VOL_MGR $GRP_NM $PV_NM
   format_partitions $VOL_MGR $GRP_NM $PV_NM

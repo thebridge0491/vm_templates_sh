@@ -39,24 +39,25 @@ gpt_disk() {
   gpt add -b 40 -a 1M -s 512K -t bios -l bios_boot $DEVX
   gpt add -a 1M -s 200M -t efi -l ESP $DEVX
 
-  gpt add -a 1M -s 1G -t linux-data -l "pvol0-osBoot" $DEVX
-  gpt add -a 1M -s 84G -t linux-lvm -l "pvol0" $DEVX
+  gpt add -a 1M -s 1G -t linux-data -l "vg0-osBoot" $DEVX
+  gpt add -a 1M -s 4G -t linux-swap -l "vg0-osSwap" $DEVX
+  gpt add -a 1M -s 80G -t linux-lvm -l "pvol0" $DEVX
 
-  gpt add -a 1M -s 1G -t linux-data -l "pvol1-osBoot" $DEVX
+  gpt add -a 1M -s 1G -t linux-data -l "vg1-osBoot" $DEVX
   gpt add -a 1M -s 80G -t linux-lvm -l "pvol1" $DEVX
 
+  gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" $DEVX
+
   if [ "zfs" = "$VOL_MGR" ] ; then
-    gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" $DEVX ;
     gpt add -a 1M -s 80G -t fbsd-zfs -l "${GRP_NM}-fsPool" $DEVX ;
 
     #gpt biosboot -A -i 4 $DEVX
     gpt biosboot -L "${GRP_NM}-fsPool" $DEVX
   else
-    gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" $DEVX ;
-    gpt add -a 1M -s 16G -t ffs -l "${GRP_NM}-fsRoot" $DEVX ;
+    gpt add -a 1M -s 20G -t ffs -l "${GRP_NM}-fsRoot" $DEVX ;
     gpt add -a 1M -s 8G -t ffs -l "${GRP_NM}-fsVar" $DEVX ;
     gpt add -a 1M -s 32G -t ffs -l "${GRP_NM}-fsHome" $DEVX ;
-    gpt add -a 1M -s 24G -t ffs -l "${GRP_NM}-free" $DEVX ;
+    gpt add -a 1M -s 20G -t ffs -l "${GRP_NM}-free" $DEVX ;
 
     #gpt biosboot -A -i 3 $DEVX
     gpt biosboot -L "${GRP_NM}-fsRoot" $DEVX
@@ -113,22 +114,21 @@ zfspart_create() {
   zfs create -o canmount=noauto -o mountpoint=/ $zpoolnm/ROOT/default
   zfs mount $zpoolnm/ROOT/default
 
-  zfs create -o mountpoint=/tmp -o exec=on -o setuid=off $zpoolnm/tmp
-  zfs create -o mountpoint=/usr -o canmount=off $zpoolnm/usr
-  zfs create $zpoolnm/usr/home
+  zfs create -o exec=on -o setuid=off -o mountpoint=/tmp $zpoolnm/tmp
+  zfs create -o canmount=off -o mountpoint=/usr $zpoolnm/usr
+  zfs create -o mountpoint=/usr/home $zpoolnm/usr/home
   zfs create -o setuid=off $zpoolnm/usr/ports
   zfs create $zpoolnm/usr/src
-  zfs create -o mountpoint=/var -o canmount=off $zpoolnm/var
+  zfs create -o canmount=off -o mountpoint=/var $zpoolnm/var
   zfs create -o exec=off -o setuid=off $zpoolnm/var/audit
   zfs create -o exec=off -o setuid=off $zpoolnm/var/crash
   zfs create -o exec=off -o setuid=off $zpoolnm/var/log
   zfs create -o atime=on $zpoolnm/var/mail
   zfs create -o setuid=off $zpoolnm/var/tmp
 
-  zfs set quota=8G $zpoolnm/usr/home
-  zfs set quota=6G $zpoolnm/var
+  zfs set quota=32G $zpoolnm/usr/home
+  zfs set quota=8G $zpoolnm/var
   zfs set quota=2G $zpoolnm/tmp
-  #zfs set mountpoint=/$zpoolnm $zpoolnm
 
   zpool set bootfs=$zpoolnm/ROOT/default $zpoolnm # ??
   zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm ; sync
@@ -161,7 +161,7 @@ format_partitions() {
     gpt label -l "$zpartnm" -i $idx $DEVX ;
   else
     modstat -n ffs ; sleep 5
-    
+
     for partnm in ${BSD_PARTNMS} ; do
 	  idx=$(echo $(gpt show -l $DEVX | grep -e "$partnm") | cut -d' ' -f3) ;
 	  dkX=$(dkctl $DEVX listwedges | grep -e $partnm | cut -d: -f1) ;

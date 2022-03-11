@@ -121,7 +121,7 @@ $o = {
             'fs_type' => 'ext4',
             'mntpoint' => '/',
             'options' => 'noatime,acl',
-            'size' => 11776 * 2 << 10 # 11776MB
+            'size' => 12 * 2 << 20 # 12GB
         },
         {
 			'VG_name' => 'vg0',
