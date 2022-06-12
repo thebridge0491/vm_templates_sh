@@ -8,6 +8,19 @@ fi
 PREFIX=${PREFIX:-$HOME/.local} ; EDITOR=${EDITOR:-nano}
 LANGS=${@:-py c jvm} ; export LANGS
 
+if grep -q -E "csh" "$SHELL" ; then
+  shell_rc=${shell_rc:-$HOME/.cshrc} ;
+else
+  shell_rc=${shell_rc:-$HOME/.bashrc} ;
+fi
+if command -v bind > /dev/null ; then
+  echo "(info) bind -p | grep -e 'history.*-search'" >> /dev/stderr ;
+  bind -p | grep -e 'history.*-search' >> /dev/stderr ; sleep 3 ;
+elif command -v bindkey > /dev/null ; then
+  echo "(info) bindkey | grep -e 'history.*-search'" >> /dev/stderr ;
+  bindkey | grep -e 'history.*-search' >> /dev/stderr ; sleep 3 ;
+fi
+
 set +e
 
 _prep_lang_c() {
@@ -20,13 +33,14 @@ _prep_lang_c() {
 _prep_lang_py() {
   echo "Configuring for Python language ..." >> /dev/stderr ; sleep 3
   #echo "TBD: No config steps needed, as yet." >> /dev/stderr ; sleep 3
-  pip install --user build
-  #pip install --user wheel future pytest pytest-timeout nose2 hyothesis coverage pylint \
-  #  pep8 pycodestyle pydocstyle Sphinx cffi click PyYAML toml configparser
+  ${PYTHON:-python3} -m pip install --user build
+  #${PYTHON:-python3} -m pip install --user wheel pytest pytest-timeout nose2 \
+  #  hyothesis coverage pylint pep8 pycodestyle pydocstyle Sphinx cffi click \
+  #  PyYAML toml configparser
 }
 
 _cachepath_lang_jvm() {
-  IVYJAR=${IVYJAR:-$HOME/.ant/lib/ivy-*.jar}
+  IVYJAR=${IVYJAR:-`find $HOME/.ant/lib -type f -name 'ivy*.jar' | head -n1`}
   for org_mod_rev in com.puppycrawl.tools:checkstyle:'[8.33,)' \
       com.beautiful-scala:scalastyle_2.13:'[1.4.0,)' org.codenarc:CodeNarc:'[1.6,)' \
       org.scala-lang:scala-compiler:'[2.13.2,)' org.scala-lang:scalap:'[2.13.2,)' \
@@ -49,12 +63,6 @@ _cachepath_lang_jvm() {
 }
 
 _alias_lang_jvm() {
-  if grep -q -E "csh" "$SHELL" ; then
-  	shell_rc=${shell_rc:-$HOME/.cshrc} ;
-  else
-  	shell_rc=${shell_rc:-$HOME/.bashrc} ;
-  fi
-
   for cmd_mainclass in checkstyle:com.puppycrawl.tools.checkstyle.Main \
       CodeNarc:org.codenarc.CodeNarc scala:scala.tools.nsc.MainGenericRunner \
       scalac:scala.tools.nsc.Main scaladoc:scala.tools.nsc.ScalaDoc \
@@ -63,6 +71,7 @@ _alias_lang_jvm() {
       groovyc:org.codehaus.groovy.tools.FileSystemCompiler \
       groovydoc:org.codehaus.groovy.tools.groovydoc.Main \
       groovysh:org.codehaus.groovy.tools.shell.Main \
+      groovyConsole:groovy.ui.Console \
       grape:org.codehaus.groovy.tools.GrapeMain clojure:clojure.main ; do
     cmd=`echo $cmd_mainclass | cut -d: -f1` ;
     mainclass=`echo $cmd_mainclass | cut -d: -f2` ;
@@ -70,23 +79,23 @@ _alias_lang_jvm() {
     # skip creating alias, if cmd exists
     if command -v $cmd > /dev/null ; then continue ; fi ;
 
-    if ! grep -q -E "alias $cmd" ${shell_rc} ; then
-		  if grep -q -E "csh" "$SHELL" ; then
-				case $cmd in
-				  scalac|scala|scaladoc|fsc)
-				    echo alias $cmd java -cp `cat $HOME/.ant/lib/classpath_scala-compiler.txt` $mainclass >> ${shell_rc} ;;
-				  groovyc|groovy|groovydoc|groovysh|grape)
-				    echo alias $cmd java -cp `cat $HOME/.ant/lib/classpath_groovy-all.txt` $mainclass >> ${shell_rc} ;;
-				  *) echo alias $cmd java -cp `cat $HOME/.ant/lib/classpath_$cmd.txt` $mainclass >> ${shell_rc} ;;
-				esac ;
+    if ! grep -q -E "^alias $cmd" ${shell_rc} ; then
+      if grep -q -E "csh" "$SHELL" ; then
+        case $cmd in
+          scalac|scala|scaladoc|fsc)
+            echo alias "$cmd 'java \$JAVA_OPTS -cp \`cat $HOME/.ant/lib/classpath_scala-compiler.txt\` $mainclass -usejavacp'" >> ${shell_rc} ;;
+          groovyc|groovy|groovydoc|groovysh|groovyConsole|grape)
+            echo alias "$cmd 'java \$JAVA_OPTS -cp \`cat $HOME/.ant/lib/classpath_groovy-all.txt\` $mainclass'" >> ${shell_rc} ;;
+          *) echo alias "$cmd 'java \$JAVA_OPTS -cp \`cat $HOME/.ant/lib/classpath_$cmd.txt\` $mainclass'" >> ${shell_rc} ;;
+        esac ;
       else
-				case $cmd in
-				  scalac|scala|scaladoc|fsc)
-				    echo alias "$cmd='java -cp `cat $HOME/.ant/lib/classpath_scala-compiler.txt` $mainclass'" >> ${shell_rc} ;;
-				  groovyc|groovy|groovydoc|groovysh|grape)
-				    echo alias "$cmd='java -cp `cat $HOME/.ant/lib/classpath_groovy-all.txt` $mainclass'" >> ${shell_rc} ;;
-				  *) echo alias "$cmd='java -cp `cat $HOME/.ant/lib/classpath_$cmd.txt` $mainclass'" >> ${shell_rc} ;;
-				esac ;
+        case $cmd in
+          scalac|scala|scaladoc|fsc)
+            echo alias "$cmd='java \$JAVA_OPTS -cp \`cat $HOME/.ant/lib/classpath_scala-compiler.txt\` $mainclass -usejavacp'" >> ${shell_rc} ;;
+          groovyc|groovy|groovydoc|groovysh|groovyConsole|grape)
+            echo alias "$cmd='java \$JAVA_OPTS -cp \`cat $HOME/.ant/lib/classpath_groovy-all.txt\` $mainclass'" >> ${shell_rc} ;;
+          *) echo alias "$cmd='java \$JAVA_OPTS -cp \`cat $HOME/.ant/lib/classpath_$cmd.txt\` $mainclass'" >> ${shell_rc} ;;
+        esac ;
       fi
     fi
   done
@@ -94,22 +103,22 @@ _alias_lang_jvm() {
   if ! command -v jython > /dev/null ; then
     ## jython java -jar ${PREFIX}/lib/jython2.7/jython-*.jar
     ## jython-standalone java -jar ${PREFIX}/bin/jython-standalone-*.jar
-		if ! grep -q -E "alias jython-standalone" ${shell_rc} ; then
-		  if grep -q -E "csh" "$SHELL" ; then
-		    echo alias jython-standalone java -jar ${PREFIX}/bin/jython-standalone-*.jar >> ${shell_rc} ;
-		  else
-		    echo "alias jython-standalone='java -jar ${PREFIX}/bin/jython-standalone-*.jar'" >> ${shell_rc} ;
-		  fi
-		fi
+    if ! grep -q -E "^alias jython-standalone" ${shell_rc} ; then
+      if grep -q -E "csh" "$SHELL" ; then
+        echo alias "jython-standalone 'java \$JAVA_OPTS -cp ${PREFIX}/bin/jython-standalone-*.jar org.python.util.jython'" >> ${shell_rc} ;
+      else
+        echo alias "jython-standalone='java \$JAVA_OPTS -cp ${PREFIX}/bin/jython-standalone-*.jar org.python.util.jython'" >> ${shell_rc} ;
+      fi
+    fi
   fi
   if ! command -v jruby > /dev/null ; then
-		if ! grep -q -E "alias jruby" ${shell_rc} ; then
-		  if grep -q -E "csh" "$SHELL" ; then
-		    echo alias jruby java -jar ${PREFIX}/bin/jruby-complete-*.jar >> ${shell_rc} ;
-		  else
-		    echo "alias jruby='java -jar ${PREFIX}/bin/jruby-complete-*.jar'" >> ${shell_rc} ;
-		  fi
-		fi
+    if ! grep -q -E "^alias jruby" ${shell_rc} ; then
+      if grep -q -E "csh" "$SHELL" ; then
+        echo alias "jruby 'java \$JAVA_OPTS -cp ${PREFIX}/bin/jruby-complete-*.jar org.jruby.Main'" >> ${shell_rc} ;
+      else
+        echo alias "jruby='java \$JAVA_OPTS -cp ${PREFIX}/bin/jruby-complete-*.jar org.jruby.Main'" >> ${shell_rc} ;
+      fi
+    fi
   fi
 }
 
@@ -122,7 +131,7 @@ _prep_lang_jvm() {
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-					  https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            https://maven.apache.org/xsd/settings-1.0.0.xsd">
   <localRepository/>
   <interactiveMode/>
   <offline/>
@@ -146,7 +155,7 @@ EOF
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-					  https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            https://maven.apache.org/xsd/settings-1.0.0.xsd">
   <localRepository/>
   <interactiveMode/>
   <offline>true</offline>
@@ -170,7 +179,8 @@ EOF
 <ivysettings>
   <include url = "\${ivy.default.settings.dir}/ivysettings.xml"/>
 
-  <properties file = "\${ivy.basedir}/src/main/resources/versions.properties"/>
+  <property name = 'rsrc_path' value = "\${ivy.basedir}/src/main/resources"/>
+  <properties file = "\${rsrc_path}/versions.properties"/>
   <property name = 'maven.local.default.root'
     value = "\${user.home}/.m2/repository"/>
   <property name = 'maven.local.default.ivy.pattern'
@@ -213,7 +223,7 @@ EOF
   fi
 
   # download up-to-date ivy jar
-  IVYJAR=${IVYJAR:-`find /usr -type f -name 'ivy*.jar' | head -n1`}
+  IVYJAR=${IVYJAR:-`find $HOME/.ant/lib /usr -type f -name 'ivy*.jar' | head -n1`}
   if [ -z "${IVYJAR}" ] ; then
     #mvn -Dartifact=org.apache.ivy:ivy:2.5.0:jar -DoutputDirectory=$HOME/.ant/lib \
     #  -Dtransitive=false -s $HOME/.m2/settings-online \
@@ -241,16 +251,29 @@ _prep_lang_dotnet() {
     #cert-sync --user /etc/pki/tls/certs/ca-bundle.crt ; # RedHat
     cert-sync --user /etc/ssl/certs/ca-certificates.crt ; # Debian,Void
   elif [ "FreeBSD" = "`uname -s`" ] ; then
+    #cert-sync --user /usr/local/etc/ssl/cert.pem ;
     cert-sync --user /usr/local/share/certs/ca-root-nss.crt ;
   fi
   echo "Configuring for .NET language(s) ..." >> /dev/stderr ; sleep 3
   mkdir -p $HOME/bin $HOME/.nuget/packages $HOME/nuget/packages ; cd $HOME/bin
   curl -LO https://dist.nuget.org/win-x86-commandline/${nuget_ver}/nuget.exe
   for pkg_ver in netstandard.library:2.0.3 fsharp.core:4.7.2 mono.gendarme:2.11.0.20121120 ilrepack:2.0.18 ; do
-  	pkgX=$(echo $pkg_ver | cut -d: -f1) ;
-  	verX=$(echo $pkg_ver | cut -d: -f2) ;
-  	mono $HOME/bin/nuget.exe install -framework ${framework} -excludeversion -o $HOME/nuget/packages $pkgX -version $verX ;
+    pkgX=$(echo $pkg_ver | cut -d: -f1) ;
+    verX=$(echo $pkg_ver | cut -d: -f2) ;
+    mono $HOME/bin/nuget.exe install -framework ${framework} -excludeversion -o $HOME/nuget/packages $pkgX -version $verX ;
   done
+  #cd $HOME/Downloads
+  #curl -LO https://dotnet.microsoft.com/download/dotnet/scripts/v1/dotnet-install.sh
+  #sh ./dotnet-install.sh --channel ${dotnet_ver:-3.1}
+  #if ! grep -q -E "DOTNET_ROOT" ${shell_rc} ; then
+  #  if grep -q -E "csh" "$SHELL" ; then
+  #    echo setenv DOTNET_ROOT \$HOME/.dotnet >> ${shell_rc} ;
+  #    echo setenv PATH $PATH:\$HOME/.dotnet >> ${shell_rc} ;
+  #  else
+  #    echo export DOTNET_ROOT=\$HOME/.dotnet >> ${shell_rc} ;
+  #    echo export PATH=$PATH=\$HOME/.dotnet >> ${shell_rc} ;
+  #  fi ;
+  #fi
 }
 
 _prep_lang_scm() {
@@ -260,47 +283,33 @@ _prep_lang_scm() {
 
 _prep_lang_hs() {
   echo "Configuring for Haskell language ..." >> /dev/stderr ; sleep 3
-  if grep -q -E "csh" "$SHELL" ; then
-  	shell_rc=${shell_rc:-$HOME/.cshrc} ;
-  else
-  	shell_rc=${shell_rc:-$HOME/.bashrc} ;
-  fi
-  RESOLVER=${RESOLVER:-lts-13.30}
+  RESOLVER=${RESOLVER:-lts-18.10}
 
   mkdir -p $HOME/.stack/global-project
   if ! grep -q -E "system-ghc" $HOME/.stack/config.yaml ; then
-  	cat << EOF >> $HOME/.stack/config.yaml ;
+    cat << EOF >> $HOME/.stack/config.yaml ;
 templates:
     params: null
 system-ghc: true
 #allow-newer: true
-#extra-include-dirs: [${PREFIX}/include]
-#extra-lib-dirs: [${PREFIX}/lib]
+extra-include-dirs: [${PREFIX}/include]
+extra-lib-dirs: [${PREFIX}/lib]
 EOF
-	fi
+  fi
   echo "NOTE: Update/fix (as needed) $HOME/.stack/config.yaml" >> /dev/stderr ;
   sleep 2 ; $EDITOR $HOME/.stack/config.yaml
   if ! grep -q -E "resolver:" $HOME/.stack/global-project/stack.yaml ; then
-  	cat << EOF >> $HOME/.stack/global-project/stack.yaml ;
+    cat << EOF >> $HOME/.stack/global-project/stack.yaml ;
 packages: []
 resolver: ${RESOLVER}
 EOF
-	fi
-  echo "NOTE: Update/fix (as needed) $HOME/.stack/global-project/stack.yaml" >> /dev/stderr ;
-  sleep 2 ; $EDITOR $HOME/.stack/global-project/stack.yaml
-
-  if ! grep -q -E "alias stack" ${shell_rc} ; then
-    if grep -q -E "csh" "$SHELL" ; then
-      echo alias stack stack --resolver ${RESOLVER} >> ${shell_rc} ;
-    else
-      echo "alias stack='stack --resolver ${RESOLVER}'" >> ${shell_rc} ;
-    fi
   fi
   #outside of project
-  stack --resolver ${RESOLVER} setup
+  stack --resolver ${RESOLVER} update ; stack --resolver ${RESOLVER} setup
 }
 
 _prep_lang_lisp() {
+  LISP=${LISP:-sbcl}
   echo "Configuring for Common Lisp language ..." >> /dev/stderr ; sleep 3
   mkdir -p $HOME/Downloads ; cd $HOME/Downloads
   # www.quicklisp.org/beta
@@ -308,20 +317,29 @@ _prep_lang_lisp() {
   curl -LO https://beta.quicklisp.org/quicklisp.lisp.asc
   curl -LO https://beta.quicklisp.org/release-key.txt
   gpg --import release-key.txt ; gpg --verify quicklisp.lisp.asc quicklisp.lisp
-  # [sbcl | ccl]
-  echo "sbcl --load quicklisp.lisp"
-  echo "  * (quicklisp-quickstart:install)"
-  echo "  * (ql:add-to-init-file)" ; sleep 5
-  sbcl --load quicklisp.lisp
+  # [sbcl | clisp]
+  if [ "clisp" = "${LISP}" ] ; then
+    echo "${LISP} -i quicklisp.lisp" ;
+    echo "  * (quicklisp-quickstart:install)" ;
+    echo '  * (load "~/quicklisp/setup.lisp")' ;
+    echo "  * (ql:add-to-init-file)" ;
+    sleep 5 ; ${LISP} -i quicklisp.lisp ;
+  else
+    echo "${LISP} --load quicklisp.lisp" ;
+    echo "  * (quicklisp-quickstart:install)" ;
+    echo '  * (load "~/quicklisp/setup.lisp")' ;
+    echo "  * (ql:add-to-init-file)" ;
+    sleep 5 ; ${LISP} --load quicklisp.lisp ;
+  fi
 }
 
 _prep_lang_ml() {
   echo "Configuring for OCaml language ..." >> /dev/stderr ; sleep 3
-  opam init ; eval `opam env`
-  opam switch create ocaml-system.${OCAMLVER:-4.05.0} ; eval `opam env`
+  opam init ; opam switch create ${OCAMLVER:-4.05.0} ; eval `opam env`
+  #cp `which camlp4of | xargs dirname`/camlp4* $HOME/.opam/default/bin/
 
-  #opam install dune bisect batteries odoc oUnit qcheck ocaml-inifiles yojson ezjsonm \
-  #  ctypes ctypes-foreign bolt
+  #opam install pcre[.7.2.3] dune[.1.11.4] bisect odoc ounit2 qcheck \
+  #  ocaml-inifiles yojson ezjsonm ctypes ctypes-foreign batteries volt
 }
 
 _prep_lang_go() {
@@ -338,15 +356,53 @@ _prep_lang_rb() {
   echo "Configuring for Ruby language ..." >> /dev/stderr ; sleep 3
   #echo "TBD: No config steps needed, as yet." >> /dev/stderr ; sleep 3
   if ! grep -q -E ":ipv4_fallback_enabled:" $HOME/.gemrc ; then
-  	echo ':ipv4_fallback_enabled: true' >> $HOME/.gemrc ;
+    echo ':ipv4_fallback_enabled: true' >> $HOME/.gemrc ;
+    echo '#:ssl_verify_mode: 0' >> $HOME/.gemrc ;
   fi
-  #gem install --user-install bundler rspec rubocop yard ffi log4r logging rake rdoc \
-  #  minitest simplecov rake-compiler
+  gem install --user-install bundler
+  if ! grep -q -E "GEM_HOME" ${shell_rc} ; then
+    if grep -q -E "csh" "$SHELL" ; then
+      echo setenv GEM_HOME `ruby -e 'puts Gem.user_dir'` >> ${shell_rc} ;
+      echo "set path = ($path \$GEM_HOME/bin)" >> ${shell_rc} ;
+    else
+      echo export GEM_HOME=`ruby -e 'puts Gem.user_dir'` >> ${shell_rc} ;
+      echo export PATH=$PATH:\$GEM_HOME/bin >> ${shell_rc} ;
+    fi
+  fi
+
 }
 
 _prep_lang_swift() {
-  echo "Configuring for Swift language ..." >> /dev/stderr ; sleep 3
-  echo "TBD: No config steps needed, as yet." >> /dev/stderr ; sleep 3
+  ## note possible [x86_64|aarch64] versions: ${distro_ver:-distroN[-aarch64]}
+  swift_ver=${swift_ver:-5.6} ; distro_ver=${distro_ver:-centos8}
+  echo "(Linux) Configuring for Swift language ..." >> /dev/stderr ; sleep 3
+  echo "See file userconfig_codelab.sh to manually enter commands (if needed) ..." >> /dev/stderr ; sleep 3
+  #echo "TBD: No config steps needed, as yet." >> /dev/stderr ; sleep 3
+  #cd $HOME/Downloads
+  #curl -LO https://download.swift.org/swift-${swift_ver}-release/${distro_ver}/swift-${swift_ver}-RELEASE/swift-${swift_ver}-RELEASE-${distro_ver}.tar.gz[.sig]
+  #curl -Ls https://swift.org/keys/all-keys.asc | gpg --import -
+  #gpg --keyserver hkp://keyserver.ubuntu.com --refresh-keys Swift
+  #gpg --verify swift-${swift_ver}-RELEASE-${distro_ver}.tar.gz.sig
+  #tar -xf swift-${swift_ver}-RELEASE-${distro_ver}.tar.gz -C $HOME/.local
+  #if ! grep -q -E "SWIFT_ROOT" ${shell_rc} ; then
+  #  if grep -q -E "csh" "$SHELL" ; then
+  #    echo "?? Currently incompatible w/ FreeBSD" >> /dev/stderr ; sleep 3 ;
+  #    #echo setenv SWIFT_ROOT \$HOME/.local/swift-${swift_ver}-RELEASE-${distro_ver} >> ${shell_rc} ;
+  #    #echo setenv PATH \$SWIFT_ROOT/usr/bin:$PATH >> ${shell_rc} ;
+  #  else
+  #    echo export SWIFT_ROOT=\$HOME/.local/swift-${swift_ver}-RELEASE-${distro_ver} >> ${shell_rc} ;
+  #    echo export PATH=\$SWIFT_ROOT/usr/bin:$PATH >> ${shell_rc} ;
+  #  fi ;
+  #fi
+
+  ## swift --version ---> Swift version ${swift_ver}  OR  fix errors
+  ## check shared object depns errors:
+  ##   (example) ldd `which swift-build` | grep -e 'not found' --->
+  ##      libtinfo.so.5 => not found
+  ##      libncurses.so.5 => not found
+  ##   (Void Linux possible example fixes)
+  ##      sudo ln -s /usr/lib/libncursesw.so.6.3 /usr/lib/libtinfo.so.5
+  ##      sudo ln -s /usr/lib/libncurses.so.6.3 /usr/lib/libncurses.so.5
 }
 
 for langX in ${LANGS} ; do

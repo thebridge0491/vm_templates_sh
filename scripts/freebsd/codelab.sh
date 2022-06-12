@@ -42,6 +42,10 @@ fi
 if [ -z "$(grep '^fdesc' /etc/fstab)" ] ; then
   echo 'fdesc  /dev/fd  fdescfs  rw  0  0' >> /etc/fstab ;
 fi
+if [ -z "$(grep '^setenv JAVAFX_HOME' /etc/csh.cshrc)" ] ; then
+  echo "setenv JAVAFX_HOME ${default_javafx_home}" >> /etc/csh.cshrc ;
+fi
+
 
 echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
 for pkgX in xauth xterm ; do

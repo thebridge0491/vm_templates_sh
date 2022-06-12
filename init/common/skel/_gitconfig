@@ -4,6 +4,7 @@
 [core]
   ; comments - Linux|Freebsd|Mac(nano), Windows(notepad)
 	editor = nano
+	filemode = false
 [cola]
   spellcheck = false
   textwidth = 78

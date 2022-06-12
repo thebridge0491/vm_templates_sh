@@ -49,6 +49,9 @@ mkdir -p ${default_java_home}
 if [ -z "$(grep '^JAVA_VERSION' ${default_java_home}/release)" ] ; then
   echo JAVA_VERSION="${default_java_version}" >> ${default_java_home}/release ;
 fi
+if [ -z "$(grep '^export JAVAFX_HOME' /etc/bash.bashrc)" ] ; then
+  echo "export JAVAFX_HOME=${default_javafx_home}" >> /etc/bash.bashrc ;
+fi
 
 echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
 for pkgX in xorg-xauth xorg-xhost xterm ; do

@@ -140,6 +140,7 @@ EOF
 cat /etc/resolv.conf ; sleep 5
 sed -i '' '/127.0.1.1/d' /etc/hosts
 echo "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hosts
+echo "#151.101.192.70   rubygems.org api.rubygems.org" >> /etc/hosts
 
 
 echo "Update services" ; sleep 3

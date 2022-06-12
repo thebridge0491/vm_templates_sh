@@ -364,13 +364,12 @@ if [ "aarch64" = "${UNAME_M}" ] ; then
     menuentry "(aarch64) Arch Linux variant" {
         terminal_output gfxterm
 
-        probe --set=bootdev --label "vg0-osBoot"
-        probe --set=rootdev --label "vg0-osRoot"
-        #set bootdev='hd0,gpt3' ; set rootdev='/dev/vda5'
-        echo $bootdev ; echo $rootdev ; sleep 5
+        search --no-floppy --label vg0-osBoot
+        #set root=hd0,gpt3
+        #echo $root ; sleep 5
 
-        linux (hd0,gpt3)/ltsImage root=/dev/vda5
-        initrd (hd0,gpt3)/initramfs-linux-lts.img
+        linux /ltsImage root=LABEL=vg0-osRoot
+        initrd /initramfs-linux-lts.img
     }
 EOF
 

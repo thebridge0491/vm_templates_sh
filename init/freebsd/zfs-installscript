@@ -227,6 +227,7 @@ sysrc ifconfig_${ifdev}_ipv6="inet6 accept_rtadv"
 
 sed -i '' '/127.0.1.1/d' /etc/hosts
 echo -e "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hosts
+echo "#151.101.192.70   rubygems.org api.rubygems.org" >> /etc/hosts
 
 
 sysrc ntpd_enable="YES"
