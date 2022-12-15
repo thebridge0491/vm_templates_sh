@@ -8,9 +8,10 @@
 #sh /tmp/disk_setup.sh mount_filesystems std bsd0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
-# perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
-# ruby -e "['io/console','digest/sha2'].each {|i| require i} ; puts 'Password:' ; puts STDIN.noecho(&:gets).chomp.crypt(\"\$6\$16CHARACTERSSALT\")"
-# python -c "import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"\$6\$16CHARACTERSSALT\"))"
+# stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
+# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
+# python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
 set -x
 if [ -e /dev/vtbd0 ] ; then
@@ -27,8 +28,8 @@ export MIRROR=${MIRROR:-ftp.freebsd.org/pub/FreeBSD} ; UNAME_M=$(uname -m)
 RELEASE=${RELEASE:-$(sysctl -n kern.osrelease | cut -d- -f1)}
 
 export INIT_HOSTNAME=${1:-freebsd-boxv0000}
-#export PLAIN_PASSWD=${2:-abcd0123}
-export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+#export PASSWD_PLAIN=${2:-abcd0123}
+export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
 tunefs -n enable -t enable /dev/gpt/${GRP_NM}-fsRoot
 tunefs -n enable -t enable /dev/gpt/${GRP_NM}-fsVar
@@ -159,13 +160,13 @@ pkg install -y nano sudo
 
 
 echo "Set root passwd ; add user" ; sleep 3
-#echo -n "${PLAIN_PASSWD}" | pw usermod root -h 0
-echo -n '${CRYPTED_PASSWD}' | pw usermod root -H 0
+#echo -n "${PASSWD_PLAIN}" | pw usermod root -h 0
+echo -n '${PASSWD_CRYPTED}' | pw usermod root -H 0
 pw groupadd usb ; pw groupmod usb -m root
 
 mkdir -p /home/packer
-#echo -n "${PLAIN_PASSWD}" | pw useradd packer -h 0 -m -G wheel,operator -s /bin/tcsh -d /home/packer -c "Packer User"
-echo -n '${CRYPTED_PASSWD}' | pw useradd packer -H 0 -m -G wheel,operator -s /bin/tcsh -d /home/packer -c "Packer User"
+#echo -n "${PASSWD_PLAIN}" | pw useradd packer -h 0 -m -G wheel,operator -s /bin/tcsh -d /home/packer -c "Packer User"
+echo -n '${PASSWD_CRYPTED}' | pw useradd packer -H 0 -m -G wheel,operator -s /bin/tcsh -d /home/packer -c "Packer User"
 chown -R packer:\$(id -gn packer) /home/packer
 
 #sh -c 'cat >> /usr/local/etc/sudoers.d/99_packer' << EOF
@@ -230,7 +231,7 @@ for bootorder in $(efibootmgr | sed -n 's|.*Boot\([0-9][0-9]*\).*|\1|p') ; do
 done
 
 
-tar -xf /tmp/init.tar -C /mnt/root/ ; sleep 5
+tar -xf /tmp/scripts.tar -C /mnt/root/ ; sleep 5
 
 read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
 if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then

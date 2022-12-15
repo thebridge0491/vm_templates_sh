@@ -8,5 +8,5 @@ qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tc
   -device virtio-blk-pci,drive=hd0 \
   -drive file=${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/${GUEST:-freebsd-aarch64-std}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
   -display default,show-cursor=on -vga none -device virtio-gpu-pci \
-  ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE:-/usr/share/AAVMF/AAVMF_CODE.fd}} \
+  ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}} \
   -cdrom ${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-aarch64-disc1.iso' | tail -n1)} -no-reboot

@@ -1,10 +1,9 @@
 [user]
-	name = imcomputer
-	email = imcomputer-codelab@yahoo.com
+	name = im.computer
+	email = im.computer-codelab@email.com
 [core]
   ; comments - Linux|Freebsd|Mac(nano), Windows(notepad)
 	editor = nano
-	filemode = false
 [cola]
   spellcheck = false
   textwidth = 78

@@ -1,9 +1,10 @@
 #!/bin/sh -x
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
-# perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
-# ruby -e "['io/console','digest/sha2'].each {|i| require i} ; puts 'Password:' ; puts STDIN.noecho(&:gets).chomp.crypt(\"\$6\$16CHARACTERSSALT\")"
-# python -c "import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"\$6\$16CHARACTERSSALT\"))"
+# stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
+# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
+# python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
 # nc -l [-p] {port} > file ## nc -w3 {host} {port} < file  # netcat xfr
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
@@ -23,15 +24,15 @@
 
 STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)} ; PROVIDER=${PROVIDER:-libvirt}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros}
-BHYVE_X64_FIRMWARE=${BHYVE_X64_FIRMWARE:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
-QEMU_X64_FIRMWARE=${QEMU_X64_FIRMWARE:-/usr/share/OVMF/OVMF_CODE.fd}
-QEMU_AA64_FIRMWARE=${QEMU_AA64_FIRMWARE:-/usr/share/AAVMF/AAVMF_CODE.fd}
+FIRMWARE_BHYVE_X64=${FIRMWARE_BHYVE_X64:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
+FIRMWARE_QEMU_X64=${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd}
+FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
 
 
 _prep() {
   mkdir -p $HOME/.ssh/publish_krls $HOME/.pki/publish_crls
-  cp -R $HOME/.ssh/publish_krls init/common/skel/_ssh/
-  cp -R $HOME/.pki/publish_crls init/common/skel/_pki/
+  cp -a $HOME/.ssh/publish_krls init/common/skel/_ssh/
+  cp -a $HOME/.pki/publish_crls init/common/skel/_pki/
 
   OUT_DIR=${OUT_DIR:-build/${GUEST}}
   mkdir -p ${OUT_DIR}
@@ -63,21 +64,17 @@ _finish() {
     pystache init/common/Vagrantfile_${PROVIDER}.mustache \
       "{\"variant\":\"${variant}\"}" > ${OUT_DIR}/Vagrantfile ;
   elif command -v mustache > /dev/null ; then
-    cat << EOF >> mustache - init/common/Vagrantfile_${PROVIDER}.mustache > ${OUT_DIR}/Vagrantfile
----
-variant: ${variant}
----
-EOF
+    echo "{\"variant\":\"${variant}\"}" | mustache - init/common/Vagrantfile_${PROVIDER}.mustache > ${OUT_DIR}/Vagrantfile ;
   fi
-  cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun.sh ${OUT_DIR}/
+  cp -a init/common/catalog.json* init/common/qemu_lxc/vmrun.sh ${OUT_DIR}/
   sleep 30
 }
 
 _install_x86_64() {
   if [ "bhyve" = "${PROVIDER}" ] ; then
-    cp ${BHYVE_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_x86_64.args ${OUT_DIR}/ ;
+    cp -a ${FIRMWARE_BHYVE_X64} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_x86_64.args ${OUT_DIR}/ ;
   else
-    cp ${QEMU_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_x86_64.args ${OUT_DIR}/ ;
+    cp -a ${FIRMWARE_QEMU_X64} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_x86_64.args ${OUT_DIR}/ ;
   fi
 
   if [ "1" = "${USE_VIRTINST:-0}" ] ; then
@@ -106,7 +103,7 @@ _install_x86_64() {
     printf "%40s\n\n" | tr ' ' '#' ; sleep 5
 
     BUEFI_OPTS=${BUEFI_OPTS:- -s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
-      -l bootrom,${BHYVE_X64_FIRMWARE}}
+      -l bootrom,${FIRMWARE_BHYVE_X64}}
 
     if [ "1" = "${FREEBSDGUEST:-0}" ] ; then
       #bhyveload -m 2048M -d ${OUT_DIR}/${GUEST}.raw ${GUEST} ;
@@ -127,7 +124,7 @@ EOF
     vncviewer :${VNCPORT:-5901} &
   else
     #------------ using qemu-system-* ---------------
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_X64}"}
     if [ "$(uname -s)" = "Linux" ] ; then
       echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
       cat /etc/qemu/bridge.conf ; sleep 5 ;
@@ -150,7 +147,7 @@ EOF
 }
 
 _install_aarch64() {
-  cp ${QEMU_AA64_FIRMWARE} init/common/qemu_lxc/vmrun_qemu_aarch64.args ${OUT_DIR}/
+  cp -a ${FIRMWARE_QEMU_AA64} init/common/qemu_lxc/vmrun_qemu_aarch64.args ${OUT_DIR}/
 
   if [ "1" = "${USE_VIRTINST:-0}" ] ; then
     #-------------- using virtinst ------------------
@@ -173,7 +170,7 @@ _install_aarch64() {
     #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml ;
   else
     #------------ using qemu-system-* ---------------
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64}"}
     if [ "$(uname -s)" = "Linux" ] ; then
       echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
       cat /etc/qemu/bridge.conf ; sleep 5 ;
@@ -204,13 +201,13 @@ _install_aarch64() {
   #ifconfig ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev} {ifdev}
 
   ## (FreeBSD) install via chroot
-  ## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/freebsd)
+  ## NOTE, transfer [dir(s) | file(s)]: scripts.tar (init/common, init/freebsd, scripts/freebsd)
 
   #geom -t
   #sh init/common/gpart_setup_vmfreebsd.sh part_format [std | zfs]
   #sh init/common/gpart_setup_vmfreebsd.sh mount_filesystems [std | zfs]
 
-  #sh init/freebsd/[std | zfs]-install.sh [hostname [$CRYPTED_PASSWD]]
+  #sh init/freebsd/[std | zfs]-install.sh [hostname [$PASSWD_CRYPTED]]
 
 freebsd_x86_64() {
   FREEBSDGUEST=1
@@ -243,7 +240,7 @@ freebsd_aarch64() {
   #mount -o remount,size=1G /run/live/overlay ; df -h ; sleep 5
   #sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
   #apt-get --yes update --allow-releaseinfo-change
-  #apt-get --yes install gdisk [lvm2 btrfs-progs] [yum-utils zypper]
+  #apt-get --yes install gdisk [lvm2 btrfs-progs] [dnf zypper]
 
   #------------ if using ZFS ---------------
   #apt-get --yes install --no-install-recommends linux-headers-$(uname -r)
@@ -352,8 +349,8 @@ archlinux_x86_64() {
   #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories
   #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories
   #apk update
-  #apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl util-linux multipath-tools perl [lvm2 btrfs-progs] [xbps debootstrap pacman[-makepkg]]
-  #setup-udev
+  #apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl util-linux multipath-tools perl [lvm2 btrfs-progs] [debootstrap pacman]
+  #setup-devd udev
 
   #------------ if using ZFS ---------------
   #apk add zfs
@@ -433,7 +430,7 @@ suse_aarch64() {
   #[dnf | yum] -y install nmap-ncat [lvm2] [debootstrap]
 
   #------------ if using ZFS ---------------
-  #[dnf | yum] -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-[8 | 7].noarch.rpm
+  #[dnf | yum] -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-[9 | 7].noarch.rpm
   #[dnf | yum] -y install kernel kernel-devel
   #. /etc/os-release ; echo ${VERSION_ID}
   #kver=$(dnf list --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1)
@@ -449,7 +446,7 @@ suse_aarch64() {
   #-----------------------------------------
 
 redhat_x86_64() {
-  RELEASE=${RELEASE:-8} ; variant=${variant:-redhat}
+  RELEASE=${RELEASE:-9} ; variant=${variant:-redhat}
   GUEST=${1:-${variant}-x86_64-std}
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/rocky/live -name 'Rocky-*.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/rocky/live ; sha256sum --ignore-missing -c CHECKSUM)
@@ -457,7 +454,7 @@ redhat_x86_64() {
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
 #redhat_aarch64() {
-#  RELEASE=${RELEASE:-8} ; variant=${variant:-redhat}
+#  RELEASE=${RELEASE:-9} ; variant=${variant:-redhat}
 #  GUEST=${1:-${variant}-aarch64-std}
 #  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/rocky/live/aarch64 -name 'Rocky-*-aarch64-*.iso' | tail -n1)}
 #  (cd ${ISOS_PARDIR}/rocky/live/aarch64 ; sha256sum --ignore-missing -c CHECKSUM)
@@ -487,7 +484,7 @@ mageia_x86_64() {
 ## pclinuxos ##
   # (PCLinuxOS distro) install using draklive-install, then post chroot cmds
   ##!! login user/passwd: guest/-
-  ## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/pclinuxos)
+  ## NOTE, transfer [dir(s) | file(s)]: scripts.tar (init/common, init/pclinuxos, scripts/pclinuxos)
 
   #su - ; export MIRRORHOST=spout.ussg.indiana.edu/linux/pclinuxos
   #nmcli device status ; nmcli connection up {ifdev}
@@ -504,7 +501,7 @@ mageia_x86_64() {
   ## (btrfs) After partitioning (by hand or script), USE Custom partitioning in
   ## draklive-install with Mount options advanced for / (root): subvol=@
   #draklive-install --expert --noauto
-  #sh init/pclinuxos/[std | lvm | btrfs]-post_drakliveinstall.sh [hostname [$PLAIN_PASSWD]]
+  #sh init/pclinuxos/[std | lvm | btrfs]-post_drakliveinstall.sh [hostname [$PASSWD_PLAIN]]
 
 pclinuxos_x86_64() {
   variant=${variant:-pclinuxos} ; GUEST=${1:-${variant}-x86_64-std}
@@ -526,13 +523,13 @@ pclinuxos_x86_64() {
   #ifconfig ; dhcpcd {ifdev}
 
   ## (NetBSD) install via chroot
-  ## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/netbsd)
+  ## NOTE, transfer [dir(s) | file(s)]: scripts.tar (init/common, init/netbsd, scripts/netbsd)
 
   #gpt show -l sd0
   #sh init/netbsd/gpt_setup_vmnetbsd.sh part_format [std]
   #sh init/netbsd/gpt_setup_vmnetbsd.sh mount_filesystems [std]
 
-  #sh init/netbsd/std-install.sh [hostname [$PLAIN_PASSWD]]
+  #sh init/netbsd/std-install.sh [hostname [$PASSWD_PLAIN]]
 
 netbsd_x86_64() {
   variant=${variant:-netbsd} ; GUEST=${1:-${variant}-x86_64-std}
@@ -561,13 +558,13 @@ netbsd_aarch64() {
   #ifconfig ; dhclient -L /tmp/dhclient.lease.{ifdev} {ifdev}
 
   ## (OpenBSD) install via chroot
-  ## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/openbsd)
+  ## NOTE, transfer [dir(s) | file(s)]: scripts.tar (init/common, init/openbsd, scripts/openbsd)
 
   #fdisk sd0
   #sh init/openbsd/disklabel_setup_vmopenbsd.sh part_format
   #sh init/openbsd/disklabel_setup_vmopenbsd.sh mount_filesystems
 
-  #sh init/openbsd/std-install.sh [hostname [$PLAIN_PASSWD]]
+  #sh init/openbsd/std-install.sh [hostname [$PASSWD_PLAIN]]
 
 openbsd_x86_64() {
   variant=${variant:-openbsd} ; GUEST=${1:-${variant}-x86_64-std}
@@ -638,11 +635,11 @@ ${@:-freebsd_x86_64 freebsd-x86_64-std}
 
 #----------------------------------------
 ## (Linux distro) install via chroot
-## NOTE, transfer [dir(s) | file(s)]: init.tar (init/common, init/<variant>)
+## NOTE, transfer [dir(s) | file(s)]: scripts.tar (init/common, init/<variant>, scripts/<variant>)
 
 #  [[sgdisk -p | sfdisk -l] /dev/[sv]da | parted /dev/[sv]da -s unit GiB print]
 #  [MKFS_CMD=mkfs.ext4] sh init/common/disk_setup_vmlinux.sh part_format [sgdisk | sfdisk | parted] [std | lvm | btrfs | zfs] [ .. ]
 #  sh init/common/disk_setup_vmlinux.sh mount_filesystems [std | lvm | btrfs | zfs] [ .. ]
 
-#  sh init/<variant>/[std | lvm | btrfs | zfs]-install.sh [hostname [$CRYPTED_PASSWD]]
+#  sh init/<variant>/[std | lvm | btrfs | zfs]-install.sh [hostname [$PASSWD_CRYPTED]]
 #----------------------------------------

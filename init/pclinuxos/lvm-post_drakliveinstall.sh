@@ -9,8 +9,8 @@ export GRP_NM=${GRP_NM:-vg0}
 export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos} ; UNAME_M=$(uname -m)
 
 export INIT_HOSTNAME=${1:-pclinuxos-boxv0000}
-export PLAIN_PASSWD=${2:-abcd0123}
-#export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+export PASSWD_PLAIN=${2:-abcd0123}
+#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
 
 echo "Re-mount filesystems" ; sleep 3
@@ -164,16 +164,16 @@ sed -i '/^password.*sufficient/ s| use_authtok||' /etc/pam.d/system-auth
 
 echo "Set root passwd ; add user" ; sleep 3
 groupadd --system wheel
-echo -n "root:${PLAIN_PASSWD}" | chpasswd
-#echo -n 'root:${CRYPTED_PASSWD}' | chpasswd -e
+echo -n "root:${PASSWD_PLAIN}" | chpasswd
+#echo -n 'root:${PASSWD_CRYPTED}' | chpasswd -e
 
 DIR_MODE=0750 useradd -m -G wheel -s /bin/bash -c 'Packer User' packer
-echo -n "packer:${PLAIN_PASSWD}" | chpasswd
-#echo -n 'packer:${CRYPTED_PASSWD}' | chpasswd -e
+echo -n "packer:${PASSWD_PLAIN}" | chpasswd
+#echo -n 'packer:${PASSWD_CRYPTED}' | chpasswd -e
 chown -R packer:\$(id -gn packer) /home/packer
 DIR_MODE=0750 useradd -m -G wheel -s /bin/bash -c 'Packer User' packer
-echo -n "packer:${PLAIN_PASSWD}" | chpasswd
-#echo -n 'packer:${CRYPTED_PASSWD}' | chpasswd -e
+echo -n "packer:${PASSWD_PLAIN}" | chpasswd
+#echo -n 'packer:${PASSWD_CRYPTED}' | chpasswd -e
 chown -R packer:\$(id -gn packer) /home/packer
 
 #sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
@@ -231,7 +231,7 @@ exit
 EOFchroot
 # end chroot commands
 
-tar -xf /tmp/init.tar -C /mnt/install/root/ ; sleep 5
+tar -xf /tmp/scripts.tar -C /mnt/install/root/ ; sleep 5
 
 read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
 if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then

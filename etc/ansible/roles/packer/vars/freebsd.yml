@@ -14,8 +14,8 @@ skel_dirs: [/usr/share/skel/dot.gnupg, /usr/share/skel/dot.pki, /usr/share/skel/
 skelmaps_srcdest: [{'srcskel': '_gnupg/*', 'destskel': 'dot.gnupg/'},
   {'srcskel': '_pki/*', 'destskel': 'dot.pki/'},
   {'srcskel': '_ssh/*', 'destskel': 'dot.ssh/'},
-  {'srcskel': '_gitconfig', 'destskel': 'dot.gitconfig'},
-  {'srcskel': '_hgrc', 'destskel': 'dot.hgrc'}]
+  {'srcskel': '_gitconfig.sample', 'destskel': 'dot.gitconfig'},
+  {'srcskel': '_hgrc.sample', 'destskel': 'dot.hgrc'}]
 sudoers_file: /usr/local/etc/sudoers
 sudoers_group: wheel
 skeldir_ssh: /usr/share/skel/dot.ssh

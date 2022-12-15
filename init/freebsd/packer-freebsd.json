@@ -1,6 +1,6 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "(export mypass=$(python -c 'import getpass ; print(getpass.getpass())') ; packer build -var plain_passwd=${mypass} -var crypted_passwd=$(python -c 'import os,crypt ; print(crypt.crypt(os.getenv(\"mypass\"), \"$6$16CHARACTERSSALT\"))') -only=[qemu_x86_64|qemu_aarch64|virtualbox-iso] template.json)",
+  "_usage_build": "(export mypass=$(python -c 'import getpass ; print(getpass.getpass())') ; packer build -var passwd_plain=${mypass} -var passwd_crypted=$(python -c 'import os,crypt ; print(crypt.crypt(os.getenv(\"mypass\"), \"$6$16CHARACTERSSALT\"))') -only=[qemu_x86_64|qemu_aarch64|virtualbox_x86_64] template.json)",
 
   "builders": [{
     "type": "qemu",
@@ -16,25 +16,25 @@
       ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
       ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"],
       ["-display", "gtk,show-cursor=on"],
-      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_x64_firmware`}}"]
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `firmware_qemu_x64`}}"]
     ],
 
     "boot_wait": "7s",
     "ssh_timeout": "2h45m",
     "ssh_username": "root",
-    "ssh_password": "{{user `plain_passwd`}}",
+    "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "shutdown -p +3 || poweroff",
     "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
-    "iso_checksum": "file:file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-FreeBSD-13.0-RELEASE-amd64",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-{{user `iso_base_x64`}}",
     "iso_url": "",
-    "iso_urls": "file://{{user `isos_pardir`}}/freebsd/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
+    "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base_x64`}}-disc1.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_base_x64`}}-disc1.iso"],
     "boot_command": [
       "<esc><wait5>boot -s<wait><enter><wait10><wait10>/bin/sh<enter><wait>",
-      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; geom -t ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; geom -t ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
     ]
   },
   {
@@ -53,23 +53,23 @@
       ["-device", "usb-kbd"], ["-device", "usb-tablet"],
       ["-vga", "none"], ["-device", "virtio-gpu-pci"],
       ["-display", "gtk,show-cursor=on"],
-      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_aa64_firmware`}}"]
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `firmware_qemu_aa64`}}"]
     ],
     "qemu_binary": "qemu-system-aarch64",
 
     "boot_wait": "7s",
     "ssh_timeout": "4h45m",
     "ssh_username": "root",
-    "ssh_password": "{{user `plain_passwd`}}",
+    "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "shutdown -p +3 || poweroff",
     "output_directory": "output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}",
 
-    "iso_checksum": "file:file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-FreeBSD-13.0-RELEASE-arm64-aarch64",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-{{user `iso_base_aa64`}}",
     "iso_url": "",
-    "iso_urls": "file://{{user `isos_pardir`}}/freebsd/{{user `iso_aa64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_aa64_name`}}.iso",
+    "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base_aa64`}}-disc1.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_base_aa64`}}-disc1.iso"],
     "boot_command": [
       "<esc><wait5>boot -s<wait><enter><wait10><wait10>/bin/sh<enter><wait>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
@@ -77,13 +77,14 @@
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
-      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/installscript http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installscript ; export CRYPTED_PASSWD='{{user `crypted_passwd`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; geom -t ; sleep 3 ; bsdinstall script /tmp/installscript<enter>"
+      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/installscript http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installscript ; export PASSWD_CRYPTED='{{user `passwd_crypted`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; geom -t ; sleep 3 ; bsdinstall script /tmp/installscript<enter>"
     ]
   },
   {
     "type": "virtualbox-iso",
     "guest_os_type": "FreeBSD_64",
     "format": "ova",
+    "name": "virtualbox_x86_64",
     "vm_name": "{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
     "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
     "guest_additions_mode": "disable",
@@ -101,19 +102,19 @@
     "boot_wait": "7s",
     "ssh_timeout": "2h45m",
     "ssh_username": "root",
-    "ssh_password": "{{user `plain_passwd`}}",
+    "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "shutdown -p +3 || poweroff",
     "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
-    "iso_checksum": "file:file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-FreeBSD-13.0-RELEASE-amd64",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-{{user `iso_base_x64`}}",
     "iso_url": "",
-    "iso_urls": "file://{{user `isos_pardir`}}/freebsd/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
+    "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base_x64`}}-disc1.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_base_x64`}}-disc1.iso"],
     "boot_command": [
       "<esc><wait5>boot -s<wait><enter><wait10><wait10>/bin/sh<enter><wait>",
-      "mdmfs -s 100m md1 /mnt ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; geom -t ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "mdmfs -s 100m md1 /mnt ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; geom -t ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
     ]
   }],
 
@@ -121,8 +122,8 @@
     "type": "shell-local",
     "inline": [
       "mkdir -p {{user `home`}}/.ssh/publish_krls {{user `home`}}/.pki/publish_crls",
-      "cp -R {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
-      "cp -R {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
+      "cp -a {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
+      "cp -a {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
       "tar -cf /tmp/scripts.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}"
     ]
   },
@@ -162,7 +163,7 @@
     "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
     "inline": [
       "tar -xf /tmp/scripts.tar -C /tmp ; mv /tmp/{{user `variant`}} /tmp/scripts",
-      "cp -R /tmp/init /tmp/scripts /root/"
+      "cp -a /tmp/init /tmp/scripts /root/"
     ]
   },
   {
@@ -185,7 +186,7 @@
     "scripts": [
       "init/common/bsd/zerofill.sh"
     ],
-    "only": ["virtualbox-iso"]
+    "only": ["virtualbox_x86_64"]
   }],
 
   "post-processors": [
@@ -201,7 +202,7 @@
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
         "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
-        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_x64_firmware`}}"],
+        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `firmware_qemu_x64`}}"],
       "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}-{{user `build_timestamp`}}.{{.Provider}}.box",
       "only": ["qemu_x86_64"]
     },
@@ -209,7 +210,7 @@
       "type": "shell-local",
       "inline": [
         "mv output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}} output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}.qcow2",
-        "cp init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/"
+        "cp -a init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/"
       ],
       "only": ["qemu_x86_64"]
     },
@@ -224,7 +225,7 @@
       "keep_input_artifact": true,
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
-        "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "{{user `qemu_aa64_firmware`}}"],
+        "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "{{user `firmware_qemu_aa64`}}"],
       "output": "output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}}-{{user `build_timestamp`}}.{{.Provider}}.box",
       "only": ["qemu_aarch64"]
     },
@@ -232,7 +233,7 @@
       "type": "shell-local",
       "inline": [
         "mv output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}} output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}}.qcow2",
-        "cp init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/"
+        "cp -a init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/"
       ],
       "only": ["qemu_aarch64"]
     }
@@ -241,26 +242,26 @@
   "variables": {
     "variant": "freebsd",
     "vol_mgr": "std",
-    "init_hostname": "{{user `variant`}}-boxv0000",
+    "init_hostname": "freebsd-boxv0000",
     "boot_cmdln_options": " ",
     "isos_pardir": "/mnt/Data0/distros",
     "RELEASE": "",
 
     "iso_url_mirror": "https://download.freebsd.org/ftp",
-    "iso_url_directory": "releases/ISO-IMAGES/13.0",
-    "iso_x64_name": "FreeBSD-13.0-RELEASE-amd64-disc1",
-    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
+    "iso_url_directory": "releases/ISO-IMAGES/13.1",
+    "iso_base_x64": "FreeBSD-13.1-RELEASE-amd64",
+    "iso_base_aa64": "FreeBSD-13.1-RELEASE-arm64-aarch64",
 
-    "iso_aa64_name": "FreeBSD-13.0-RELEASE-arm64-aarch64-disc1",
-    "qemu_aa64_firmware": "/usr/share/AAVMF/AAVMF_CODE.fd",
-
+    "firmware_qemu_x64": "/usr/share/OVMF/OVMF_CODE.fd",
+    "firmware_qemu_aa64": "/usr/share/AAVMF/AAVMF_CODE.fd",
     "disk_size": "30720",
     "headless": "",
-    "plain_passwd": "abcd0123",
-    "crypted_passwd": "$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91",
-    "build_timestamp": "{{isotime `2006.01`}}",
+    "passwd_plain": "abcd0123",
+    "passwd_crypted": "$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91",
     "author": "thebridge0491",
-    "datestamp": "{{isotime `2006.01.02`}}",
-    "home": "{{env `HOME`}}"
-  }
+    "home": "{{env `HOME`}}",
+    "build_timestamp": "{{isotime `2006.01`}}",
+    "datestamp": "{{isotime `2006.01.02`}}"
+  },
+  "sensitive-variables": ["passwd_plain", "passwd_crypted"]
 }

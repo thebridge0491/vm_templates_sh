@@ -1,0 +1,208 @@
+#!/usr/bin/env python
+
+import os, sys, argparse, subprocess
+import imaplib
+
+MIN_PYTHON = (3, 6)
+if sys.version_info < MIN_PYTHON:
+	sys.exit("Python %s.%s or later is required.\n" % MIN_PYTHON)
+
+SCRIPTPARENT = os.path.dirname(os.path.abspath(__file__))
+
+# ensure GPG_TTY set to allow interactive agent usage from inside a pipe
+os.environ['GPG_TTY'] = os.getenv('GPG_TTY', subprocess.getoutput('tty'))
+
+## ? (--keyring) alternate keyring ; ? (-v) verbose output ; ? (-a) armor
+GPG_CMD = os.getenv('GPG_CMD', 'gpg')
+
+HDR_ITEMS = os.getenv('HDR_ITEMS', 'From To Subject Date')
+
+def parse_cmdopts(args=None):
+	opts_parser = argparse.ArgumentParser()
+	
+	opts_parser.add_argument('-e', '--endpoint', default='smtp.gmail.com',
+		help='Specify imap endpoint(host)(default: smtp.gmail.com)')
+	opts_parser.add_argument('-p', '--port', default=993,
+		help='Specify imap port(default: 993)')
+	opts_parser.add_argument('-a', '--auth', default='plain',
+		choices=['plain', 'login', 'oauthbearer', 'xoauth2'],
+		help='Specify auth method(default: plain)')
+	opts_parser.add_argument('-u', '--user', default='im.computer@email.com',
+		help='Specify imap user(from)(default: im.computer@email.com)')
+	opts_parser.add_argument('-m', '--mailbox', default='INBOX',
+		help='Specify imap mailbox(default: INBOX)')
+	opts_parser.add_argument('-s', '--criterion', default='UNSEEN',
+	  help='Specify imap search criterion(default: UNSEEN)')
+	opts_parser.add_argument('-i', '--idx_spec', default='0',
+		help='Specify imap index spec(default: 0)')
+	opts_parser.add_argument('-b', '--brief', action = 'store_true',
+	  default=False, help='Fetch whole or brief(headers: {0}) msg(default: False)'.format(
+	  HDR_ITEMS))
+	opts_parser.add_argument('-c', '--use_curl', action = 'store_true',
+	  default=False, help='Use curl(default: False)')
+	
+	return opts_parser.parse_args(args)
+
+def main(argv=None):
+  opts_hash = parse_cmdopts(argv)
+  
+  if opts_hash.auth in ['oauthbearer', 'xoauth2']:
+    tokenfile = input("Token file(default: appmail.tokens) for user({0}): ".format(
+      opts_hash.user)) or 'appmail.tokens'
+    token = subprocess.getoutput('python $HOME/.config/mutt/oauth2.py {0}'.format(
+      tokenfile)).split()[0]
+    sasl_str = 'n,a={0},\1auth=Bearer {1}\1\1'.format(opts_hash.user, token)
+    if 'xoauth2' == opts_hash.auth:
+      sasl_str = 'user={0}\1auth=Bearer {1}\1\1'.format(opts_hash.user, token)
+  else: # plain | login
+    #import getpass
+    #passw = getpass.getpass("Password for user({0}): ".format(
+    #  opts_hash.user))
+    
+    #keepassdb = input("Keepass database(default: $HOME/.keepass/store.kdbx) for user({0}): ".format(
+    #  opts_hash.user)) or '$HOME/.keepass/store.kdbx'
+    #entry = input("Keepass entry(default: appmail) for user({0}): ".format(
+    #  opts_hash.user)) or 'appmail'
+    #passw = subprocess.getoutput('keepassxc-cli show -apassword {0} {1}'.format(
+    #  keepassdb, entry)).split()[0]
+      
+    #certkeyfile = input("Cert/key file(default: $HOME/.pki/encrypt.pem) for user({0}): ".format(
+    #  opts_hash.user)) or '$HOME/.pki/encrypt.pem'
+    #entry = input("Password entry(default: appmail) for user({0}): ".format(
+    #  opts_hash.user)) or 'appmail'
+    #passw = subprocess.getoutput('openssl pkeyutl -decrypt -inkey {0} -in $HOME/.pki/.{1}.enc'.format(
+    #  certkeyfile, entry)).split()[0]
+    
+    entry = input("Password entry(default: appmail) for user({0}): ".format(
+      opts_hash.user)) or 'appmail'
+    passw = subprocess.getoutput('{0} --no-tty -qd ~/.{1}.gpg'.format(
+      GPG_CMD, entry)).split()[0]
+    sasl_str = '\0{0}\0{1}'.format(opts_hash.user, passw)
+  
+  if opts_hash.use_curl:
+    import io, pycurl
+    
+    curl_conn = pycurl.Curl()
+    curl_conn.setopt(curl_conn.URL, "imaps://{0}".format(opts_hash.endpoint))
+    curl_conn.setopt(curl_conn.PORT, opts_hash.port)
+    curl_conn.setopt(curl_conn.USE_SSL, pycurl.USESSL_ALL)
+    curl_conn.setopt(curl_conn.CRLF, 1)
+    #curl_conn.setopt(curl_conn.UPLOAD, 0)
+    #curl_conn.setopt(curl_conn.IPRESOLVE, pycurl.IPRESOLVE_V4)
+    #curl_conn.setopt(curl_conn.FOLLOWLOCATION, 1)
+    #curl_conn.setopt(curl_conn.CONNECTTIMEOUT, 30)
+    #curl_conn.setopt(curl_conn.VERBOSE, 1)
+    
+    if opts_hash.auth in ['oauthbearer', 'xoauth2']:
+      curl_conn.setopt(curl_conn.USERNAME, opts_hash.user)
+      curl_conn.setopt(curl_conn.XOAUTH2_BEARER, token)
+    else:
+      curl_conn.setopt(curl_conn.USERPWD, 
+        "{0}:{1}".format(opts_hash.user, passw))
+    
+    curl_conn.setopt(curl_conn.CUSTOMREQUEST,
+      'examine {0}'.format(opts_hash.mailbox))
+    curl_conn.perform()
+    
+    if '0' != opts_hash.idx_spec:
+      curl_conn.setopt(curl_conn.URL, 'imaps://{0}/{1}'.format(
+        opts_hash.endpoint, opts_hash.mailbox))
+      if opts_hash.brief:
+        curl_conn.setopt(curl_conn.CUSTOMREQUEST,
+          'fetch {0} (BODY.PEEK[HEADER.FIELDS ({1})])'.format(
+          opts_hash.idx_spec, HDR_ITEMS))
+        #ostrm = io.BytesIO()
+        #curl_conn.setopt(curl_conn.WRITEDATA, ostrm)
+        curl_conn.setopt(curl_conn.VERBOSE, 1)
+        curl_conn.perform()
+      else:
+        #curl_conn.setopt(curl_conn.VERBOSE, 1)
+        #curl_conn.setopt(curl_conn.CUSTOMREQUEST,
+        #  'fetch {0} (BODY.PEEK[])'.format(opts_hash.idx_spec))
+        curl_conn.setopt(curl_conn.URL, 'imaps://{0}/{1};MAILINDEX={2}'.format(
+          opts_hash.endpoint, opts_hash.mailbox, opts_hash.idx_spec))
+        curl_conn.setopt(curl_conn.CUSTOMREQUEST, None)
+        curl_conn.perform()
+        curl_conn.setopt(curl_conn.URL, 'imaps://{0}/{1}'.format(
+          opts_hash.endpoint, opts_hash.mailbox))
+        curl_conn.setopt(curl_conn.CUSTOMREQUEST,
+          'store {0} -FLAGS (\Seen)'.format(opts_hash.idx_spec))
+        curl_conn.perform()
+    else:
+      curl_conn.setopt(curl_conn.CUSTOMREQUEST, None)
+      curl_conn.perform()
+      #print(curl_conn.perform_rs())
+      curl_conn.setopt(curl_conn.CUSTOMREQUEST,
+        'status {0} (MESSAGES RECENT UIDNEXT UIDVALIDITY UNSEEN)'.format(opts_hash.mailbox))
+      curl_conn.perform()
+      curl_conn.setopt(curl_conn.URL, 'imaps://{0}/{1}'.format(
+        opts_hash.endpoint, opts_hash.mailbox))
+      curl_conn.setopt(curl_conn.CUSTOMREQUEST,
+        'search {0}'.format(opts_hash.criterion))
+      curl_conn.perform()
+    
+    curl_conn.close()
+    sys.exit(0)
+  
+  imap_conn = imaplib.IMAP4_SSL(opts_hash.endpoint, opts_hash.port)
+  
+  # auth() method base64 encodes sasl str
+  imap_conn.authenticate(opts_hash.auth, lambda _=None: sasl_str)
+  imap_conn.select(opts_hash.mailbox, True) # mailbox='INBOX', readonly=False
+  
+  if '0' != opts_hash.idx_spec:
+    if opts_hash.brief:
+      resptype, respdata = imap_conn.fetch(opts_hash.idx_spec,
+        '(BODY.PEEK[HEADER.FIELDS ({0})])'.format(HDR_ITEMS))
+      print('fetch', resptype)
+      for tupX in respdata:
+        try:
+          [print(x.decode()) for x in tupX]
+        except:
+          pass
+    else:
+      #resptype, respdata = imap_conn.fetch(opts_hash.idx_spec, '(RFC822)')
+      #print('fetch', resptype)
+      #for tupX in respdata:
+      #  try:
+      #    [print(x.decode()) for x in tupX]
+      #  except:
+      #    pass
+      #resptype, respdata = imap_conn.store(opts_hash.idx_spec, '-FLAGS', '\\Seen')
+      resptype, respdata = imap_conn.fetch(opts_hash.idx_spec, '(BODY.PEEK[])')
+      print('fetch', resptype)
+      for tupX in respdata:
+        try:
+          [print(x.decode()) for x in tupX]
+        except:
+          pass
+  else:
+    resptype, respdata = imap_conn.list()
+    print('list', resptype)
+    [print(x.decode()) for x in respdata]
+    resptype, respdata = imap_conn.status(opts_hash.mailbox,
+      '(MESSAGES RECENT UIDNEXT UIDVALIDITY UNSEEN)')
+    print('status', resptype)
+    print(respdata[0].decode())
+    resptype, respdata = imap_conn.search(None, opts_hash.criterion)
+    print('search', resptype)
+    print(respdata[0].decode())
+  
+  imap_conn.close()
+  imap_conn.logout()
+
+
+if '__main__' == __name__:
+  import sys
+  #raise SystemExit(main(sys.argv[1:]))
+  sys.exit(main(sys.argv[1:]))
+
+
+# imaps_cli.py usage example:
+# python imaps_cli.py [-e imap.gmail.com] [-p 993] [-a plain]
+#   [-u im.computer@email.com] [-m INBOX] [-s UNSEEN] [-i 0] [-b]
+
+# (smime dec) cat smime.p7m | openssl cms -decrypt -aes256 -recip recip.pem \
+#   > tmp/data.mime
+# (mime extract) (cd tmp ; [munpack -t data.mime | ripmime -i data.mime])
+# (gpg dec) cat data.txt.gpg | gpg --decrypt > data.txt.gpg

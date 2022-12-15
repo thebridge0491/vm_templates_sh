@@ -19,7 +19,7 @@ case $OS_NAME in
     elif [ -f /usr/lib/os-release ] ; then
       . /usr/lib/os-release ;
     fi ;
-    #sudo tar -xf /root/init.tar ;
+    #sudo tar -xf /root/scripts.tar ;
     sudo find /root/init -name 'distro_pkg*' -exec cp {} /tmp/ \; ;
     . /tmp/distro_pkgs.ini ; . /tmp/distro_pkgmgr_funcs.sh ;;
 esac

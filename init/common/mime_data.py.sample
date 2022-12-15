@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+
+import os, sys, base64, re
+
+import mimetypes
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+MIN_PYTHON = (3, 6)
+if sys.version_info < MIN_PYTHON:
+	sys.exit("Python %s.%s or later is required.\n" % MIN_PYTHON)
+
+SCRIPTPARENT = os.path.dirname(os.path.abspath(__file__))
+
+usage_str = '''usage: 
+  {0} {1} mime_attachmt [data.txt]
+  {0} {1} mime_mixed [data.txt[,dataN.txt] [sys.stdin]]
+  {0} {1} mime_extract [data.mime [.]]
+  '''.format(os.path.basename(sys.executable), os.path.relpath(__file__))
+
+def mime_attachmt(infile='data.txt'):
+  ctype, encoding = mimetypes.guess_type(infile)
+  if ctype is None or encoding is not None:
+    ctype = 'application/octet-stream'
+  maintype, subtype = ctype.split('/', 1)
+  
+  mimedata = MIMEBase(maintype, subtype)
+  
+  with open(infile, 'rb') as fIn:
+    #mimedata.set_payload(base64.encodebytes(fIn.read()))
+    mimedata.set_payload(fIn.read())
+    encoders.encode_base64(mimedata)
+  
+  mimedata.replace_header('Content-Type', '{0}; name="{1}"'.format(ctype,
+    os.path.basename(infile)))
+  mimedata.add_header('Content-Disposition', 'attachment',
+    filename=os.path.basename(infile))
+  
+  return mimedata
+
+def mime_mixed(infiles='data.txt', body=sys.stdin):
+  container = MIMEMultipart()
+  
+  if sys.stdin == body:
+    print('Input body, then Ctrl-D: ', file=sys.stderr, flush=True, end='')
+    mimedata = MIMEText(body.read())
+  else:
+    with open(body) as fIn:
+      mimedata = MIMEText(fIn.read().strip() + "\n")
+  
+  mimedata.replace_header('Content-Type', 'text/plain; charset=utf-8')
+  mimedata.add_header('Content-Disposition', 'inline')
+  
+  container.attach(mimedata)
+  
+  #for infile in infiles.split(','):
+  for infile in re.split(',|;|:|\*|\n', infiles):
+    container.attach(mime_attachmt(infile))
+    
+  return container
+
+def mime_extract(mimefile='data.mime', outdir='.'):
+  import email
+  
+  if not os.path.exists(outdir):
+    os.mkdir(outdir)
+  with open(mimefile) as fIn:
+    msg = email.message_from_file(fIn)
+  cnt = 0
+  for partN in msg.walk():
+    # skip multipart/* containers
+    if 'multipart' == partN.get_content_maintype():
+      continue
+    filenm = partN.get_filename()
+    if not filenm:
+      cnt += 1
+      extN = mimetypes.guess_extension(partN.get_content_type()) or '.dat'
+      filenm = 'part-{0:03d}{1}'.format(cnt, extN)
+    with open(os.path.join(outdir, filenm), 'wb') as fOut:
+      fOut.write(partN.get_payload(decode=True))
+
+
+if __name__ == '__main__':
+  if 2 >= len(sys.argv):
+    print(usage_str)
+    sys.exit(1)
+  script_name, *args = sys.argv
+  
+  if 2 < len(sys.argv):
+    func_name = args.pop(0)
+    rest = args
+  else:
+    func_name, rest = args, []
+  if func_name in ['mime_attachmt', 'mime_mixed']:
+    print(globals()[func_name](*rest).as_string(), end='')
+  else:
+    globals()[func_name](*rest)

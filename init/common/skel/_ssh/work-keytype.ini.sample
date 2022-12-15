@@ -1,0 +1,6 @@
+certtype=user
+keytype_bitopts="ed25519: rsa:-b3072"
+comment=im.computer
+certid=im.computer
+principals=im.computer@yahoo.com,im.computer
+

@@ -14,8 +14,8 @@ Preferences: AES256 AES192 CAMELLIA256 CAMELLIA192 SHA512 SHA384 SHA256 BZIP2 ZL
 
 #Creation-Date: 2011-10-01
 Expire-Date: 13m
-Name-Real: plain_user
-Name-Email: plain_user@yahoo.com
+Name-Real: im.computer
+Name-Email: im.computer@gmail.com
 #Name-Comment: Practice PGP Keyring
 %commit
 %echo Done!

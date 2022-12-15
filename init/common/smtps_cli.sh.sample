@@ -1,0 +1,112 @@
+#!/bin/sh
+
+# (smime enc) [cat /dev/null |] sh mime_data.sh mime_mixed \
+#   data.txt[,dataN.txt] | openssl cms -encrypt -aes256 recip.crt > smime.p7m
+# (gpg enc) cat data.txt | gpg --encrypt --recipient recip@email.com \
+#   > data.txt.gpg
+# (mime msg) [cat /dev/null |] sh mime_data.sh mime_mixed \
+#   data.txt[.gpg][,dataN.txt[.gpg]] > data.mime
+
+# usage:
+#   [host=smtp.gmail.com] [port=465] \
+#     sh smtps_cli.sh [-f=a.sendr@email.com] \
+#     [-s="email subject"] [-i=[data.[txt|mime]|smime.p7m] recip [...recipN]
+
+## ensure GPG_TTY set to allow interactive agent usage from inside a pipe
+# [setenv | export] GPG_TTY[=]`tty`
+
+## ? (--keyring) alternate keyring ; ? (-v) verbose output ; ? (-a) armor
+GPG_CMD=${GPG_CMD:-gpg}
+
+USE_CURL=${USE_CURL:-0} ; OPEN_AUTH=${OPEN_AUTH:-0}
+# [gmail.com | mail.yahoo.com | comcast.net]
+host=${host:-smtp.gmail.com} ; port=${port:-465}
+
+#infile="$(< /dev/stdin)"
+sender=a.sendr@email.com
+subj="email subject"
+infile=data.txt
+recips=""
+
+for opt in "$@" ; do
+  case $opt in
+  -s=*) subj=`echo $opt | sed 's|-s=||'` ;;
+  -i=*) infile=`echo $opt | sed 's|-i=||'` ;;
+  -f=*) sender=`echo $opt | sed 's|-f=||'` ;;
+  *) recips="${recips}${opt} " ;;
+  esac
+done
+
+hdr_txt="From: ${sender}\nTo: `echo ${recips} | tr ' ' ,`\nSubject: ${subj}"
+
+if [ ! "0" = "${OPEN_AUTH:-0}" ] ; then
+  read -p "Token file(default: appmail.tokens) for user($sender): " tokenfile ; echo
+  tokenfile=${tokenfile:-appmail.tokens}
+  token=$(python $HOME/.config/mutt/oauth2.py ${tokenfile})
+  
+  # #Note: disable line-wrapping: use openssl base64 -A OR base64 -w 0
+  auth_method=oauthbearer
+  sasl_str=$(printf "n,a=${sender},\1auth=Bearer ${token}\1\1" | openssl base64 -A)
+  if [ ! "0" = "${USE_XOAUTH2:-0}" ] ; then
+    auth_method=xoauth2
+    sasl_str=$(printf "user=${sender}\1auth=Bearer ${token}\1\1" | openssl base64 -A)
+  fi ;
+else
+  #stty -echo
+  #read -p "Host password for user($sender): " passw ; echo
+  #stty echo
+  
+  #read -p "Keepass database(default: $HOME/.keepass/store.kdbx) for user($sender): " keepassdb ; echo
+  #keepassdb=${keepassdb:-$HOME/.keepass/store.kdbx}
+  #read -p "Keepass entry(default: appmail) for user($sender): " entry ; echo
+  #entry=${entry:-appmail}
+  #passw=$(keepassxc-cli show -apassword ${keepassdb} ${entry})
+  
+  #read -p "Cert/key file(default: $HOME/.pki/encrypt.pem) for user($sender): " certkeyfile ; echo
+  #certkeyfile=${certkeyfile:-$HOME/.pki/encrypt.pem}
+  #read -p "Password entry(default: appmail) for user($sender): " entry ; echo
+  #entry=${entry:-appmail}
+  #passw=$(openssl pkeyutl -decrypt -inkey ${certkeyfile} -in $HOME/.pki/.${entry}.enc)
+  
+  read -p "Password entry(default: appmail) for user($sender): " entry ; echo
+  entry=${entry:-appmail}
+  passw=$(${GPG_CMD} --no-tty -qd $HOME/.${entry}.gpg)
+  
+  auth_method=plain
+  sasl_str=$(printf "\0${sender}\0${passw}" | openssl base64)
+fi
+
+if [ "0" = "${USE_CURL:-0}" ] ; then
+  {
+  	echo "ehlo ${host}" ; sleep 2 ;
+  	echo "helo ${host}" ; sleep 2 ;
+  	echo "auth ${auth_method} ${sasl_str}" ; sleep 2 ;
+  	echo "mail from: <${sender}>" ; sleep 2 ;
+  	for recip in ${recips} ; do
+  	  echo "rcpt to: <${recip}>" ; sleep 2 ;
+  	done ;
+  	echo "data" ; sleep 2 ;
+  	echo -e ${hdr_txt} ; sleep 2 ;
+  	cat ${infile} ; sleep 2 ;
+  	echo "." ; sleep 2 ;
+  	} | openssl s_client -crlf -connect ${host}":"${port}
+	#} | gnutls-cli --crlf --insecure --no-ca-verification --port ${port} ${host}
+	
+	# (openssl s_client) ??? Linux: -CApath ...      ; macOS: -CAfile ...
+	# (gnutls-cli)       ??? Linux: --x509cafile ... ; macOS: --x509cafile ...
+else
+	mail_rcpts=""
+	for recip in ${recips} ; do
+	  mail_rcpts="${mail_rcpts}--mail-rcpt ${recip} " ;
+	done ;
+	
+	if [ "0" = "${OPEN_AUTH:-0}" ] ; then
+	  cred_opts="--user ${sender}":"${passw}" ;
+	else
+	  cred_opts="--user ${sender} --oauth2-bearer ${token}" ;
+	fi ;
+	
+	(echo -e ${hdr_txt} ; cat ${infile}) | curl --insecure --crlf --ssl \
+	  ${cred_opts} --url smtps://${host}":"${port} \
+	  --mail-from ${sender} --upload-file - ${mail_rcpts} ;
+fi

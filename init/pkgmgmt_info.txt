@@ -20,14 +20,16 @@ upgrade OS      freebsd-update fetch \   apt-get dist-upgrade
                 ----------------------   ----------------------   ----------------------
 search pkg      pkg search <pkg>         apt-cache search <pkg>   xbps-query -Rs <pkg>
 search rexp     pkg search --regex <pkg> apt-cache search <pkg>   xbps-query -Rs <pkg>
-search file                              apt-file search <f>      xbps-query -o <f>
+search file     pkg which <f>            apt-file search <f>      xbps-query -o <f>
                                            (PCLOS) rpm -qf <f>
 list installed  pkg info                 dpkg -l | grep '^i'      xbps-query -l
                 pkg query %n               (PCLOS) rpm -qa
 list explicit   pkg query -e '%a=0' %o   apt-mark showmanual      xbps-query -m
 show pkg info   pkg info <pkg>           apt-cache show <pkg>     xbps-query -S <pkg>
-pkg depns                                dpkg-query --show <pkg>  xbps-query -Rx <pkg>
-pkg revdepns                             apt-cache rdepends <pkg> xbps-query -RX <pkg>
+pkg depns       pkg info \               dpkg-query --show <pkg>  xbps-query -Rx <pkg>
+                  --dependencies <pkg>
+pkg revdepns    pkg query -e '%#r>0' \   apt-cache rdepends <pkg> xbps-query -RX <pkg>
+                  %o <pkg>
                 ----------------------   ----------------------   ----------------------
 list repos      pkg -vv | grep -A99 \    cat /etc/apt/ \          xbps-query -L
                    -e "Repositories:"      sources.list

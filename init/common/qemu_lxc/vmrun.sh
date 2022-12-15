@@ -12,10 +12,10 @@
 #   [MACHINE=x86_64] sh vmrun.sh run_qemu [freebsd-x86_64-zfs]
 
 STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)} ; IMGFMT=${IMGFMT:-qcow2}
-MACHINE=${MACHINE:-x86_64}
-BHYVE_X64_FIRMWARE=${BHYVE_X64_FIRMWARE:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
-QEMU_X64_FIRMWARE=${QEMU_X64_FIRMWARE:-/usr/share/OVMF/OVMF_CODE.fd}
-QEMU_AA64_FIRMWARE=${QEMU_AA64_FIRMWARE:-/usr/share/AAVMF/AAVMF_CODE.fd}
+MACHINE=${MACHINE:-x86_64} ; IMGEXT=${IMGEXT:-.qcow2}
+FIRMWARE_BHYVE_X64=${FIRMWARE_BHYVE_X64:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
+FIRMWARE_QEMU_X64=${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd}
+FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
 
 #-------- create Vagrant ; use box image --------
 box_vagrant() {
@@ -101,19 +101,19 @@ EOF
     fi
   fi
   if [ "libvirt" = "${PROVIDER}" ] ; then
-    IMGFILE=${IMGFILE:-${GUEST}.${IMGFMT}} ;
+    IMGFILE=${IMGFILE:-${GUEST}${IMGEXT}} ;
     #mv ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img ;
     qemu-img convert -f qcow2 -O qcow2 ${STORAGE_DIR}/${IMGFILE} \
       ${STORAGE_DIR}/box.img ;
     if [ "aarch64" = "${MACHINE}" ] ; then
-      cp ${QEMU_AA64_FIRMWARE} ${STORAGE_DIR}/ ;
+      cp -a ${FIRMWARE_QEMU_AA64} ${STORAGE_DIR}/ ;
     else
-      cp ${QEMU_X64_FIRMWARE} ${STORAGE_DIR}/ ;
+      cp -a ${FIRMWARE_QEMU_X64} ${STORAGE_DIR}/ ;
     fi ;
   elif [ "bhyve" = "${PROVIDER}" ] ; then
     IMGFILE=${IMGFILE:-${GUEST}.raw}
     mv ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img ;
-    cp ${BHYVE_X64_FIRMWARE} ${STORAGE_DIR}/ ;
+    cp -a ${FIRMWARE_BHYVE_X64} ${STORAGE_DIR}/ ;
   fi
   (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${build_timestamp}.${PROVIDER}.box metadata.json info.json Vagrantfile `ls vmrun* *_CODE.fd` box.img)
 
@@ -145,28 +145,28 @@ EOF
 
 diff_qemuimage() {
   GUEST=${1:-freebsd-${MACHINE}-zfs} ; BOXPREFIX=${BOXPREFIX:-${GUEST}*/}
-  qemu-img create -f qcow2 -o backing_file=$(cd ${STORAGE_DIR} ; find . -path "*${BOXPREFIX}*.${IMGFMT}" | tail -n1) \
-    ${STORAGE_DIR}/${GUEST}.${IMGFMT}
+  qemu-img create -f qcow2 -F qcow2 -o backing_file=$(cd ${STORAGE_DIR} ; find . -path "*${BOXPREFIX}*${IMGEXT}" | tail -n1) \
+    ${STORAGE_DIR}/${GUEST}${IMGEXT}
   echo ''
-  qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}.${IMGFMT} ; sleep 5
+  qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}${IMGEXT} ; sleep 5
 }
 
 revert_backingimage() {
   GUEST=${1:-freebsd-${MACHINE}-zfs} ; BOXPREFIX=${BOXPREFIX:-${GUEST}}
-  backing_file=$(cd ${STORAGE_DIR} ; qemu-img info --backing-chain ${GUEST}.${IMGFMT} | sed -n 's|backing file:[ ]*\(.*\)$|\1|p')
-  mv ${STORAGE_DIR}/${GUEST}.${IMGFMT} ${STORAGE_DIR}/${GUEST}.${IMGFMT}.bak
-  sync ; (cd ${STORAGE_DIR} ; cp ${backing_file} ${GUEST}.${IMGFMT}) ; sync
-  (cd ${STORAGE_DIR} ; qemu-img rebase -b ${GUEST}.${IMGFMT} \
-    ${STORAGE_DIR}/${GUEST}.${IMGFMT}.bak ; sync)
-  qemu-img commit ${STORAGE_DIR}/${GUEST}.${IMGFMT}.bak ; sync
-  rm ${STORAGE_DIR}/${GUEST}.${IMGFMT}.bak ; sync
-  qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}.${IMGFMT} ; sleep 5
+  backing_file=$(cd ${STORAGE_DIR} ; qemu-img info --backing-chain ${GUEST}${IMGEXT} | sed -n 's|backing file:[ ]*\(.*\)$|\1|p')
+  mv ${STORAGE_DIR}/${GUEST}${IMGEXT} ${STORAGE_DIR}/${GUEST}${IMGEXT}.bak
+  sync ; (cd ${STORAGE_DIR} ; cp ${backing_file} ${GUEST}${IMGEXT}) ; sync
+  (cd ${STORAGE_DIR} ; qemu-img rebase -F qcow2 -b ${GUEST}${IMGEXT} \
+    ${STORAGE_DIR}/${GUEST}${IMGEXT}.bak ; sync)
+  qemu-img commit ${STORAGE_DIR}/${GUEST}${IMGEXT}.bak ; sync
+  rm ${STORAGE_DIR}/${GUEST}${IMGEXT}.bak ; sync
+  qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}${IMGEXT} ; sleep 5
 }
 #------------------------------------------------
 
 #-------------- using virtinst ------------------
 import_lxc() {
-  GUEST=${1:-devuan-boxe0000}
+  GUEST=${1:-debian-boxe0000}
   CONNECT_OPT=${CONNECT_OPT:---connect lxc:///}
 
   virt-install ${CONNECT_OPT} --init /sbin/init --memory 768 --vcpus 1 \
@@ -180,7 +180,7 @@ import_lxc() {
 }
 
 import_qemu() {
-  GUEST=${1:-freebsd-${MACHINE}-zfs} ; IMGFILE=${IMGFILE:-${GUEST}.${IMGFMT}}
+  GUEST=${1:-freebsd-${MACHINE}-zfs} ; IMGFILE=${IMGFILE:-${GUEST}${IMGEXT}}
   CONNECT_OPT=${CONNECT_OPT:---connect qemu:///system}
   VUEFI_OPTS=${VUEFI_OPTS:---boot uefi}
 
@@ -219,7 +219,7 @@ run_bhyve() {
 
   GUEST=${1:-freebsd-${MACHINE}-zfs} ; IMGFILE=${IMGFILE:-${GUEST}.raw}
   BUEFI_OPTS=${BUEFI_OPTS:--s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
-    -s 30,xhci,tablet -l bootrom,${BHYVE_X64_FIRMWARE}}
+    -s 30,xhci,tablet -l bootrom,${FIRMWARE_BHYVE_X64}}
 
   bhyve -A -H -P -c 2 -m 2048M -l com1,stdio -s 0,hostbridge -s 1,lpc \
     -s 2,virtio-net,${NET_OPT:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
@@ -236,28 +236,28 @@ run_bhyve() {
 
 #------------ using qemu-system-* ---------------
 run_qemu() {
-  GUEST=${1:-freebsd-${MACHINE}-zfs} ; IMGFILE=${IMGFILE:-${GUEST}.${IMGFMT}}
+  GUEST=${1:-freebsd-${MACHINE}-zfs} ; IMGFILE=${IMGFILE:-${GUEST}${IMGEXT}}
   VIRTFS_OPTS=${VIRTFS_OPTS:--virtfs local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough}
 
   if [ "aarch64" = "${MACHINE}" ] ; then
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64}"}
     qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
       -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
       -device virtio-blk-pci,drive=hd0 \
-      -drive file=${STORAGE_DIR}/${IMGFILE},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+      -drive file=${STORAGE_DIR}/${IMGFILE},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT} \
       -display default,show-cursor=on -vga none -device virtio-gpu-pci \
       ${QUEFI_OPTS} ${VIRTFS_OPTS} &
   else
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_X64}"}
     qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
       -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
       -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
       -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
-      -drive file=${STORAGE_DIR}/${IMGFILE},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
+      -drive file=${STORAGE_DIR}/${IMGFILE},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT} \
       -display default,show-cursor=on -vga none -device qxl-vga,vgamem_mb=64 \
       ${QUEFI_OPTS} ${VIRTFS_OPTS} &
   fi

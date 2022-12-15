@@ -8,9 +8,10 @@
 #sh /tmp/disk_setup.sh mount_filesystems std vg0
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
-# perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
-# ruby -e "['io/console','digest/sha2'].each {|i| require i} ; puts 'Password:' ; puts STDIN.noecho(&:gets).chomp.crypt(\"\$6\$16CHARACTERSSALT\")"
-# python -c "import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"\$6\$16CHARACTERSSALT\"))"
+# stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
+# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
+# python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
 set -x
 if [ -e /dev/vda ] ; then
@@ -30,8 +31,8 @@ fi
 service_mgr=${service_mgr:-sysvinit} # sysvinit | runit | openrc
 
 export INIT_HOSTNAME=${1:-debian-boxv0000}
-#export PLAIN_PASSWD=${2:-abcd0123}
-export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+#export PASSWD_PLAIN=${2:-abcd0123}
+export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
 
 echo "Create /etc/fstab" ; sleep 3
@@ -185,12 +186,12 @@ EOF
 
 
 echo "Set root passwd ; add user" ; sleep 3
-#echo -n "root:${PLAIN_PASSWD}" | chpasswd
-echo -n 'root:${CRYPTED_PASSWD}' | chpasswd -e
+#echo -n "root:${PASSWD_PLAIN}" | chpasswd
+echo -n 'root:${PASSWD_CRYPTED}' | chpasswd -e
 
 DIR_MODE=0750 useradd -m -G operator,sudo -s /bin/bash -c 'Packer User' packer
-#echo -n "packer:${PLAIN_PASSWD}" | chpasswd
-echo -n 'packer:${CRYPTED_PASSWD}' | chpasswd -e
+#echo -n "packer:${PASSWD_PLAIN}" | chpasswd
+echo -n 'packer:${PASSWD_CRYPTED}' | chpasswd -e
 chown -R packer:\$(id -gn packer) /home/packer
 
 #sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
@@ -278,7 +279,7 @@ exit
 EOFchroot
 # end chroot commands
 
-tar -xf /tmp/init.tar -C /mnt/root/ ; sleep 5
+tar -xf /tmp/scripts.tar -C /mnt/root/ ; sleep 5
 
 read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
 if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then

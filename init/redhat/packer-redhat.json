@@ -1,6 +1,6 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "(export mypass=$(python -c 'import getpass ; print(getpass.getpass())') ; packer build -var plain_passwd=${mypass} -var crypted_passwd=$(python -c 'import os,crypt ; print(crypt.crypt(os.getenv(\"mypass\"), \"$6$16CHARACTERSSALT\"))') -only=[qemu_x86_64|qemu_aarch64|virtualbox-iso] template.json)",
+  "_usage_build": "(export mypass=$(python -c 'import getpass ; print(getpass.getpass())') ; packer build -var passwd_plain=${mypass} -var passwd_crypted=$(python -c 'import os,crypt ; print(crypt.crypt(os.getenv(\"mypass\"), \"$6$16CHARACTERSSALT\"))') -only=[qemu_x86_64|qemu_aarch64|virtualbox_x86_64] template.json)",
 
   "builders": [{
     "type": "qemu",
@@ -16,14 +16,14 @@
       ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
       ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"],
       ["-display", "gtk,show-cursor=on"],
-      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_x64_firmware`}}"],
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `firmware_qemu_x64`}}"],
       ["-virtfs", "{{user `virtfs_opts`}}"]
     ],
 
     "boot_wait": "10s",
     "ssh_timeout": "2h45m",
     "ssh_username": "packer",
-    "ssh_password": "{{user `plain_passwd`}}",
+    "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
@@ -32,16 +32,16 @@
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/rocky/live/CHECKSUM",
     "iso_url": "",
-    "iso_urls": "file://{{user `isos_pardir`}}/rocky/{{user `isolive_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `isolive_url_directory`}}/x86_64/{{user `isolive_x64_cdlabel`}}.iso",
+    "iso_urls": ["file://{{user `isos_pardir`}}/rocky/{{user `isolive_name_x64`}}.iso","{{user `iso_url_mirror`}}/{{user `isolive_url_directory`}}/x86_64/{{user `isolive_cdlabel_x64`}}.iso"],
     "boot_command": [
-      "<wait><wait><wait>c<wait>linuxefi /isolinux/vmlinuz0 root=live:LABEL={{user `isolive_x64_cdlabel`}} ro rd.live.image rhgb text {{user `boot_cmdln_options`}} systemd.unit=multi-user.target<enter>initrdefi /isolinux/initrd0.img<enter>boot<enter>",
+      "<wait><wait><wait>c<wait>linuxefi /isolinux/vmlinuz0 root=live:LABEL={{user `isolive_cdlabel_x64`}} ro rd.live.image rhgb text {{user `boot_cmdln_options`}} systemd.unit=multi-user.target<enter>initrdefi /isolinux/initrd0.img<enter>boot<enter>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<enter>liveuser<enter><wait10>sudo su<enter><wait10>dnf -y check-update ; setenforce 0 ; sestatus ; dnf -y install nmap-ncat lvm2 {{user `foreign_pkgmgr`}} ; sleep 5 ; ",
       "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; ",
       "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then . /etc/os-release ; dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(echo ${VERSION_ID} | cut -d. -f1).noarch.rpm ; dnf -y install kernel kernel-devel ; dnf -y install http://download.zfsonlinux.org/epel/zfs-release.el${ZFS_REL:-${VERSION_ID/./_}}.noarch.rpm ; rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux ; dnf config-manager --disable zfs ; dnf config-manager --enable zfs-kmod ; dnf -y install zfs ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ; dkms status ; dnf config-manager --disable zfs-kmod ; dnf config-manager --enable zfs ; sleep 5 ; fi ; ",
-      "env MKFS_CMD={{user `mkfs_cmd`}} sh -x /tmp/disk_setup.sh part_format sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "env MKFS_CMD={{user `mkfs_cmd`}} sh -x /tmp/disk_setup.sh part_format sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
     ]
   },
   {
@@ -60,7 +60,7 @@
       ["-device", "usb-kbd"], ["-device", "usb-tablet"],
       ["-vga", "none"], ["-device", "virtio-gpu-pci"],
       ["-display", "gtk,show-cursor=on"],
-      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_aa64_firmware`}}"],
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `firmware_qemu_aa64`}}"],
       ["-virtfs", "{{user `virtfs_opts`}}"]
     ],
     "qemu_binary": "qemu-system-aarch64",
@@ -68,7 +68,7 @@
     "boot_wait": "10s",
     "ssh_timeout": "4h45m",
     "ssh_username": "packer",
-    "ssh_password": "{{user `plain_passwd`}}",
+    "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
@@ -77,10 +77,10 @@
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/rocky/aarch64/CHECKSUM",
     "iso_url": "",
-    "iso_urls": "file://{{user `isos_pardir`}}/rocky/{{user `iso_aa64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_aa64_name`}}.iso",
+    "iso_urls": ["file://{{user `isos_pardir`}}/rocky/{{user `iso_name_aa64`}}.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name_aa64`}}.iso"],
     "boot_command": [
       "<wait>c<wait>linux /images/pxeboot/vmlinuz inst.stage2=hd:LABEL=Rocky-8-4-aarch64-dvd ro {{user `boot_cmdln_options`}} ",
-      "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-anaconda-ks.cfg inst.repo=http://{{user `repo_host`}}{{user `repo_aa64_directory`}} ip=::::{{user `init_hostname`}}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>",
+      "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-anaconda-ks.cfg inst.repo=http://{{user `repo_host`}}{{user `repo_directory_aa64`}} ip=::::{{user `init_hostname`}}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>",
       "initrd /images/pxeboot/initrd.img<enter><wait10>boot<enter><wait10>"
     ]
   },
@@ -88,6 +88,7 @@
     "type": "virtualbox-iso",
     "guest_os_type": "RedHat_64",
     "format": "ova",
+    "name": "virtualbox_x86_64",
     "vm_name": "{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
     "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
     "guest_additions_mode": "disable",
@@ -107,7 +108,7 @@
     "boot_wait": "10s",
     "ssh_timeout": "2h45m",
     "ssh_username": "packer",
-    "ssh_password": "{{user `plain_passwd`}}",
+    "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
@@ -116,7 +117,7 @@
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/rocky/CHECKSUM",
     "iso_url": "",
-    "iso_urls": "file://{{user `isos_pardir`}}/rocky/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/x86_64/{{user `iso_x64_name`}}.iso",
+    "iso_urls": ["file://{{user `isos_pardir`}}/rocky/{{user `iso_name_x64`}}.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/x86_64/{{user `iso_name_x64`}}.iso"],
     "boot_command": [
       "<wait>c<wait>linuxefi /images/pxeboot/vmlinuz {{user `boot_cmdln_options`}} ",
       "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-anaconda-ks.cfg inst.repo=http://{{user `repo_host`}}{{user `repo_directory`}} ip=::::{{user `init_hostname`}}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>",
@@ -128,8 +129,8 @@
     "type": "shell-local",
     "inline": [
       "mkdir -p {{user `home`}}/.ssh/publish_krls {{user `home`}}/.pki/publish_crls",
-      "cp -R {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
-      "cp -R {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
+      "cp -a {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
+      "cp -a {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
       "tar -cf /tmp/scripts.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}"
     ]
   },
@@ -169,7 +170,7 @@
     "execute_command": "env {{.Vars}} sudo sh -x '{{.Path}}'",
     "inline": [
       "tar -xf /tmp/scripts.tar -C /tmp ; mv /tmp/{{user `variant`}} /tmp/scripts",
-      "cp -R /tmp/init /tmp/scripts /root/"
+      "cp -a /tmp/init /tmp/scripts /root/"
     ]
   },
   {
@@ -192,7 +193,7 @@
     "scripts": [
       "init/common/linux/zerofill.sh"
     ],
-    "only": ["virtualbox-iso"]
+    "only": ["virtualbox_x86_64"]
   }],
 
   "post-processors": [
@@ -208,7 +209,7 @@
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
         "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
-        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_x64_firmware`}}"],
+        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `firmware_qemu_x64`}}"],
       "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}-{{user `build_timestamp`}}.{{.Provider}}.box",
       "only": ["qemu_x86_64"]
     },
@@ -216,7 +217,7 @@
       "type": "shell-local",
       "inline": [
         "mv output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}} output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}.qcow2",
-        "cp init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/"
+        "cp -a init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/"
       ],
       "only": ["qemu_x86_64"]
     },
@@ -231,7 +232,7 @@
       "keep_input_artifact": true,
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
-        "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "{{user `qemu_aa64_firmware`}}"],
+        "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "{{user `firmware_qemu_aa64`}}"],
       "output": "output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}}-{{user `build_timestamp`}}.{{.Provider}}.box",
       "only": ["qemu_aarch64"]
     },
@@ -239,7 +240,7 @@
       "type": "shell-local",
       "inline": [
         "mv output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}} output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/{{user `variant`}}-aarch64-{{user `vol_mgr`}}.qcow2",
-        "cp init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/"
+        "cp -a init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-aarch64-{{user `vol_mgr`}}/"
       ],
       "only": ["qemu_aarch64"]
     }
@@ -249,50 +250,49 @@
     "variant": "redhat",
     "vol_mgr": "std",
     "mkfs_cmd": "mkfs.ext4",
-    "init_hostname": "{{user `variant`}}-boxv0000",
+    "init_hostname": "redhat-boxv0000",
     "foreign_pkgmgr": "debootstrap",
     "boot_cmdln_options": " quiet nomodeset video=1024x768 ",
     "virtfs_opts": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
     "isos_pardir": "/mnt/Data0/distros",
     "RELEASE": "",
 
+    "_repo_host_centos": "mirror.stream.centos.org",
+    "_repo_directory_centos": "/9-stream/BaseOS/x86_64/os",
+    "_iso_url_mirror_centos": "https://mirror.stream.centos.org",
+    "_iso_url_directory_centos": "/9-stream/BaseOS/x86_64/iso",
+    "_iso_name_x64_centos": "CentOS-Stream-9-latest-x86_64-boot",
+    "_repo_host_almalinux": "repo.almalinux.org/almalinux",
+    "_repo_directory_almalinux": "/9/BaseOS/x86_64/os",
+    "_iso_url_mirror_almalinux": "https://repo.almalinux.org/almalinux",
+    "_iso_name_x64_almalinux": "AlmaLinux-9.1-x86_64-boot",
+    "_isolive_url_directory_almalinux": "9/live",
+    "_isolive_name_x64_almalinux": "live/AlmaLinux-9.1-x86_64-Live-XFCE",
+    "_isolive_cdlabel_x64_almalinux": "AlmaLinux-9.1-x86_64-Live-XFCE",
     "repo_host": "dl.rockylinux.org/pub/rocky",
-    "repo_directory": "/8/BaseOS/x86_64/os",
+    "repo_directory": "/9/BaseOS/x86_64/os",
     "iso_url_mirror": "https://dl.rockylinux.org/pub/rocky",
-    "iso_url_directory": "8/isos",
-    "iso_x64_name": "Rocky-8.4-x86_64-boot",
-    "isolive_url_directory": "8/live",
-    "isolive_x64_name": "live/Rocky-8.5-XFCE-20211115",
-    "isolive_x64_cdlabel": "Rocky-8.5-XFCE-20211114",
-    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
+    "iso_url_directory": "9/isos",
+    "iso_name_x64": "Rocky-9.1-x86_64-boot",
+    "isolive_url_directory": "9/live",
+    "isolive_name_x64": "live/Rocky-9.1-XFCE-20221124.0",
+    "isolive_cdlabel_x64": "Rocky-9.1-XFCE-20211114",
 
-    "repo_host_almalinux": "repo.almalinux.org/almalinux",
-    "repo_directory_almalinux": "/8/BaseOS/x86_64/os",
-    "iso_url_mirror_almalinux": "https://repo.almalinux.org/almalinux",
-    "iso_x64_name_almalinux": "AlmaLinux-8.4-x86_64-boot",
-    "isolive_url_directory_almalinux": "8/live",
-    "isolive_x64_name_almalinux": "live/AlmaLinux-8-x86_64-Live-XFCE-beta-1",
-    "isolive_x64_cdlabel_almalinux": "AlmaLinux-8-x86_64-Live-XFCE",
+    "repo_directory_aa64": "/9/BaseOS/aarch64/os",
+    "_iso_name_aa64_centos": "aarch64/CentOS-Stream-9-latest-aarch64-boot",
+    "_iso_name_aa64_almalinux": "aarch64/AlmaLinux-9.1-aarch64-boot",
+    "iso_name_aa64": "aarch64/Rocky-9.1-aarch64-boot",
 
-    "repo_host_centos": "mirror.centos.org/centos",
-    "repo_directory_centos": "/8-stream/BaseOS/x86_64/os",
-    "iso_url_mirror_centos": "https://mirror.centos.org/centos",
-    "iso_url_directory_centos": "8-stream/isos",
-    "iso_x64_name_centos": "CentOS-Stream-8-x86_64-latest-boot",
-
-    "repo_aa64_directory": "/8/BaseOS/aarch64/os",
-    "iso_aa64_name": "aarch64/Rocky-8.4-aarch64-boot",
-    "iso_aa64_name_almalinux": "aarch64/AlmaLinux-8.4-aarch64-boot",
-    "iso_aa64_name_centos": "aarch64/CentOS-Stream-8-aarch64-latest-boot",
-    "qemu_aa64_firmware": "/usr/share/AAVMF/AAVMF_CODE.fd",
-
+    "firmware_qemu_x64": "/usr/share/OVMF/OVMF_CODE.fd",
+    "firmware_qemu_aa64": "/usr/share/AAVMF/AAVMF_CODE.fd",
     "disk_size": "30720",
     "headless": "",
-    "plain_passwd": "abcd0123",
-    "crypted_passwd": "$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91",
-    "build_timestamp": "{{isotime `2006.01`}}",
+    "passwd_plain": "abcd0123",
+    "passwd_crypted": "$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91",
     "author": "thebridge0491",
-    "datestamp": "{{isotime `2006.01.02`}}",
-    "home": "{{env `HOME`}}"
-  }
+    "home": "{{env `HOME`}}",
+    "build_timestamp": "{{isotime `2006.01`}}",
+    "datestamp": "{{isotime `2006.01.02`}}"
+  },
+  "sensitive-variables": ["passwd_plain", "passwd_crypted"]
 }

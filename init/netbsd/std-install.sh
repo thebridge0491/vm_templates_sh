@@ -8,9 +8,10 @@
 #sh /tmp/disk_setup.sh mount_filesystems std bsd1
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
-# perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
-# ruby -e "['io/console','digest/sha2'].each {|i| require i} ; puts 'Password:' ; puts STDIN.noecho(&:gets).chomp.crypt(\"\$6\$16CHARACTERSSALT\")"
-# python -c "import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"\$6\$16CHARACTERSSALT\"))"
+# stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
+# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
+# python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
 set -x
 if [ -e /dev/sd0 ] ; then
@@ -24,8 +25,8 @@ export REL=${REL:-$(sysctl -n kern.osrelease)}
 export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/NetBSD}
 
 export INIT_HOSTNAME=${1:-netbsd-boxv0000}
-export PLAIN_PASSWD=${2:-abcd0123}
-#export CRYPTED_PASSWD=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+export PASSWD_PLAIN=${2:-abcd0123}
+#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
 idxESP=$(echo $(gpt show -l $DEVX | grep -e ESP) | cut -d' ' -f3)
 idxRoot=$(echo $(gpt show -l $DEVX | grep -e "${GRP_NM}-fsRoot") | cut -d' ' -f3)
@@ -88,7 +89,7 @@ done
 mount_kernfs kernfs /mnt/kern ; mount_procfs procfs /mnt/proc
 mount_tmpfs tmpfs /mnt/var/shm ; mount_ptyfs ptyfs /mnt/dev/pts
 
-hash_passwd=$(pwhash ${PLAIN_PASSWD})
+hash_passwd=$(pwhash ${PASSWD_PLAIN})
 
 
 cat << EOFchroot | chroot /mnt /bin/sh
@@ -230,7 +231,7 @@ exit
 EOFchroot
 # end chroot commands
 
-tar -xf /tmp/init.tar -C /mnt/root/ ; sleep 5
+tar -xf /tmp/scripts.tar -C /mnt/root/ ; sleep 5
 
 
 mkdir -p /mnt/efi ; mount_msdos -l /dev/${dkESP} /mnt/efi

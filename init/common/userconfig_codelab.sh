@@ -10,16 +10,57 @@ LANGS=${@:-py c jvm} ; export LANGS
 
 if grep -q -E "csh" "$SHELL" ; then
   shell_rc=${shell_rc:-$HOME/.cshrc} ;
+elif grep -q -E "sh" "$SHELL" ; then
+  shell_rc=${shell_rc:-$HOME/.shrc} ;
+elif grep -q -E "zsh" "$SHELL" ; then
+  shell_rc=${shell_rc:-$HOME/.zshrc} ;
 else
   shell_rc=${shell_rc:-$HOME/.bashrc} ;
 fi
 if command -v bind > /dev/null ; then
+  if ! grep -q -E "history.*-search" $HOME/.inputrc ; then
+    cat << EOF >> $HOME/.inputrc
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+
+EOF
+  fi ;
   echo "(info) bind -p | grep -e 'history.*-search'" >> /dev/stderr ;
   bind -p | grep -e 'history.*-search' >> /dev/stderr ; sleep 3 ;
 elif command -v bindkey > /dev/null ; then
   echo "(info) bindkey | grep -e 'history.*-search'" >> /dev/stderr ;
   bindkey | grep -e 'history.*-search' >> /dev/stderr ; sleep 3 ;
 fi
+## NOTES for bind (linux) or bindkey (freebsd|macOS) history search [back|for]ward
+##   equivalent: \e (escape char) <--> \M- (meta prefix) <--> ^[
+##
+##   linux $HOME/.inputrc OR /etc/inputrc
+##   --------------------
+##   #"\M-[A": history-search-backward
+##   #"\M-[B": history-search-forward
+##   "\e[A": history-search-backward
+##   "\e[B": history-search-forward
+##
+##   freebsd $HOME/.cshrc OR [/usr/local]/etc/inputrc
+##   --------------------
+##   ..
+##   if ( $?tcsh ) then
+##     bindkey "^W" backward-delete-word
+##     bindkey -k up history-search-backward
+##     bindkey -k down history-search-forward
+##   endif
+##   ..
+##
+##   macOS $HOME/.zshrc
+##   --------------------
+##   bindkey "^R" history-incremental-search-backward
+##   bindkey "^S" history-incremental-search-forward
+##   #bindkey "^[[A" history-search-backward
+##   #bindkey "^[[B" history-search-forward
+##   bindkey "\e[A" history-search-backward
+##   bindkey "\e[B" history-search-forward
+
+cp -an $0 /var/tmp/
 
 set +e
 
@@ -35,8 +76,8 @@ _prep_lang_py() {
   #echo "TBD: No config steps needed, as yet." >> /dev/stderr ; sleep 3
   ${PYTHON:-python3} -m pip install --user build
   #${PYTHON:-python3} -m pip install --user wheel pytest pytest-timeout nose2 \
-  #  hyothesis coverage pylint pep8 pycodestyle pydocstyle Sphinx cffi click \
-  #  PyYAML toml configparser
+  #  hyothesis coverage pylint pep8 pycodestyle pydocstyle sphinx cffi click \
+  #  pyyaml toml configparser
 }
 
 _cachepath_lang_jvm() {
@@ -230,9 +271,9 @@ EOF
     #  org.apache.maven.plugins:maven-dependency-plugin:2.6:copy ;
     cd $HOME/Downloads ;
     #curl -LO https://dlcdn.apache.org/ant/ivy/2.5.0/apache-ivy-2.5.0-bin.zip ;
-    #unzip apache-ivy-2.5.0-bin.zip ; cp apache-ivy-2.5.0-bin/ivy-*.jar $HOME/.ant/lib/ ;
+    #unzip apache-ivy-2.5.0-bin.zip ; cp -a apache-ivy-2.5.0-bin/ivy-*.jar $HOME/.ant/lib/ ;
     curl -LO https://repo1.maven.org/maven2/org/apache/ivy/ivy/2.5.0/ivy-2.5.0.jar ;
-    cp ivy-*.jar $HOME/.ant/lib/ ;
+    cp -a ivy-*.jar $HOME/.ant/lib/ ;
   else
     #? installed pkg [gradle|groovy]: {gradle/lib/plugins,groovy/lib}/ivy-*.jar
     java -Divy.settings.defaultResolver=main -jar ${IVYJAR} -settings $HOME/.ivy2/ivysettings.xml \
@@ -243,6 +284,33 @@ EOF
   _cachepath_lang_jvm ; ls $HOME/.ant/lib/classpath_*.txt ; sleep 5
   _alias_lang_jvm ; alias ; sleep 5
 }
+## NOTES to dnld build tool wrappers for JVM languages
+## wrapper for maven (./mvnw[.cmd], .mvn/wrapper/___.[properties|jar]):
+##  curl -LO https://repo1.maven.org/maven2/org/apache/maven/wrapper/maven-wrapper-distribution/[3.1.0]/maven-wrapper-distribution-[3.1.0]-bin.zip
+##  unzip maven-wrapper-distribution-[3.1.0]-bin.zip
+##  cat <<EOF > .mvn/wrapper/maven-wrapper.properties
+##  distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/[3.3.9]/apache-maven-[3.3.9]-bin.zip
+##  wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/[3.1.0]/maven-wrapper-[3.1.0].jar
+##  EOF
+##  ./mvnw[.cmd] --help
+## ----------------------------------------------
+## wrapper for gradle (./gradlew[.bat], gradle/wrapper/___.[properties|jar]):
+##  curl --create-dirs -Lo gradle/wrapper/gradle-wrapper.[properties|jar] https://github.com/gradle/gradle/raw/[master|v6.9.0]/gradle/wrapper/gradle-wrapper.[properties|jar]
+##  java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain wrapper [--gradle-version 6.9.0]
+##  ./gradlew[.bat] help
+## ----------------------------------------------
+## wrapper for sbt (./sbtw):
+##  curl -Lo sbtw https://git.io.sbt
+##  chmod +x ./sbtw ; ./sbtw [-sbt-version 1.5.2] -sbt-create
+## OR
+##  java -jar ivy.jar -dependency org.scala-sbt sbt-launch [1.5.2] -retrieve "$HOME/.sbt/launchers/[revision]/[artifact](-[classifier]).[ext]"
+##  echo "java -cp $HOME/.sbt/launchers/[1.5.2]/sbt-launch.jar xsbt.boot.Boot \$@" > sbtw
+##  chmod +x ./sbtw ; ./sbtw help
+## ----------------------------------------------
+## wrapper for leiningen (./leinw):
+##  curl -Lo leinw https://github.com/technomancy/leiningen/raw/[stable|2.9.5]/bin/lein
+##  chmod +x ./leinw [; ./leinw upgrade [2.9.5]]
+## ----------------------------------------------
 
 _prep_lang_dotnet() {
   nuget_ver=${nuget_ver:-latest} ; framework=${framework:-net471}
@@ -264,14 +332,14 @@ _prep_lang_dotnet() {
   done
   #cd $HOME/Downloads
   #curl -LO https://dotnet.microsoft.com/download/dotnet/scripts/v1/dotnet-install.sh
-  #sh ./dotnet-install.sh --channel ${dotnet_ver:-3.1}
+  #sh ./dotnet-install.sh --channel ${dotnet_ver:-LTS}
   #if ! grep -q -E "DOTNET_ROOT" ${shell_rc} ; then
   #  if grep -q -E "csh" "$SHELL" ; then
   #    echo setenv DOTNET_ROOT \$HOME/.dotnet >> ${shell_rc} ;
-  #    echo setenv PATH $PATH:\$HOME/.dotnet >> ${shell_rc} ;
+  #    echo "set path = ($path \$HOME/.dotnet)" >> ${shell_rc} ;
   #  else
   #    echo export DOTNET_ROOT=\$HOME/.dotnet >> ${shell_rc} ;
-  #    echo export PATH=$PATH=\$HOME/.dotnet >> ${shell_rc} ;
+  #    echo export PATH=$PATH:\$HOME/.dotnet >> ${shell_rc} ;
   #  fi ;
   #fi
 }
@@ -336,7 +404,7 @@ _prep_lang_lisp() {
 _prep_lang_ml() {
   echo "Configuring for OCaml language ..." >> /dev/stderr ; sleep 3
   opam init ; opam switch create ${OCAMLVER:-4.05.0} ; eval `opam env`
-  #cp `which camlp4of | xargs dirname`/camlp4* $HOME/.opam/default/bin/
+  #cp -a `which camlp4of | xargs dirname`/camlp4* $HOME/.opam/default/bin/
 
   #opam install pcre[.7.2.3] dune[.1.11.4] bisect odoc ounit2 qcheck \
   #  ocaml-inifiles yojson ezjsonm ctypes ctypes-foreign batteries volt
@@ -369,14 +437,13 @@ _prep_lang_rb() {
       echo export PATH=$PATH:\$GEM_HOME/bin >> ${shell_rc} ;
     fi
   fi
-
 }
 
 _prep_lang_swift() {
   ## note possible [x86_64|aarch64] versions: ${distro_ver:-distroN[-aarch64]}
-  swift_ver=${swift_ver:-5.6} ; distro_ver=${distro_ver:-centos8}
+  swift_ver=${swift_ver:-5.6} ; distro_ver=${distro_ver:-amazonlinux2}
   echo "(Linux) Configuring for Swift language ..." >> /dev/stderr ; sleep 3
-  echo "See file userconfig_codelab.sh to manually enter commands (if needed) ..." >> /dev/stderr ; sleep 3
+  echo "See file ${0} to manually enter commands (if needed) ..." >> /dev/stderr ; sleep 3
   #echo "TBD: No config steps needed, as yet." >> /dev/stderr ; sleep 3
   #cd $HOME/Downloads
   #curl -LO https://download.swift.org/swift-${swift_ver}-release/${distro_ver}/swift-${swift_ver}-RELEASE/swift-${swift_ver}-RELEASE-${distro_ver}.tar.gz[.sig]
@@ -388,7 +455,7 @@ _prep_lang_swift() {
   #  if grep -q -E "csh" "$SHELL" ; then
   #    echo "?? Currently incompatible w/ FreeBSD" >> /dev/stderr ; sleep 3 ;
   #    #echo setenv SWIFT_ROOT \$HOME/.local/swift-${swift_ver}-RELEASE-${distro_ver} >> ${shell_rc} ;
-  #    #echo setenv PATH \$SWIFT_ROOT/usr/bin:$PATH >> ${shell_rc} ;
+  #    #echo "set path = (\$SWIFT_ROOT/usr/bin $path)" >> ${shell_rc} ;
   #  else
   #    echo export SWIFT_ROOT=\$HOME/.local/swift-${swift_ver}-RELEASE-${distro_ver} >> ${shell_rc} ;
   #    echo export PATH=\$SWIFT_ROOT/usr/bin:$PATH >> ${shell_rc} ;

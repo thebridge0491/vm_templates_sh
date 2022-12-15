@@ -3,7 +3,7 @@ qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,acpi=off,accel=k
   -nic ${NET_OPT:-user,hostfwd=tcp::4022-:22},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
   -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
   -device virtio-blk-pci,drive=hd0 \
-  -drive file=${STORAGE_DIR:-$(dirname $0)}/${IMGFILE:-${GUEST:-freebsd-aarch64-std}.${IMGFMT:-qcow2}},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT:-qcow2} \
+  -drive file=${STORAGE_DIR:-$(dirname $0)}/${IMGFILE:-${GUEST:-freebsd-aarch64-std}${IMGEXT:-.qcow2}},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT:-qcow2} \
   -display default,show-cursor=on -vga none -device virtio-gpu-pci \
-  ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE:-/usr/share/AAVMF/AAVMF_CODE.fd}} \
+  ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}} \
   ${VIRTFS_OPTS:--virtfs local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough}

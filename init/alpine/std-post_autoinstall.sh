@@ -8,8 +8,8 @@ set -x
 export MIRROR=${MIRROR:-dl-cdn.alpinelinux.org/alpine}
 export GRP_NM=${GRP_NM:-vg0}
 
-#export PLAIN_PASSWD=${1:-abcd0123}
-export CRYPTED_PASSWD=${1:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+#export PASSWD_PLAIN=${1:-abcd0123}
+export PASSWD_CRYPTED=${1:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
 
 service sshd stop
 
@@ -43,8 +43,8 @@ sleep 5
 echo "Add user" ; sleep 3
 #DIR_MODE=0750
 useradd -m -g users -G wheel -s /bin/bash -c 'Packer User' packer
-#echo -n "packer:${PLAIN_PASSWD}" | chpasswd
-echo -n 'packer:${CRYPTED_PASSWD}' | chpasswd -e
+#echo -n "packer:${PASSWD_PLAIN}" | chpasswd
+echo -n 'packer:${PASSWD_CRYPTED}' | chpasswd -e
 chown -R packer:\$(id -gn packer) /home/packer
 
 #sh -c 'cat > /etc/sudoers.d/99_packer' << EOF
@@ -78,7 +78,7 @@ exit
 EOFchroot
 # end chroot commands
 
-tar -xf /tmp/init.tar -C /mnt/root/ ; sleep 5
+tar -xf /tmp/scripts.tar -C /mnt/root/ ; sleep 5
 
 read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
 if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then

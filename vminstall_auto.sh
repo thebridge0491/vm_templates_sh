@@ -1,9 +1,10 @@
 #!/bin/sh -x
 
 # passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
-# perl -e 'use Term::ReadKey ; print "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
-# ruby -e "['io/console','digest/sha2'].each {|i| require i} ; puts 'Password:' ; puts STDIN.noecho(&:gets).chomp.crypt(\"\$6\$16CHARACTERSSALT\")"
-# python -c "import crypt,getpass ; print(crypt.crypt(getpass.getpass(), \"\$6\$16CHARACTERSSALT\"))"
+# stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
+# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
+# python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
 # nc -l [-p] {port} > file ## nc -w3 {host} {port} < file  # netcat xfr
 # ssh user@ipaddr "su -c 'sh -xs - arg1 argN'" < script.sh
@@ -23,14 +24,14 @@
 
 STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros}
-QEMU_X64_FIRMWARE=${QEMU_X64_FIRMWARE:-/usr/share/OVMF/OVMF_CODE.fd}
-QEMU_AA64_FIRMWARE=${QEMU_AA64_FIRMWARE:-/usr/share/AAVMF/AAVMF_CODE.fd}
+FIRMWARE_QEMU_X64=${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd}
+FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
 
 
 _prep() {
   mkdir -p $HOME/.ssh/publish_krls $HOME/.pki/publish_crls
-  cp -R $HOME/.ssh/publish_krls init/common/skel/_ssh/
-  cp -R $HOME/.pki/publish_crls init/common/skel/_pki/
+  cp -a $HOME/.ssh/publish_krls init/common/skel/_ssh/
+  cp -a $HOME/.pki/publish_crls init/common/skel/_pki/
 
   OUT_DIR=${OUT_DIR:-build/${GUEST}}
   mkdir -p ${OUT_DIR}
@@ -58,18 +59,14 @@ _finish() {
     pystache init/common/Vagrantfile_libvirt.mustache \
       "{\"variant\":\"${variant}\"}" > ${OUT_DIR}/Vagrantfile ;
   elif command -v mustache > /dev/null ; then
-    cat << EOF >> mustache - init/common/Vagrantfile_libvirt.mustache > ${OUT_DIR}/Vagrantfile
----
-variant: ${variant}
----
-EOF
+    echo "{\"variant\":\"${variant}\"}" | mustache - init/common/Vagrantfile_libvirt.mustache > ${OUT_DIR}/Vagrantfile ;
   fi
-  cp -R init/common/catalog.json* init/common/qemu_lxc/vmrun.sh ${OUT_DIR}/
+  cp -a init/common/catalog.json* init/common/qemu_lxc/vmrun.sh ${OUT_DIR}/
   sleep 30
 }
 
 _install_x86_64() {
-  cp ${QEMU_X64_FIRMWARE} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_x86_64.args ${OUT_DIR}/
+  cp -a ${FIRMWARE_QEMU_X64} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_x86_64.args ${OUT_DIR}/
 
   if [ "1" = "${USE_VIRTINST:-0}" ] ; then
     #-------------- using virtinst ------------------
@@ -90,7 +87,7 @@ _install_x86_64() {
       --boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
       --disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
       ${INST_SRC_OPTS} ${VUEFI_OPTS} -n ${GUEST} \
-      --initrd-inject="/tmp/${cfg_file}" --initrd-inject="/tmp/init.tar" \
+      --initrd-inject="/tmp/${cfg_file}" --initrd-inject="/tmp/scripts.tar" \
       --extra-args="${EXTRA_ARGS}" &
     else
       virt-install ${CONNECT_OPT} --arch x86_64 --memory 2048 --vcpus 2 \
@@ -106,7 +103,7 @@ _install_x86_64() {
     #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml ;
   else
     #------------ using qemu-system-* ---------------
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_X64}"}
     if [ "$(uname -s)" = "Linux" ] ; then
       echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
       cat /etc/qemu/bridge.conf ; sleep 5 ;
@@ -143,7 +140,7 @@ _install_x86_64() {
 }
 
 _install_aarch64() {
-  cp ${QEMU_AA64_FIRMWARE} init/common/qemu_lxc/vmrun_qemu_aarch64.args ${OUT_DIR}/
+  cp -a ${FIRMWARE_QEMU_AA64} init/common/qemu_lxc/vmrun_qemu_aarch64.args ${OUT_DIR}/
 
   if [ "1" = "${USE_VIRTINST:-0}" ] ; then
     #-------------- using virtinst ------------------
@@ -164,7 +161,7 @@ _install_aarch64() {
       --boot menu=on,cdrom,hd,network --controller scsi,model=virtio-scsi \
       --disk path=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect_zeroes=unmap,bus=scsi,format=qcow2 \
       ${INST_SRC_OPTS} ${VUEFI_OPTS} -n ${GUEST} \
-      --initrd-inject="/tmp/${cfg_file}" --initrd-inject="/tmp/init.tar" \
+      --initrd-inject="/tmp/${cfg_file}" --initrd-inject="/tmp/scripts.tar" \
       --extra-args="${EXTRA_ARGS}" &
     else
       virt-install ${CONNECT_OPT} --arch aarch64 --memory 2048 --vcpus 2 \
@@ -180,7 +177,7 @@ _install_aarch64() {
     #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml ;
   else
     #------------ using qemu-system-* ---------------
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${QEMU_AA64_FIRMWARE}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64}"}
     if [ "$(uname -s)" = "Linux" ] ; then
       echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
       cat /etc/qemu/bridge.conf ; sleep 5 ;
@@ -218,7 +215,7 @@ _install_aarch64() {
 _freebsd() {
   INST_SRC_OPTS=${INST_SRC_OPTS:---cdrom="${ISO_PATH}"}
 
-  tar -cf /tmp/init.tar init/common init/freebsd
+  tar -cf /tmp/scripts.tar init/common init/freebsd -C scripts freebsd
   ## NOTE, saved auto install config: /root/installscript
 
   echo "### Once network connected, transfer needed file(s) ###" ; sleep 5
@@ -233,7 +230,7 @@ _freebsd() {
   ## NOTE, transfer [dir(s) | file(s)]: init/common, init/freebsd
 
   #geom -t
-  #[CRYPTED_PASSWD=$CRYPTED_PASSWD] [INIT_HOSTNAME=freebsd-boxv0000] bsdinstall script init/freebsd/[std | zfs]-installscript
+  #[PASSWD_CRYPTED=$PASSWD_CRYPTED] [INIT_HOSTNAME=freebsd-boxv0000] bsdinstall script init/freebsd/[std | zfs]-installscript
 }
 freebsd_x86_64() {
   VOL_MGR=${VOL_MGR:-std} ; variant=freebsd
@@ -264,9 +261,9 @@ _debian() {
 
   #CFGHOST [http://<host>:<port> | file://]
   EXTRA_ARGS=${EXTRA_ARGS:- auto=true preseed/url=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} locale=en_US keymap=us console-setup/ask_detect=false domain= hostname=${init_hostname} mirror/http/hostname=${repo_host} mirror/http/directory=${repo_directory} choose-init/select_init=${service_mgr}}
-  cp init/debian/${VOL_MGR}-preseed.cfg /tmp/${cfg_file}
+  cp -a init/debian/${VOL_MGR}-preseed.cfg /tmp/${cfg_file}
 
-  tar -cf /tmp/init.tar init/common init/debian
+  tar -cf /tmp/scripts.tar init/common init/debian -C scripts debian
   ## NOTE, debconf-get-selections [--installer] -> auto install cfg
 }
 debian_x86_64() {
@@ -281,6 +278,7 @@ debian_x86_64() {
     (cd ${ISOS_PARDIR}/devuan ; sha256sum --ignore-missing -c SHA256SUMS) ;
   fi
 
+  ##MIRROR: pkgmaster.devuan.org/devuan
   ##dnld: <mirror>/dists/<version>/main/installer-amd64/current/images/cdrom/debian-installer/amd64/{linux,initrd.gz}
   KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/devuan -name 'linux' | tail -n1)}
   INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/devuan -name 'initrd.gz' | tail -n1)}
@@ -300,7 +298,7 @@ debian_aarch64() {
   fi
 
   ##MIRROR: pkgmaster.devuan.org/devuan
-  ##dnld: <mirror>/dists/beowulf/main/installer-arm64/current/images/netboot/debian-installer/arm64/{linux,initrd.gz}
+  ##dnld: <mirror>/dists/<version>/main/installer-arm64/current/images/netboot/debian-installer/arm64/{linux,initrd.gz}
   KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/devuan/arm64/netboot/debian-installer/arm64 -name 'linux' | tail -n1)}
   INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/devuan/arm64/netboot/debian-installer/arm64 -name 'initrd.gz' | tail -n1)}
 
@@ -317,7 +315,7 @@ debian_aarch64() {
 _alpine() {
   INST_SRC_OPTS=${INST_SRC_OPTS:---cdrom="${ISO_PATH}"}
 
-  tar -cf /tmp/init.tar init/common init/alpine
+  tar -cf /tmp/scripts.tar init/common init/alpine -C scripts alpine
 
   echo "### Once network connected, transfer needed file(s) ###" ; sleep 5
 
@@ -332,7 +330,7 @@ _alpine() {
   #APKREPOSOPTS=http://${MIRROR}/latest-stable/main BOOT_SIZE=200 USE_EFI=1 [BOOTFS=ext4 VARFS=ext4] setup-alpine -f init/alpine/[std | lvm]-answers
   # .. reboot
   # .. after reboot
-  #sh init/alpine/[std | lvm]-post_autoinstall.sh [$CRYPTED_PASSWD]
+  #sh init/alpine/[std | lvm]-post_autoinstall.sh [$PASSWD_CRYPTED]
 }
 alpine_x86_64() {
   VOL_MGR=${VOL_MGR:-std} ; variant=alpine
@@ -362,9 +360,9 @@ _suse() {
 
   #CFGHOST [http://<host>:<port> | file://]
   EXTRA_ARGS=${EXTRA_ARGS:- netsetup=dhcp lang=en_US install=http://${repo_host}${repo_directory} hostname=${init_hostname} domain= autoyast=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} textmode=1}
-  cp init/suse/${VOL_MGR}-autoinst.xml /tmp/${cfg_file}
+  cp -a init/suse/${VOL_MGR}-autoinst.xml /tmp/${cfg_file}
 
-  tar -cf /tmp/init.tar init/common init/suse
+  tar -cf /tmp/scripts.tar init/common init/suse -C scripts suse
   ## NOTE, yast2 clone_system -> auto install config: /root/autoinst.xml
 }
 suse_x86_64() {
@@ -405,7 +403,7 @@ suse_aarch64() {
 
 _redhat() {
   cfg_file=anaconda-ks.cfg
-  # [rocky/8|almalinux/8|centos/8-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
+  # [rocky/9|almalinux/9|centos/9-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
   repo_host=${repo_host:-dl.rockylinux.org/pub/rocky}
   #repo_host=${repo_host:-repo.almalinux.org/almalinux}
   #repo_host=${repo_host:-mirror.centos.org/centos}
@@ -413,9 +411,9 @@ _redhat() {
   #CFGHOST [http://<host>:<port> | file://]
   EXTRA_ARGS=${EXTRA_ARGS:- nomodeset video=1024x768 inst.ks=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} inst.repo=http://${repo_host}${repo_directory} ip=::::${init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text}
   # systemd.unit=multi-user.target
-  cp init/redhat/${VOL_MGR}-anaconda-ks.cfg /tmp/${cfg_file}
+  cp -a init/redhat/${VOL_MGR}-anaconda-ks.cfg /tmp/${cfg_file}
 
-  tar -cf /tmp/init.tar init/common init/redhat
+  tar -cf /tmp/scripts.tar init/common init/redhat -C scripts redhat
   ## NOTE, saved auto install config: /root/anaconda-ks.cfg
 
   ## NOTE, in kickstart failure to find ks.cfg:
@@ -424,7 +422,7 @@ _redhat() {
 }
 redhat_x86_64() {
   VOL_MGR=${VOL_MGR:-std} ; variant=redhat
-  init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-8}
+  init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-9}
   repo_directory=${repo_directory:-/${RELEASE}/BaseOS/x86_64/os}
   GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
 
@@ -445,7 +443,7 @@ redhat_x86_64() {
 }
 redhat_aarch64() {
   VOL_MGR=${VOL_MGR:-std} ; variant=redhat
-  init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-8}
+  init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-9}
   repo_directory=${repo_directory:-/${RELEASE}/BaseOS/aarch64/os}
   GUEST=${1:-${variant}-aarch64-${VOL_MGR}}
 
@@ -474,9 +472,9 @@ mageia_x86_64() {
   #CFGHOST [http://<host>:<port> | file://]
   EXTRA_ARGS=${EXTRA_ARGS:- automatic=method:http,server:${repo_host},directory:${repo_directory},network:dhcp auto_install=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} nomodeset text}
   # systemd.unit=multi-user.target
-  cp init/mageia/${VOL_MGR}-auto_inst.cfg.pl /tmp/${cfg_file}
+  cp -a init/mageia/${VOL_MGR}-auto_inst.cfg.pl /tmp/${cfg_file}
 
-  tar -cf /tmp/init.tar init/common init/mageia
+  tar -cf /tmp/scripts.tar init/common init/mageia -C scripts mageia
   ## NOTE, saved auto install config: /root/drakx/auto_inst_cfg.pl
 
   init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-8}
@@ -499,7 +497,7 @@ mageia_x86_64() {
 _openbsd() {
   INST_SRC_OPTS=${INST_SRC_OPTS:---import --disk="${ISO_PATH}"}
 
-  tar -cf /tmp/init.tar init/common init/openbsd
+  tar -cf /tmp/scripts.tar init/common init/openbsd -C scripts openbsd
   ## NOTE, saved install response file: /tmp/i/install.resp
 
   echo "### Once network connected, transfer needed file(s) ###" ; sleep 5
@@ -512,8 +510,8 @@ _openbsd() {
   ## NOTE, transfer [dir(s) | file(s)]: init/common, init/openbsd
 
   #export MIRROR=ftp4.usa.openbsd.org/pub/OpenBSD
-  #cp init/openbsd/custom.disklabel init/openbsd/install.resp /tmp/
-  #sh init/openbsd/autoinstall.sh [$PLAIN_PASSWD]
+  #cp -a init/openbsd/custom.disklabel init/openbsd/install.resp /tmp/
+  #sh init/openbsd/autoinstall.sh [$PASSWD_PLAIN]
 }
 openbsd_x86_64() {
   VOL_MGR=${VOL_MGR:-std} ; variant=openbsd

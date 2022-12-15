@@ -71,8 +71,13 @@ sed -i 's|domain|domain, mdns|g' /etc/nftables/*nftables.conf
 cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
 cp -R /root/init/common/skel/_ssh/* /etc/skel/.ssh/
 cp -R /root/init/common/skel/_pki/* /etc/skel/.pki/
-cp /root/init/common/skel/_gitconfig /etc/skel/.gitconfig
-cp /root/init/common/skel/_hgrc /etc/skel/.hgrc
+cp /root/init/common/skel/_gitconfig.sample /etc/skel/.gitconfig
+cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
+cat << EOF >> /etc/skel/.inputrc
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+
+EOF
 
 if [ "$(grep '^.*%wheel.*ALL.*NOPASSWD.*' /etc/sudoers)" ] ; then
   sed -i "s|^.*%wheel.*ALL.*NOPASSWD.*|%wheel ALL=(ALL) NOPASSWD: ALL|" /etc/sudoers ;

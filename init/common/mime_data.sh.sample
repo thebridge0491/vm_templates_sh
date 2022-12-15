@@ -1,0 +1,72 @@
+#!/bin/sh
+
+usage="usage: 
+	${0} mime_attachmt [data.txt]
+	${0} mime_mixed [data.txt[,..,dataN.txt] [/dev/stdin]]
+	${0} mime_extract [data.mime [.]]"
+
+mime_attachmt() { # input: file ; output: MIME header w/ base64-encoded file
+	infile=${1:-data.txt}
+	
+	cat << EOF
+Content-Type: $(file --brief --mime-type $infile); name="$(basename $infile)"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="$(basename $infile)"
+
+$(openssl base64 -in $infile)
+EOF
+}
+
+mime_mixed() { # input: file(s) & body ; output: multipart/mixed MIME
+	infiles=${1:-data.txt} ; body=${2:-/dev/stdin}
+
+	md5_cmd='md5sum'
+	if [ "$(uname -s)" != 'Linux' ] ; then
+		md5_cmd="md5" ;
+	fi
+	boundary=$(date +%s | ${md5_cmd} | awk '{print $1;}')
+
+	cat << EOF
+Content-Type: multipart/mixed; boundary="${boundary}"
+
+This is a multi-part message in MIME format.
+
+--${boundary}
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+$(echo "Enter body(file(s): $infile): " > /dev/stderr)
+$(echo '' ; cat $body)
+
+EOF
+  for infile in $(echo $infiles | tr ',' ' ') ; do
+    cat << EOF
+--${boundary}
+$(mime_attachmt $infile)
+
+EOF
+  done
+
+  echo --${boundary}--
+}
+
+mime_extract() { # input: file & outdir ; output: extracted file(s) to dir
+	mimefile=${1:-data.mime} ; outdir=${2:-.}
+	
+	#realmime=$(realpath $mimefile)
+	#(cd $outdir ; munpack -t $realmime)
+	ripmime -d $outdir -i $mimefile
+}
+
+is_function="0"
+case "$1" in
+	"mime_attachmt") is_function="1" ;;
+	"mime_mixed") is_function="1" ;;
+	"mime_extract") is_function="1" ;;
+esac
+if [ "0" = "${is_function}" ] ; then
+	printf "${usage}\n" ; exit ;
+fi
+func=$1 ; shift
+${func} $@

@@ -9,6 +9,6 @@ qemu-system-x86_64 -machine pc,accel=kvm:hvf:tcg \
   -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
   -drive file=${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/${GUEST:-freebsd-x86_64-zfs}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
   -display default,show-cursor=on -vga cirrus \
-  ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${QEMU_X64_FIRMWARE:-/usr/share/OVMF/OVMF_CODE.fd}} \
+  ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd}} \
   -cdrom ${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)} -no-reboot
-  
+

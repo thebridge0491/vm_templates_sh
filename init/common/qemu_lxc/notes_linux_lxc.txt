@@ -21,12 +21,12 @@
 
 
 # NOTE, make lxc container accessible by virt-manager/virsh:
-GUEST=${GUEST:-devuan-boxe0000} ; HOME=${HOME:-/home/packer}
+GUEST=${GUEST:-debian-boxe0000} ; HOME=${HOME:-/home/packer}
 # ex: lxc-create -t download -n ${GUEST} -- -d devuan -r beowulf -a amd64
 #     lxc-start -d -n ${GUEST} ; lxc-attach -n ${GUEST} -- passwd
 #     #if console access errors, ? fix /etc/inittab tty's
 #     lxc-console --tty 0 -n ${GUEST} # verify root can login
-# sed -e "s|/home/packer|${HOME}|" -e "s|devuan-boxe0000|${GUEST}|" init/common/qemu_lxc/domain-lxc.xml.sample > ${GUEST}.xml
+# sed -e "s|/home/packer|${HOME}|" -e "s|debian-boxe0000|${GUEST}|" init/common/qemu_lxc/domain-lxc.xml.sample > ${GUEST}.xml
 # virsh --connect lxc:/// define ${GUEST}.xml
 # OR
 # virt-install --connect lxc:/// --init /sbin/init --memory 768 --vcpus 1 --controller virtio-serial --console pty,target_type=virtio --network network=default,model=virtio-net,mac=RANDOM --boot menu=on --filesystem type=mount,mode=passthrough,source=/mnt/Data0,target=/media/9p_Data0 --filesystem $HOME/.local/share/lxc/${GUEST}/rootfs,/ -n ${GUEST}

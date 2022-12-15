@@ -1,6 +1,6 @@
 {
   "_info_passwd_crypted_hash": "# [md5|sha256|sha512] - [$1|$5|$6]$...",
-  "_usage_build": "(export mypass=$(python -c 'import getpass ; print(getpass.getpass())') ; packer build -var plain_passwd=${mypass} -var crypted_passwd=$(python -c 'import os,crypt ; print(crypt.crypt(os.getenv(\"mypass\"), \"$6$16CHARACTERSSALT\"))') -only=[qemu_x86_64|virtualbox-iso] template.json)",
+  "_usage_build": "(export mypass=$(python -c 'import getpass ; print(getpass.getpass())') ; packer build -var passwd_plain=${mypass} -var passwd_crypted=$(python -c 'import os,crypt ; print(crypt.crypt(os.getenv(\"mypass\"), \"$6$16CHARACTERSSALT\"))') -only=[qemu_x86_64|virtualbox_x86_64] template.json)",
 
   "builders": [{
     "type": "qemu",
@@ -16,23 +16,23 @@
       ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
       ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"],
       ["-display", "gtk,show-cursor=on"],
-      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_x64_firmware`}}"],
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `firmware_qemu_x64`}}"],
       ["-virtfs", "{{user `virtfs_opts`}}"]
     ],
 
     "boot_wait": "5s",
     "ssh_timeout": "2h45m",
     "ssh_username": "packer",
-    "ssh_password": "{{user `plain_passwd`}}",
+    "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "sudo shutdown -hP +3 || sudo poweroff",
     "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
-   "iso_checksum": "file:file://{{user `isos_pardir`}}/mageia/{{user `isolive_x64_name`}}.iso.sha512",
+   "iso_checksum": "file:file://{{user `isos_pardir`}}/mageia/{{user `isolive_name_x64`}}.iso.sha512",
     "iso_url": "",
-    "iso_urls": "file://{{user `isos_pardir`}}/mageia/{{user `isolive_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `isolive_url_directory`}}/{{user `isolive_x64_cdlabel`}}.iso",
+    "iso_urls": ["file://{{user `isos_pardir`}}/mageia/{{user `isolive_name_x64`}}.iso","{{user `iso_url_mirror`}}/{{user `isolive_url_directory`}}/{{user `isolive_cdlabel_x64`}}.iso"],
     "boot_command": [
       "<wait><enter>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
@@ -41,13 +41,14 @@
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<enter>live<enter><wait10>su<enter><wait10>dnf -y check-update ; dnf -y install lvm2 btrfs-progs ; ",
-      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; env MKFS_CMD={{user `mkfs_cmd`}} sh -x /tmp/disk_setup.sh part_format sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `crypted_passwd`}}'<enter><wait>"
+      "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; env MKFS_CMD={{user `mkfs_cmd`}} sh -x /tmp/disk_setup.sh part_format sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
     ]
   },
   {
     "type": "virtualbox-iso",
     "guest_os_type": "Mandriva_64",
     "format": "ova",
+    "name": "virtualbox_x86_64",
     "vm_name": "{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
     "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
     "guest_additions_mode": "disable",
@@ -67,16 +68,16 @@
     "boot_wait": "5s",
     "ssh_timeout": "2h45m",
     "ssh_username": "packer",
-    "ssh_password": "{{user `plain_passwd`}}",
+    "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
     "disk_size": "{{user `disk_size`}}",
     "http_directory": "init",
     "shutdown_command": "sudo shutdown -hP +3 || sudo poweroff",
     "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
-    "iso_checksum": "file:file://{{user `isos_pardir`}}/mageia/{{user `iso_x64_name`}}.iso.sha512",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/mageia/{{user `iso_name_x64`}}.iso.sha512",
     "iso_url": "",
-    "iso_urls": "file://{{user `isos_pardir`}}/mageia/{{user `iso_x64_name`}}.iso,{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_x64_name`}}.iso",
+    "iso_urls": ["file://{{user `isos_pardir`}}/mageia/{{user `iso_name_x64`}}.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name_x64`}}.iso"],
     "boot_command": [
       "<wait><wait5>c<wait>linux /isolinux/x86_64/vmlinuz text 3 textmode=1 {{user `boot_cmdln_options`}} systemd.unit=multi-user.target ",
       "automatic=method:http,server:{{user `repo_host`}},directory:{{user `repo_directory`}},network:dhcp auto_install=http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-auto_inst.cfg.pl<enter>",
@@ -88,8 +89,8 @@
     "type": "shell-local",
     "inline": [
       "mkdir -p {{user `home`}}/.ssh/publish_krls {{user `home`}}/.pki/publish_crls",
-      "cp -R {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
-      "cp -R {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
+      "cp -a {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
+      "cp -a {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
       "tar -cf /tmp/scripts.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}"
     ]
   },
@@ -118,7 +119,7 @@
     "execute_command": "env {{.Vars}} sudo sh -x '{{.Path}}'",
     "inline": [
       "tar -xf /tmp/scripts.tar -C /tmp ; mv /tmp/{{user `variant`}} /tmp/scripts",
-      "cp -R /tmp/init /tmp/scripts /root/"
+      "cp -a /tmp/init /tmp/scripts /root/"
     ]
   },
   {
@@ -141,7 +142,7 @@
     "scripts": [
       "init/common/linux/zerofill.sh"
     ],
-    "only": ["virtualbox-iso"]
+    "only": ["virtualbox_x86_64"]
   }],
 
   "post-processors": [
@@ -157,7 +158,7 @@
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
         "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
-        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_x64_firmware`}}"],
+        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `firmware_qemu_x64`}}"],
       "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}-{{user `build_timestamp`}}.{{.Provider}}.box",
       "only": ["qemu_x86_64"]
     },
@@ -165,7 +166,7 @@
       "type": "shell-local",
       "inline": [
         "mv output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}} output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}.qcow2",
-        "cp init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/"
+        "cp -a init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/"
       ],
       "only": ["qemu_x86_64"]
     }
@@ -175,7 +176,7 @@
     "variant": "mageia",
     "vol_mgr": "std",
     "mkfs_cmd": "mkfs.ext4",
-    "init_hostname": "{{user `variant`}}-boxv0000",
+    "init_hostname": "mageia-boxv0000",
     "boot_cmdln_options": "nomodeset video=1024x768 ",
     "virtfs_opts": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
     "isos_pardir": "/mnt/Data0/distros",
@@ -185,19 +186,20 @@
     "repo_directory": "/distrib/8/x86_64",
     "iso_url_mirror": "https://mirrors.kernel.org/mageia",
     "iso_url_directory": "distrib/8/x86_64/install/images",
-    "iso_x64_name": "Mageia-8-netinstall-x86_64",
+    "iso_name_x64": "Mageia-8-netinstall-x86_64",
     "isolive_url_directory": "iso/8/Mageia-8-Live-Xfce-x86_64",
-    "isolive_x64_cdlabel": "Mageia-8-Live-Xfce-x86_64",
-    "isolive_x64_name": "live/Mageia-8-Live-Xfce-x86_64",
-    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
+    "isolive_name_x64": "live/Mageia-8-Live-Xfce-x86_64",
+    "isolive_cdlabel_x64": "Mageia-8-Live-Xfce-x86_64",
 
+    "firmware_qemu_x64": "/usr/share/OVMF/OVMF_CODE.fd",
     "disk_size": "30720",
     "headless": "",
-    "plain_passwd": "abcd0123",
-    "crypted_passwd": "$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91",
-    "build_timestamp": "{{isotime `2006.01`}}",
+    "passwd_plain": "abcd0123",
+    "passwd_crypted": "$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91",
     "author": "thebridge0491",
-    "datestamp": "{{isotime `2006.01.02`}}",
-    "home": "{{env `HOME`}}"
-  }
+    "home": "{{env `HOME`}}",
+    "build_timestamp": "{{isotime `2006.01`}}",
+    "datestamp": "{{isotime `2006.01.02`}}"
+  },
+  "sensitive-variables": ["passwd_plain", "passwd_crypted"]
 }

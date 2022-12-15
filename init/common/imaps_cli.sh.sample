@@ -1,0 +1,138 @@
+#!/bin/sh
+
+# (smime dec) cat smime.p7m | openssl cms -decrypt -aes256 -recip recip.pem \
+#   > tmp/data.mime
+# (mime extract) (cd tmp ; [munpack -t data.mime | ripmime -i data.mime])
+# (gpg dec) cat data.txt.gpg | gpg --decrypt > data.txt.gpg
+
+# usage:
+#   [host=imap.gmail.com] [port=993] \
+#     sh imaps_cli.sh [-u=im.computer@email.com] \
+#     [-m=INBOX] [-c=UNSEEN] [-i=0] [-b=0]
+
+## ensure GPG_TTY set to allow interactive agent usage from inside a pipe
+# [setenv | export] GPG_TTY[=]`tty`
+
+## ? (--keyring) alternate keyring ; ? (-v) verbose output ; ? (-a) armor
+GPG_CMD=${GPG_CMD:-gpg}
+
+USE_CURL=${USE_CURL:-0} ; OPEN_AUTH=${OPEN_AUTH:-0}
+HDR_ITEMS=${HDR_ITEMS:-From To Subject Date}
+# [gmail.com | mail.yahoo.com | comcast.net]
+host=${host:-imap.gmail.com} ; port=${port:-993}
+
+user=im.computer@email.com
+mailbox=INBOX
+criterion=UNSEEN
+idx_spec=0
+brief=0
+
+for opt in "$@" ; do
+  case $opt in
+  -m=*) mailbox=`echo $opt | sed 's|-m=||'` ;;
+  -c=*) criterion=`echo $opt | sed 's|-c=||'` ;;
+  -u=*) user=`echo $opt | sed 's|-u=||'` ;;
+  -i=*) idx_spec=`echo $opt | sed 's|-i=||'` ;;
+  -b=*) brief=`echo $opt | sed 's|-b=||'` ;;
+  esac
+done
+
+if [ ! "0" = "${OPEN_AUTH:-0}" ] ; then
+  read -p "Token file(default: appmail.tokens) for user($user): " tokenfile ; echo
+  tokenfile=${tokenfile:-appmail.tokens}
+  token=$(python $HOME/.config/mutt/oauth2.py ${tokenfile})
+  
+  # #Note: disable line-wrapping: use openssl base64 -A OR base64 -w 0
+  auth_method=oauthbearer
+  sasl_str=$(printf "n,a=${user},\1auth=Bearer ${token}\1\1" | openssl base64 -A)
+  if [ ! "0" = "${USE_XOAUTH2:-0}" ] ; then
+    auth_method=xoauth2
+    sasl_str=$(printf "user=${user}\1auth=Bearer ${token}\1\1" | openssl base64 -A)
+  fi ;
+else
+  #stty -echo
+  #read -p "Host password for user($user): " passw ; echo
+  #stty echo
+  
+  #read -p "Keepass database(default: $HOME/.keepass/store.kdbx) for user($user): " keepassdb ; echo
+  #keepassdb=${keepassdb:-$HOME/.keepass/store.kdbx}
+  #read -p "Keepass entry(default: appmail) for user($user): " entry ; echo
+  #entry=${entry:-appmail}
+  #passw=$(keepassxc-cli show -apassword ${keepassdb} ${entry})
+  
+  #read -p "Cert/key file(default: $HOME/.pki/encrypt.pem) for user($user): " certkeyfile ; echo
+  #certkeyfile=${certkeyfile:-$HOME/.pki/encrypt.pem}
+  #read -p "Password entry(default: appmail) for user($user): " entry ; echo
+  #entry=${entry:-appmail}
+  #passw=$(openssl pkeyutl -decrypt -inkey ${certkeyfile} -in $HOME/.pki/.${entry}.enc)
+  
+  read -p "Password entry(default: appmail) for user($user): " entry ; echo
+  entry=${entry:-appmail}
+  passw=$(${GPG_CMD} --no-tty -qd $HOME/.${entry}.gpg)
+  
+  auth_method=plain
+  sasl_str=$(printf "\0${user}\0${passw}" | openssl base64)
+fi
+
+if [ "0" = "${USE_CURL:-0}" ] ; then
+  {
+  	echo "l1 authenticate ${auth_method} ${sasl_str}" ; sleep 2 ;
+  	echo "g1 examine ${mailbox}" ; sleep 2 ;
+  	if [ ! "0" = "${idx_spec}" ] ; then
+  	  if [ ! "0" = "${brief}" ] ; then
+  	    echo "f1 fetch ${idx_spec} (BODY.PEEK[HEADER.FIELDS (${HDR_ITEMS})])" ;
+  	    sleep 2 ;
+  	  else
+  	    #echo "f3 fetch ${idx_spec} (RFC822)" ; sleep 2 ;
+  	    ##echo "m1 store ${idx_spec} -FLAGS (\Seen)" ; sleep 2 ;
+  	    echo "f2 fetch ${idx_spec} (BODY.PEEK[])" ; sleep 2 ;
+  	  fi ;
+  	else
+  	  echo "a1 list / *" ; sleep 2 ;
+  	  echo "i1 status ${mailbox} (MESSAGES RECENT UIDNEXT UIDVALIDITY UNSEEN)" ; sleep 2 ;
+  	  echo "s1 search ${criterion}" ; sleep 2 ;
+  	fi ;
+  	echo "z1 logout" ; sleep 2 ;
+  	} | openssl s_client -quiet -verify_quiet -crlf -connect ${host}":"${port}
+	#} | gnutls-cli --crlf --insecure --no-ca-verification --port ${port} ${host}
+	
+	# (openssl s_client) ??? Linux: -CApath ...      ; macOS: -CAfile ...
+	# (gnutls-cli)       ??? Linux: --x509cafile ... ; macOS: --x509cafile ...
+else
+	mail_rcpts=""
+	for recip in ${recips} ; do
+	  mail_rcpts="${mail_rcpts}--mail-rcpt ${recip} " ;
+	done ;
+	
+	if [ "0" = "${OPEN_AUTH:-0}" ] ; then
+	  cred_opts="--user ${user}":"${passw}" ;
+	else
+	  cred_opts="--user ${user} --oauth2-bearer ${token}" ;
+	fi ;
+	
+  curl --insecure --crlf --ssl ${cred_opts} --url imaps://${host}":"${port} \
+  	--request "examine ${mailbox}" ;
+	if [ ! "0" = "${idx_spec}" ] ; then
+	  if [ ! "0" = "${brief}" ] ; then
+  	  curl --insecure --crlf --ssl ${cred_opts} \
+  	    --url imaps://${host}":"${port}"/${mailbox}" --verbose \
+  	    --request "fetch ${idx_spec} (BODY.PEEK[HEADER.FIELDS (${HDR_ITEMS})])" ;
+	  else
+  	  #curl --insecure --crlf --ssl ${cred_opts} \
+  	  #  --url imaps://${host}":"${port}"/${mailbox}" --verbose \
+  	  #  --request "fetch ${idx_spec} (BODY.PEEK[])" ;
+  	  curl --insecure --crlf --ssl ${cred_opts} \
+  	    --url imaps://${host}":"${port}"/${mailbox};MAILINDEX=${idx_spec}" ;
+  	  curl --insecure --crlf --ssl ${cred_opts} \
+  	    --url imaps://${host}":"${port}"/${mailbox}" \
+    	  --request "store ${idx_spec} -FLAGS (\Seen)" ;
+    fi ;
+	else
+  	curl --insecure --crlf --ssl ${cred_opts} --url imaps://${host}":"${port} ;
+  	curl --insecure --crlf --ssl ${cred_opts} --url imaps://${host}":"${port} \
+  	  --request "status ${mailbox} (MESSAGES RECENT UIDNEXT UIDVALIDITY UNSEEN)" ;
+  	curl --insecure --crlf --ssl ${cred_opts} \
+  	  --url imaps://${host}":"${port}"/${mailbox}" \
+	    --request "search ${criterion}" ;
+	fi ;
+fi

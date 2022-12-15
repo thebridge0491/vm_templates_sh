@@ -1,2 +1,0 @@
-#@cert-authority *.example.com $(cat <path>/sshca-id_<keytype>.pub)
-#@cert-authority 192.168.0.0/16 $(cat <path>/sshca-id_<keytype>.pub)

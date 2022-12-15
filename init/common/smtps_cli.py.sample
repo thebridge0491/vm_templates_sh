@@ -1,0 +1,142 @@
+#!/usr/bin/env python
+
+import os, sys, argparse, subprocess
+import smtplib
+
+MIN_PYTHON = (3, 6)
+if sys.version_info < MIN_PYTHON:
+	sys.exit("Python %s.%s or later is required.\n" % MIN_PYTHON)
+
+SCRIPTPARENT = os.path.dirname(os.path.abspath(__file__))
+
+# ensure GPG_TTY set to allow interactive agent usage from inside a pipe
+os.environ['GPG_TTY'] = os.getenv('GPG_TTY', subprocess.getoutput('tty'))
+
+## ? (--keyring) alternate keyring ; ? (-v) verbose output ; ? (-a) armor
+GPG_CMD = os.getenv('GPG_CMD', 'gpg')
+
+def parse_cmdopts(args=None):
+	opts_parser = argparse.ArgumentParser()
+	
+	opts_parser.add_argument('recips', nargs='+',
+		help='Recipients (to)')
+	opts_parser.add_argument('-e', '--endpoint', default='smtp.gmail.com',
+		help='Specify smtp endpoint(host)(default: smtp.gmail.com)')
+	opts_parser.add_argument('-p', '--port', default=465,
+		help='Specify smtp port(default: 465)')
+	opts_parser.add_argument('-a', '--auth', default='plain',
+		choices=['plain', 'login', 'oauthbearer', 'xoauth2'],
+		help='Specify auth method(default: plain)')
+	opts_parser.add_argument('-f', '--sender', default='a.sendr@email.com',
+		help='Specify smtp sender(from)(default: a.sendr@email.com)')
+	opts_parser.add_argument('-s', '--subj', default='email subject',
+		help='Specify smtp subject(default: email subject)')
+	opts_parser.add_argument('-i', '--infile', type=argparse.FileType('r'),
+	  default='data.txt', help='Specify smtp message infile(default: data.txt)')
+	opts_parser.add_argument('-c', '--use_curl', action = 'store_true',
+	  default=False, help='Use curl(default: False)')
+	
+	return opts_parser.parse_args(args)
+
+def main(argv=None):
+  opts_hash = parse_cmdopts(argv)
+  
+  if opts_hash.auth in ['oauthbearer', 'xoauth2']:
+    tokenfile = input("Token file(default: appmail.tokens) for user({0}): ".format(
+      opts_hash.sender)) or 'appmail.tokens'
+    token = subprocess.getoutput('python $HOME/.config/mutt/oauth2.py {0}'.format(
+      tokenfile)).split()[0]
+    sasl_str = 'n,a={0},\1auth=Bearer {1}\1\1'.format(opts_hash.sender, token)
+    if 'xoauth2' == opts_hash.auth:
+      sasl_str = 'user={0}\1auth=Bearer {1}\1\1'.format(opts_hash.sender, token)
+  else: # plain | login
+    #import getpass
+    #passw = getpass.getpass("Password for user({0}): ".format(
+    #  opts_hash.sender))
+    
+    #keepassdb = input("Keepass database(default: $HOME/.keepass/store.kdbx) for user({0}): ".format(
+    #  opts_hash.sender)) or '$HOME/.keepass/store.kdbx'
+    #entry = input("Keepass entry(default: appmail) for user({0}): ".format(
+    #  opts_hash.sender)) or 'appmail'
+    #passw = subprocess.getoutput('keepassxc-cli show -apassword {0} {1}'.format(
+    #  keepassdb, entry)).split()[0]
+      
+    #certkeyfile = input("Cert/key file(default: $HOME/.pki/encrypt.pem) for user({0}): ".format(
+    #  opts_hash.sender)) or '$HOME/.pki/encrypt.pem'
+    #entry = input("Password entry(default: appmail) for user({0}): ".format(
+    #  opts_hash.sender)) or 'appmail'
+    #passw = subprocess.getoutput('openssl pkeyutl -decrypt -inkey {0} -in $HOME/.pki/.{1}.enc'.format(
+    #  certkeyfile, entry)).split()[0]
+    
+    entry = input("Password entry(default: appmail) for user({0}): ".format(
+      opts_hash.sender)) or 'appmail'
+    passw = subprocess.getoutput('{0} --no-tty -qd ~/.{1}.gpg'.format(
+      GPG_CMD, entry)).split()[0]
+    sasl_str = '\0{0}\0{1}'.format(opts_hash.sender, passw)
+  
+  content = "From: {0}\nTo: {1}\nSubject: {2}\n{3}\n.\n".format(
+    opts_hash.sender, ','.join(opts_hash.recips), opts_hash.subj,
+    opts_hash.infile.read())
+  
+  if opts_hash.use_curl:
+    import io, pycurl
+    
+    curl_conn = pycurl.Curl()
+    curl_conn.setopt(curl_conn.URL, "smtps://{0}".format(opts_hash.endpoint))
+    curl_conn.setopt(curl_conn.PORT, opts_hash.port)
+    curl_conn.setopt(curl_conn.USE_SSL, pycurl.USESSL_ALL)
+    curl_conn.setopt(curl_conn.CRLF, 1)
+    curl_conn.setopt(curl_conn.UPLOAD, 1)
+    #curl_conn.setopt(curl_conn.IPRESOLVE, pycurl.IPRESOLVE_V4)
+    #curl_conn.setopt(curl_conn.FOLLOWLOCATION, 1)
+    #curl_conn.setopt(curl_conn.CONNECTTIMEOUT, 30)
+    #curl_conn.setopt(curl_conn.VERBOSE, 1)
+    
+    if opts_hash.auth in ['oauthbearer', 'xoauth2']:
+      curl_conn.setopt(curl_conn.USERNAME, opts_hash.sender)
+      curl_conn.setopt(curl_conn.XOAUTH2_BEARER, token)
+    else:
+      curl_conn.setopt(curl_conn.USERPWD, 
+        "{0}:{1}".format(opts_hash.sender, passw))
+    
+    curl_conn.setopt(curl_conn.MAIL_FROM, opts_hash.sender)
+    curl_conn.setopt(curl_conn.MAIL_RCPT, opts_hash.recips)
+    
+    istrm = io.BytesIO(content.encode())
+    curl_conn.setopt(curl_conn.READDATA, istrm)
+    
+    curl_conn.perform()
+    #print(curl_conn.perform_rs())
+    
+    curl_conn.close()
+    sys.exit(0)
+  
+  smtp_conn = smtplib.SMTP_SSL(opts_hash.endpoint, opts_hash.port)
+  
+  smtp_conn.ehlo(opts_hash.endpoint)
+  smtp_conn.helo(opts_hash.endpoint)
+  
+  # auth() method base64 encodes sasl str
+  smtp_conn.auth(opts_hash.auth, lambda _=None: sasl_str)
+  smtp_conn.sendmail(opts_hash.sender, opts_hash.recips, content)
+  
+  smtp_conn.quit()
+
+
+if '__main__' == __name__:
+  import sys
+  #raise SystemExit(main(sys.argv[1:]))
+  sys.exit(main(sys.argv[1:]))
+
+
+# smtps_cli.py usage example:
+# python smtps_cli.py [-e smtp.gmail.com] [-p 465] [-a plain]
+#   [-f a.sendr@email.com] [-s "email subject"] \
+#   [-i [data.[txt|mime]|smime.p7m]] recip [...recipN]
+
+# (smime enc) [cat /dev/null |] python mime_data.py mime_mixed \
+#   data.txt[,dataN.txt] | openssl cms -encrypt -aes256 recip.crt > smime.p7m
+# (gpg enc) cat data.txt | gpg --encrypt --recipient recip@email.com \
+#   > data.txt.gpg
+# (mime msg) [cat /dev/null |] python mime_data.py mime_mixed \
+#   data.txt[.gpg][,dataN.txt[.gpg]] > data.mime

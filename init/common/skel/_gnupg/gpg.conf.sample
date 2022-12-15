@@ -1,12 +1,12 @@
 #========================================
 # PGP Certificate configuration options for GnuPG
 
-#default-key plain_user@yahoo.com
-#default-recipient imcomputer@yahoo.com
+default-key AC4F9EC1419CA793387A03B4E02B3B63D40B0F0B
+#default-recipient im.computer@yahoo.com
 default-recipient-self
-#encrypt-to imcomputer@yahoo.com
-#hidden-encrypt-to imcomputer@yahoo.com
-#group mynames = plain_user@yahoo.com imcomputer@yahoo.com plain_user
+#encrypt-to im.computer@yahoo.com
+#hidden-encrypt-to im.computer@gmail.com
+#group mynames = im.computer@gmail.com im.computer@yahoo.com im.computer
 
 #auto-key-locate keyserver hkps://hkps.pool.sks-keyservers.net
 #keyserver hkps://hkps.pool.sks-keyservers.net

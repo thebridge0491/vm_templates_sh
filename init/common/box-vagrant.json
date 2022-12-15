@@ -14,13 +14,13 @@
   "provisioners": [{
     "type": "shell-local",
     "inline": [
-      "cp -R init/common/metadata_libvirt.json output-vms/{{user `vm_name`}}/metadata.json",
+      "cp -a init/common/metadata_libvirt.json output-vms/{{user `vm_name`}}/metadata.json",
       "if [ 'aarch64' = '{{user `machine`}}'] ; then",
-      "cp -R {{user `qemu_aa64_firmware`}} output-vms/{{user `vm_name`}}/",
+      "cp -a {{user `firmware_qemu_aa64`}} output-vms/{{user `vm_name`}}/",
       "else",
-      "cp -R {{user `qemu_x64_firmware`}} output-vms/{{user `vm_name`}}/",
+      "cp -a {{user `firmware_qemu_x64`}} output-vms/{{user `vm_name`}}/",
       "fi",
-      "cp -R init/common/info.json init/common/qemu_lxc/vmrun* output-vms/{{user `vm_name`}}/",
+      "cp -a init/common/info.json init/common/qemu_lxc/vmrun* output-vms/{{user `vm_name`}}/",
       "if command -v erb > /dev/null ; then",
       "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `build_timestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
       "erb variant={{user `variant`}} init/common/Vagrantfile_libvirt.erb > output-vms/{{user `vm_name`}}/Vagrantfile",
@@ -40,8 +40,8 @@
   {
     "type": "shell-local",
     "inline": [
-      "cp -R init/common/metadata_bhyve.json output-vms/{{user `vm_name`}}/metadata.json",
-      "cp -R init/common/info.json init/common/qemu_lxc/vmrun* {{user `bhyve_x64_firmware`}} output-vms/{{user `vm_name`}}/",
+      "cp -a init/common/metadata_bhyve.json output-vms/{{user `vm_name`}}/metadata.json",
+      "cp -a init/common/info.json init/common/qemu_lxc/vmrun* {{user `firmware_bhyve_x64`}} output-vms/{{user `vm_name`}}/",
       "if command -v erb > /dev/null ; then",
       "erb author={{user `author`}} guest={{user `vm_name`}} datestamp={{user `build_timestamp`}} init/common/catalog.json.erb > output-vms/{{user `vm_name`}}/{{user `vm_name`}}_catalog.json",
       "erb variant={{user `variant`}} init/common/Vagrantfile_bhyve.erb > output-vms/{{user `vm_name`}}/Vagrantfile",
@@ -62,11 +62,11 @@
     "machine": "x86_64",
     "variant": "freebsd",
     "vm_name": "freebsd-x86_64-std",
-    "bhyve_x64_firmware": "/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd",
-    "qemu_x64_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
-    "qemu_aa64_firmware": "/usr/share/AAVMF/AAVMF_CODE.fd",
-    "build_timestamp": "{{isotime `2006.01`}}",
+    "firmware_bhyve_x64": "/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd",
+    "firmware_qemu_x64": "/usr/share/OVMF/OVMF_CODE.fd",
+    "firmware_qemu_aa64": "/usr/share/AAVMF/AAVMF_CODE.fd",
     "author": "thebridge0491",
+    "build_timestamp": "{{isotime `2006.01`}}",
     "datestamp": "{{isotime `2006.01.02`}}"
   }
 }

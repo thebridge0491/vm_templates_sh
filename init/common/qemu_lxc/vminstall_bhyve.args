@@ -21,7 +21,7 @@ bhyve -A -H -P -c 2 -m 2048M -s 0,hostbridge -s 1,lpc \
   -s 3,virtio-blk,${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/${GUEST:-freebsd-x86_64-zfs}.raw \
   -l com1,stdio \
   ${BUEFI_OPTS:--s 29,fbuf,tcp=0.0.0.0:${VNCPORT:-5901},w=1024,h=768 \
-    -l bootrom,${BHYVE_X64_FIRMWARE:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}} \
+    -l bootrom,${FIRMWARE_BHYVE_X64:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}} \
   -s 31,ahci-cd,${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)} \
   ${GUEST:-freebsd-x86_64-zfs} &
 

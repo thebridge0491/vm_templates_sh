@@ -65,7 +65,7 @@ cfg_sshd() { # requires sudo/root access
 		      ${skeldir_ssh}/known_hosts ;
 	      fi ;
 	    done ;
-	    cp $sshca_krl $sshca_pubkey /etc/ssh/ ;
+	    cp -a $sshca_krl $sshca_pubkey /etc/ssh/ ;
     fi
     cat << EOF >> $SSHD_CONFIG
 HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256

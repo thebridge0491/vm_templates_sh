@@ -1,10 +1,4 @@
-{{! usage: cat << EOF | mustache - <template>
----
-variant: freebsd
----
-EOF
-}}
-
+{{! usage: echo '{"variant":"freebsd"}' | mustache - <template> }}
 ## minimal contents
 #Vagrant.configure("2") do |config|
 #  config.vm.provider :libvirt do |p|
@@ -55,8 +49,8 @@ Vagrant.configure(2) do |config|
     s.inline = <<-EOF
 echo '##########'
 echo 'Manually copy updated scripts tarball, then run provision xferscripts.'
-echo "  cd #{repo_dir} ; cp -R ~/.ssh/publish_krls init/common/skel/_ssh/"
-echo "  cp -R ~/.pki/publish_crls init/common/skel/_pki/"
+echo "  cd #{repo_dir} ; cp -a $HOME/.ssh/publish_krls init/common/skel/_ssh/"
+echo "  cp -a $HOME/.pki/publish_crls init/common/skel/_pki/"
 echo "  tar -cf /tmp/scripts.tar init/common init/#{variant} -C scripts #{variant}"
 echo '  xfr: scp /tmp/scripts.tar packer@10.0.2.10:/tmp/scripts.tar'
 echo '  xfr: ssh packer@10.0.2.10 "cat - > /tmp/scripts.tar" < /tmp/scripts.tar'
@@ -70,17 +64,17 @@ set -x
 sudo rm -r /tmp/init ; sudo rm -r /tmp/scripts
 mkdir -p /tmp/init ; sudo chmod 1777 /tmp
 tar -xf /tmp/scripts.tar -C /tmp
-for path in /root/init.tar /root/init /root/scripts ; do
+for path in /root/scripts.tar /root/init /root/scripts ; do
   sudo rm -r $path ;
 done
-mv /tmp/#{variant} /tmp/scripts ; sudo cp -fR /tmp/init /tmp/scripts /root/
+mv /tmp/#{variant} /tmp/scripts ; sudo cp -fa /tmp/init /tmp/scripts /root/
 EOF
   end
 
   config.vm.provision 'runscript', type: 'shell', run: 'never' do |s|
     s.env = {'HOME_DIR': '/home/vagrant', 'WITH_X11': 'nox11',
       'FETCH_RETRY': '20', 'FETCH_TIMEOUT': '300',
-      'PLAIN_PASSWD': "#{ENV.fetch('PLAIN_PASSWD', 'abcd0123')}"}
+      'PASSWD_PLAIN': "#{ENV.fetch('PASSWD_PLAIN', 'abcd0123')}"}
     s.inline = "sh /root/scripts/#{RUNSCRIPT_ARGS[0]}"
     s.args = RUNSCRIPT_ARGS[1..-1]
   end

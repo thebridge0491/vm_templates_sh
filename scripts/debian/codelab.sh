@@ -34,7 +34,11 @@ fi
 if [ -z "$(grep '^export JAVAFX_HOME' /etc/bash.bashrc)" ] ; then
   echo "export JAVAFX_HOME=${default_javafx_home}" >> /etc/bash.bashrc ;
 fi
+#update-alternatives --get-selections
 #update-alternatives --config [java | javac | jar | javadoc | javap | jdb | keytool]
+# or
+#update-java-alternatives --list
+#update-java-alternatives --set java-[11]-openjdk-[amd64]
 
 echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
 for pkgX in xauth xterm ; do

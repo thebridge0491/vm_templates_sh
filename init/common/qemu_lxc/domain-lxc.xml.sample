@@ -1,5 +1,5 @@
 <domain type='lxc'>
-  <name>devuan-boxe0000</name>
+  <name>debian-boxe0000</name>
   <!--<uuid>64ea5cd9-2311-4c9a-bd31-c3f985298eb9</uuid>-->
   <memory unit='KiB'>786432</memory>
   <currentMemory unit='KiB'>786432</currentMemory>
@@ -26,7 +26,7 @@
       <target dir='/media/9p_Data0'/>
     </filesystem>
     <filesystem type='mount' accessmode='mapped'>
-      <source dir='/home/packer/.local/share/lxc/devuan-boxe0000/rootfs'/>
+      <source dir='/home/packer/.local/share/lxc/debian-boxe0000/rootfs'/>
       <target dir='/'/>
     </filesystem>
     <interface type='network'>

@@ -17,6 +17,8 @@ mkdir -p ${default_java_home}
 if [ -z "$(grep '^JAVA_VERSION' ${default_java_home}/release)" ] ; then
   echo JAVA_VERSION="${default_java_version}" >> ${default_java_home}/release ;
 fi
+#update-alternatives --get-selections
+#update-alternatives --config [java | javac | jar | javadoc | javap | jdb | keytool]
 
 #dbus-uuidgen --ensure[=/etc/machine-id]
 if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
@@ -81,8 +83,8 @@ sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
 cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
 cp -R /root/init/common/skel/_ssh/* /etc/skel/.ssh/
 cp -R /root/init/common/skel/_pki/* /etc/skel/.pki/
-cp /root/init/common/skel/_gitconfig /etc/skel/.gitconfig
-cp /root/init/common/skel/_hgrc /etc/skel/.hgrc
+cp /root/init/common/skel/_gitconfig.sample /etc/skel/.gitconfig
+cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
 
 sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
 sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
