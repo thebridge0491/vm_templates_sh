@@ -21,7 +21,7 @@
     ],
 
     "boot_wait": "5s",
-    "ssh_timeout": "2h45m",
+    "ssh_timeout": "4h45m",
     "ssh_username": "packer",
     "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
@@ -38,8 +38,8 @@
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
       "<wait10><wait10><wait10><wait10><wait10><wait10>",
-      "<enter>devuan<enter>devuan<enter>sudo su<enter> sleep 3 ; . /etc/os-release ; mount -o remount,size=1G /run/live/overlay ; df -h ; sleep 5 ; sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list ; apt-get --yes update --allow-releaseinfo-change ; apt-get --yes install gdisk lvm2 btrfs-progs {{user `foreign_pkgmgr`}} ; ",
-      "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then . /etc/os-release ; sed -i 's|^#deb|deb|g' /etc/apt/sources.list ; apt-get --yes update ; apt-get --yes install --no-install-recommends linux-headers-$(uname -r) ; echo '(in another terminal - need interactive response)' manually enter \"apt-get --yes install -t ${VERSION_CODENAME/ */}-backports --no-install-recommends zfs-dkms\" within 2 minutes ; sleep 600 ; apt-get --yes install -t ${VERSION_CODENAME/ */}-backports --no-install-recommends zfsutils-linux ; fi ; ",
+      "<enter>devuan<enter>devuan<enter>sudo su<enter>ip link ; sleep 3 ; dhcpcd eth0 ; dhclient eth0 ; systemctl stop ssh ; systemctl status ssh ; invoke-rc.d ssh stop ; invoke-rc.d ssh status<enter>sleep 3 ; . /etc/os-release ; mount -o remount,size=1G /run/live/overlay ; df -h ; sleep 5 ; sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list ; apt-get --yes update --allow-releaseinfo-change ; apt-get --yes install gdisk lvm2 btrfs-progs {{user `foreign_pkgmgr`}} ; ",
+      "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then . /etc/os-release ; sed -i 's|^#deb|deb|g' /etc/apt/sources.list ; apt-get --yes update ; apt-get --yes install --no-install-recommends linux-headers-$(uname -r) ; apt-get --yes install -t ${VERSION_CODENAME/ */}-backports --no-install-recommends zfs-dkms ; sleep 600 ; apt-get --yes install -t ${VERSION_CODENAME/ */}-backports --no-install-recommends zfsutils-linux ; fi ; ",
       "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; env MKFS_CMD={{user `mkfs_cmd`}} sh -x /tmp/disk_setup.sh part_format sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} service_mgr={{user `service_mgr`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
     ]
   },
@@ -105,7 +105,7 @@
     ],
 
     "boot_wait": "5s",
-    "ssh_timeout": "2h45m",
+    "ssh_timeout": "4h45m",
     "ssh_username": "packer",
     "ssh_password": "{{user `passwd_plain`}}",
     "headless": "{{user `headless`}}",
@@ -269,9 +269,9 @@
     "iso_url_mirror_x64": "https://mirror.math.princeton.edu/pub/devuan",
     "iso_url_directory_x64": "devuan_chimaera/installer-iso",
     "iso_name_x64": "devuan_chimaera_4.0.0_amd64_netinstall",
-    "isolive_url_directory": "devuan_chimaera/desktop-live",
-    "isolive_name_x64": "live/devuan_chimaera_4.0.2_amd64_desktop-live",
-    "isolive_cdlabel_x64": "devuan_chimaera_4.0.2_amd64_desktop-live",
+    "isolive_url_directory": "devuan_chimaera/minimal-live",
+    "isolive_name_x64": "live/devuan_chimaera_4.0.2_amd64_minimal-live",
+    "isolive_cdlabel_x64": "devuan_chimaera_4.0.2_amd64_minimal-live",
 
     "_iso_url_mirror_aa64_debian": "https://mirror.math.princeton.edu/pub/debian-cd",
     "_iso_url_directory_aa64_debian": "current/arm64/iso-cd",

@@ -56,11 +56,11 @@ EOF
 
 echo "Bootstrap base pkgs" ; sleep 3
 if command -v apk > /dev/null ; then
-  apk --arch ${UNAME_M} --repository http://${MIRROR}/${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
+  apk --arch ${UNAME_M} --repository http://${MIRROR}/${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata ;
 else
   curl -LO http://dl-cdn.alpinelinux.org/alpine/latest-stable/main/${UNAME_M}/apk-tools-static-${apktools_ver:-2.12.10-r1}.apk ;
   tar -xf apk-tools-static-*.apk ;
-  ./sbin/apk.static --arch ${UNAME_M} --repository http://${MIRROR}/${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata sudo ;
+  ./sbin/apk.static --arch ${UNAME_M} --repository http://${MIRROR}/${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add alpine-base tzdata ;
 fi
 
 

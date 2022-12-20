@@ -34,7 +34,7 @@
     "iso_url": "",
     "iso_urls": ["file://{{user `isos_pardir`}}/artix/{{user `iso_name_x64`}}.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name_x64`}}.iso"],
     "boot_command": [
-      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10>artix<enter>artix<enter><wait10>sudo su<enter><wait>systemctl stop sshd ; mount -o remount,size=1G /run/artix/cowspace ; mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5 ; pacman -Sy ; sleep 3 ; pacman -Sy --needed --noconfirm gnu-netcat parted glibc dosfstools gptfdisk lvm2 btrfs-progs {{user `foreign_pkgmgr`}} ; sleep 5 ; ",
+      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10>artix<enter>artix<enter><wait10>sudo su<enter><wait>systemctl stop sshd ; rc-service sshd stop ; sv down sshd ; mount -o remount,size=1G /run/artix/cowspace ; mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5 ; pacman -Sy ; sleep 3 ; pacman -Sy --needed --noconfirm gnu-netcat parted glibc dosfstools gptfdisk lvm2 btrfs-progs {{user `foreign_pkgmgr`}} ; sleep 5 ; ",
       "cd /tmp ; curl -o /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; curl -o /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; curl -o /tmp/repo_archzfs.cfg 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/repo_archzfs.cfg' ; ",
       "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then cat /tmp/repo_archzfs.cfg >> /etc/pacman.conf ; curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg ; pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76 ; pacman -Sy --noconfirm zfs-dkms ; pacman -Sy --noconfirm zfs-utils ; sleep 5 ; fi ; ",
       "mv /etc/pacman.conf /etc/pacman.conf.old ; env MKFS_CMD={{user `mkfs_cmd`}} sh -x /tmp/disk_setup.sh part_format sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} service_mgr={{user `service_mgr`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
@@ -75,9 +75,9 @@
     "iso_url": "",
     "iso_urls": ["file://{{user `isos_pardir`}}/artix/{{user `iso_name_x64`}}.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name_x64`}}.iso"],
     "boot_command": [
-      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10>artix<enter>artix<enter><wait10>sudo su<enter><wait>systemctl stop sshd ; mount -o remount,size=1G /run/artix/cowspace ; mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5 ; pacman -Sy ; sleep 3 ; pacman -Sy --needed --noconfirm gnu-netcat parted glibc dosfstools gptfdisk lvm2 btrfs-progs {{user `foreign_pkgmgr`}} ; sleep 5 ; ",
-      "cd /tmp ; curl -o /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; curl -o /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; curl -o /tmp/repo_archzfs.cfg 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/repo_archzfs.cfg' ; ",
-      "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then cat /tmp/repo_archzfs.cfg >> /etc/pacman.conf ; curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg ; pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76 ; pacman -Sy --noconfirm zfs-dkms ; pacman -Sy --noconfirm zfs-utils ; sleep 5 ; fi ; ",
+      "<wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10><wait10>artix<enter>artix<enter><wait10>sudo su<enter><wait>systemctl stop sshd ; rc-service sshd stop ; sv down sshd ; mount -o remount,size=1G /run/artix/cowspace ; mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5 ; curl -o /tmp/repo_archzfs.cfg 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/repo_archzfs.cfg' ; cat /tmp/repo_archzfs.cfg >> /etc/pacman.conf ; curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg ; pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76 ; pacman -Sy ; sleep 3 ; pacman -Sy --needed --noconfirm gnu-netcat parted glibc dosfstools gptfdisk lvm2 btrfs-progs {{user `foreign_pkgmgr`}} ; sleep 5 ; ",
+      "cd /tmp ; curl -o /tmp/disk_setup.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup_vmlinux.sh' ; curl -o /tmp/install.sh 'http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh' ; ",
+      "if [ 'zfs' = '{{user `vol_mgr`}}' ] ; then pacman -Sy --needed --noconfirm zfs-dkms zfs-utils ; sleep 5 ; fi ; ",
       "mv /etc/pacman.conf /etc/pacman.conf.old ; env MKFS_CMD={{user `mkfs_cmd`}} sh -x /tmp/disk_setup.sh part_format sgdisk {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} service_mgr={{user `service_mgr`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
     ]
   }],
@@ -186,7 +186,8 @@
     "_iso_name_x64_archlinux": "archlinux-2022.12.01-x86_64",
     "iso_url_mirror": "https://iso.artixlinux.org",
     "iso_url_directory": "artix",
-    "iso_name_x64": "artix-base-runit-20220713-x86_64",
+    "_iso_name_x64": "artix-base-runit-20220713-x86_64",
+    "iso_name_x64": "artix-rescue-runit-20221220-x86_64",
 
     "firmware_qemu_x64": "/usr/share/OVMF/OVMF_CODE.fd",
     "disk_size": "30720",

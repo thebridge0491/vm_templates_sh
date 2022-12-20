@@ -1,0 +1,94 @@
+notes on custom iso (Void mklive, Artix buildiso, Alpine mkimage)
+
+Void mklive
+-----------
+
+# (initial) (dependencies: liblz4, xbps>=0.45, git, qemu-user-static)
+# (initial) git clone https://github.com/void-linux/void-mklive.git
+# (initial) cd void-mklive ; make
+
+# (update repo) git pull [; make]
+# sudo ./mklive.sh -S "sshd dhcpcd wpa_supplicant acpid" -p "dialog cryptsetup
+#     lvm2 mdadm void-docs-browse xtools-minimal linux-headers zfs"
+#     [-o void-rescue-x86_64-<kernel_ver>-YYYYMMDD.iso]
+
+
+Artix buildiso
+--------------
+
+# (initial) sudo modprobe loop ; sudo pacman -Sy artools iso-profiles
+# (initial) buildiso -p base -q
+# (initial) cp /etc/artools/artools-*.conf $HOME/.config/artools/
+#           echo INITSYS=\"runit\" >> $HOME/.config/artools/artools-iso.conf
+# (initial) cp -a /usr/share/artools/iso-profiles $HOME/artools-workspace/
+#           // modify copied iso-profiles folder to customise iso
+# (initial) buildiso -p base -q // test the output
+
+# buildiso -p base -x
+
+# // enter chroot to add packages/configure
+# artix-chroot /var/lib/artools/buildiso/base/artix/rootfs
+# // init keyring, add packages(zfs, etc) in chroot, xfer repo_archzfs.cfg
+# pacman-key --init ; pacman -Sy --noconfirm artix-keyring
+# pacman -U --noconfirm `ls /var/cache/pacman/pkg/artix-keyring*`
+# pacman-key --populate artix
+# pacman -S --needed artix-grub-live
+# cat repo_archzfs.cfg >> /etc/pacman.conf
+# curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg
+# pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
+# pacman -S --needed linux-headers zfs-dkms zfs-utils
+# exit
+
+# buildiso -p base -sc
+# buildiso -p base -bc
+# buildiso -p base -zc
+# // $HOME/artools-workspace/iso/base/artix-base-runit-YYYYMMDD-x86_64.iso
+
+
+Alpine (aports) mkimage
+-----------------------
+
+# (initial) (dependencies: alpine-sdk build-base apk-tools alpine-conf busybox
+#     fakeroot xorriso squashfs-tools sudo mtools dosfstools grub-efi git zfs)
+# (initial) usermod -a -G abuild <user> // OR adduser build -G abuild
+#     echo "%abuild ALL=(ALL) ALL" > /etc/sudoers.d/abuild
+#     apk update ; su - <user> // OR su - build
+#     abuild-keygen -i -a // create/add <user> RSA key to abuild keys
+#     ls /etc/apk/keys // ensure pub key of <user> is present
+# (initial) git clone --depth=1 https://gitlab.alpinelinux.org/alpine/aports.git
+#     //create/edit aports/scripts/{mkimg.<profile>.sh,genapkovl-<profile>.sh}
+#   ex: aports/scripts/mkimg.rescue.sh
+#   ----------------------------------
+#    profile_rescue() {
+#        profile_standard
+#        kernel_cmdline="unionfs_size=512M console=tty0 console=ttyS0,115200"
+#        syslinux_serial="0 115200"
+#        kernel_addons="zfs"
+#        apks="$apks
+#            iscsi-scst zfs-scripts zfs zfs-utils-py
+#            cciss_vol_status lvm2 mdadm mkinitfs mtools nfs-utils
+#            parted rsync sfdisk util-linux xfsprogs dosfstools ntfs-3g
+#            "
+#            # if x86_64, add syslinux
+#
+#        local _k _a
+#        for _k in $kernel_flavors; do
+#            apks="$apks linux-$_k"
+#            for _a in $kernel_addons; do
+#                apks="$apks $_a-$_k"
+#            done
+#        done
+#        apks="$apks linux-firmware linux-firmware-none"
+#    }
+#
+#   chmod +x aports/scripts/mkimg.rescue.sh
+#   cp aports/scripts/genapkovl-dhcp.sh aports/scripts/genapkovl-rescue.sh
+#   // for /etc/apk/world, add zfs on separate line after alpine-base
+#   sed -i '/alpine-base/a \
+#   zfs
+#   ' aports/scripts/genapkovl-rescue.sh
+
+# mkdir alpine-mkimage ; touch .default_boot_services
+# apkovl=genapkovl-<rescue>.sh sh aports/scripts/mkimage.sh --tag <3.17.0>
+#    --repository http://dl-cdn.alpinelinux.org/alpine/latest-stable/main
+#    --outdir alpine-mkimage --profile <rescue> --arch <x86_64>

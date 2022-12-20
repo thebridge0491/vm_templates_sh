@@ -30,7 +30,7 @@
     "shutdown_command": "sudo shutdown -hP +3 || sudo poweroff",
     "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
-    "iso_checksum": "file:file://{{user `isos_pardir`}}/voidlinux/sha256.txt",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/voidlinux/sha256sum.txt",
     "iso_url": "",
     "iso_urls": ["file://{{user `isos_pardir`}}/voidlinux/{{user `iso_name_x64`}}.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name_x64`}}.iso"],
     "boot_command": [
@@ -70,7 +70,7 @@
     "shutdown_command": "sudo shutdown -hP +3 || sudo poweroff",
     "output_directory": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}",
 
-    "iso_checksum": "file:file://{{user `isos_pardir`}}/voidlinux/sha256.txt",
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/voidlinux/sha256sum.txt",
     "iso_url": "",
     "iso_urls": ["file://{{user `isos_pardir`}}/voidlinux/{{user `iso_name_x64`}}.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_name_x64`}}.iso"],
     "boot_command": [
@@ -181,7 +181,9 @@
     "repo_host": "mirror.clarkson.edu/voidlinux",
     "iso_url_mirror": "https://mirror.clarkson.edu/voidlinux",
     "iso_url_directory": "live/20221001",
-    "iso_name_x64": "void-live-x86_64-20221001-base",
+    "_iso_name_x64": "void-live-x86_64-20221001-base",
+    "_iso_name_x64": "hrmpf-x86_64-5.15.11_1-20211227",
+    "iso_name_x64": "void-rescue-x86_64-6.0.13_1-20221218",
 
     "firmware_qemu_x64": "/usr/share/OVMF/OVMF_CODE.fd",
     "disk_size": "30720",

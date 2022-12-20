@@ -236,7 +236,8 @@ freebsd_aarch64() {
 
   #sudo su ; . /etc/os-release
   #ip link ; [networkctl status ; networkctl up {ifdev}]
-  #[dhcpcd {ifdev}]
+  #[dhcpcd {ifdev} ; dhclient {ifdev}]
+  #systemctl stop ssh ; invoke-rc.d ssh stop
   #mount -o remount,size=1G /run/live/overlay ; df -h ; sleep 5
   #sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
   #apt-get --yes update --allow-releaseinfo-change
@@ -258,7 +259,7 @@ debian_x86_64() {
   GUEST=${1:-${variant}-x86_64-std}
   #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/live -name 'debian-live-*-amd64*.iso' | tail -n1)}
   #(cd ${ISOS_PARDIR}/debian/live ; sha256sum --ignore-missing -c SHA256SUMS)
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/devuan/live -name 'devuan_*_amd64_desktop-live.iso' | tail -n1)}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/devuan/live -name 'devuan_*_amd64_minimal-live.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/devuan/live ; sha256sum --ignore-missing -c SHA256SUMS.txt)
 
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
@@ -283,8 +284,10 @@ debian_x86_64() {
 
 void_x86_64() {
   variant=${variant:-void} ; GUEST=${1:-${variant}-x86_64-std}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'void-live-x86_64-*.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/voidlinux ; sha256sum --ignore-missing -c sha256.txt)
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'void-live-x86_64-*.iso' | tail -n1)}
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'hrmpf-x86_64-*.iso' | tail -n1)}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/voidlinux -name 'void-rescue-x86_64-*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/voidlinux ; sha256sum --ignore-missing -c sha256sum.txt)
 
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64
 }
@@ -307,16 +310,15 @@ void_x86_64() {
   #(artix) pacman-key --init ; pacman -Sy artix-keyring
   #(artix) pacman-key --populate artix
   #(arch|artix) sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf
-  #(artix) pacman -Sy gnu-netcat parted dosfstools gptfdisk [lvm2 btrfs-progs]
-  #[pacman -Sy debootstrap]
-
-  #------------ if using ZFS ---------------
   ## NOTE, transfer archzfs config file: init/archlinux/repo_archzfs.cfg
   #cat init/archlinux/repo_archzfs.cfg >> /etc/pacman.conf
   #curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg
   #pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
+  #(artix) pacman -Sy --needed gnu-netcat parted dosfstools gptfdisk [lvm2 btrfs-progs]
+  #[pacman -Sy debootstrap]
 
-  #pacman -Sy linux-headers zfs-dkms ; pacman -Sy --needed zfs-utils
+  #------------ if using ZFS ---------------
+  #pacman -Sy --needed linux-headers zfs-dkms zfs-utils
   ##--- (arch) or retrieve archived zfs-linux package instead of zfs-dkms ---
   ## Note, xfer archived zfs-linux package matching kernel (uname -r)
   ## example kernelver -> 5.7.11-arch1-1 becomes 5.7.11.arch1.1-1
@@ -332,7 +334,8 @@ archlinux_x86_64() {
   GUEST=${1:-${variant}-x86_64-std}
   #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'archlinux-*.iso' | tail -n1)}
   #(cd ${ISOS_PARDIR}/archlinux ; sha1sum --ignore-missing -c sha1sums.txt)
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/artix -name 'artix-*-runit-*.iso' | tail -n1)}
+  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/artix -name 'artix-base-runit-*.iso' | tail -n1)}
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/artix -name 'artix-rescue-runit-*.iso' | tail -n1)}
   (cd ${ISOS_PARDIR}/artix ; sha256sum --ignore-missing -c sha256sums)
 
   sleep 5 ; _prep ; sleep 3 ; _install_x86_64

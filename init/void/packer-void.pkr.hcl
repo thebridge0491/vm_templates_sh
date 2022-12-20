@@ -47,7 +47,9 @@ variable "init_hostname" {
 
 variable "iso_name_x64" {
   type    = string
-  default = "void-live-x86_64-20221001-base"
+  #default = "void-live-x86_64-20221001-base"
+  #default = "hrmpf-x86_64-5.15.11_1-20211227"
+  default = "void-rescue-x86_64-6.0.13_1-20221218"
 }
 
 variable "iso_url_directory" {
@@ -118,7 +120,7 @@ source "qemu" "qemu_x86_64" {
   disk_size          = "${var.disk_size}"
   headless           = "${var.headless}"
   http_directory     = "init"
-  iso_checksum       = "file:file://${var.isos_pardir}/voidlinux/sha256.txt"
+  iso_checksum       = "file:file://${var.isos_pardir}/voidlinux/sha256sum.txt"
   iso_url            = ""
   iso_urls           = ["file://${var.isos_pardir}/voidlinux/${var.iso_name_x64}.iso","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_x64}.iso"]
   machine_type       = "q35"
@@ -142,7 +144,7 @@ source "virtualbox-iso" "virtualbox_x86_64" {
   hard_drive_interface = "sata"
   headless             = "${var.headless}"
   http_directory       = "init"
-  iso_checksum         = "file:file://${var.isos_pardir}/voidlinux/sha256.txt"
+  iso_checksum         = "file:file://${var.isos_pardir}/voidlinux/sha256sum.txt"
   iso_interface        = "sata"
   iso_url              = ""
   iso_urls             = ["file://${var.isos_pardir}/voidlinux/${var.iso_name_x64}.iso","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_x64}.iso"]
