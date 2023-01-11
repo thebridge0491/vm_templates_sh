@@ -1,4 +1,4 @@
-# usage: (export mypass=$(python -c 'import getpass ; print(getpass.getpass())') ; packer init <dir>[/template.pkr.hcl] ; packer build -var passwd_plain=${mypass} -var passwd_crypted=$(python -c 'import os,crypt ; print(crypt.crypt(os.getenv("mypass"), "$6$16CHARACTERSSALT"))') -only=[qemu.qemu_x86_64|qemu.qemu_aarch64|virtualbox-iso.virtualbox_x86_64] <dir>[/template.pkr.hcl])
+# usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
 variable "REL" {
   type    = string
@@ -17,7 +17,7 @@ variable "boot_cmdln_options" {
 
 variable "disk_size" {
   type    = string
-  default = "30720"
+  default = "30720M"
 }
 
 variable "firmware_qemu_aa64" {
@@ -72,19 +72,29 @@ variable "isos_pardir" {
 
 variable "passwd_crypted" {
   type    = string
-  default = "$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91"
+  default = "$6$16CHARACTERSSALT$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1"
   sensitive = true
 }
 
 variable "passwd_plain" {
   type    = string
-  default = "abcd0123"
+  default = "packer"
   sensitive = true
+}
+
+variable "qemunet_bridge" {
+  type    = string
+  default = "br0"
 }
 
 variable "variant" {
   type    = string
   default = "openbsd"
+}
+
+variable "vboxguest_ostype" {
+  type    = string
+  default = "OpenBSD_64"
 }
 
 variable "vol_mgr" {
@@ -97,10 +107,11 @@ locals {
   #datestamp       = "${legacy_isotime("2006.01.02")}"
   build_timestamp  = "${formatdate("YYYY.MM", timestamp())}"
   datestamp        = "${formatdate("YYYY.MM.DD", timestamp())}"
+  mac_last3          = "${formatdate("hh:mm:ss", timestamp())}"
 }
 
 source "qemu" "qemu_aarch64" {
-  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>dhclient vio0<enter><wait>", "ftp -o /tmp/custom.disklabel http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/custom.disklabel ; ftp -o /tmp/install.resp http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/install.resp ; ftp -o /tmp/autoinstall.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"]
+  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>dhclient vio0 ; ifconfig vio0 inet autoconf<enter><wait>", "ftp -o /tmp/custom.disklabel http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/custom.disklabel ; ftp -o /tmp/install.resp http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/install.resp ; ftp -o /tmp/autoinstall.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"]
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -113,10 +124,11 @@ source "qemu" "qemu_aarch64" {
   iso_url            = ""
   iso_urls           = ["file://${var.isos_pardir}/openbsd/${var.iso_name_aa64}.img","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_aa64}.img"]
   machine_type       = "virt"
+  net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-aarch64-${var.vol_mgr}"
   qemu_binary        = "qemu-system-aarch64"
-  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{ .Name }}"], ["-device", "virtio-net,netdev=user.0"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"]]
-  shutdown_command   = "shutdown -p +3 || poweroff"
+  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{ .Name }}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"]]
+  shutdown_command   = "/sbin/shutdown -p +3 || /sbin/poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"
   ssh_username       = "root"
@@ -124,7 +136,10 @@ source "qemu" "qemu_aarch64" {
 }
 
 source "qemu" "qemu_x86_64" {
-  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>dhclient vio0<enter><wait>", "ftp -o /tmp/custom.disklabel http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/custom.disklabel ; ftp -o /tmp/install.resp http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/install.resp ; ftp -o /tmp/autoinstall.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"]
+  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>dhclient vio0 ; ifconfig vio0 inet autoconf<enter><wait>", "ftp -o /tmp/custom.disklabel http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/custom.disklabel ; ftp -o /tmp/install.resp http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/install.resp ; ftp -o /tmp/autoinstall.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"]
+
+  #boot_command         = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>", "mount_mfs -s 100m md1 /tmp ; mount_mfs -s 100m md2 /mnt ; mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; dhclient -L /tmp/dhclient.lease.em0 em0 ; dhclient -L /tmp/dhclient.lease.vio0 vio0 ; ifconfig em0 inet autoconf ; ifconfig vio0 inet autoconf ; cd /tmp ; ftp -o /tmp/custom.disklabel http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/custom.disklabel ; ftp -o /tmp/disk_setup.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/disklabel_setup_vmopenbsd.sh ; ftp -o /tmp/install.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/${var.vol_mgr}-install.sh ; (cd /dev ; sh MAKEDEV sd0) ; sh -x /tmp/disk_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems<enter><wait10><wait10><wait10>env REL=${var.REL} sh -x /tmp/install.sh ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -133,49 +148,26 @@ source "qemu" "qemu_x86_64" {
   disk_size          = "${var.disk_size}"
   headless           = "${var.headless}"
   http_directory     = "init"
-  iso_checksum       = "file:file://${var.isos_pardir}/openbsd/amd64/SHA256"
+  #iso_checksum       = "file:file://${var.isos_pardir}/openbsd/amd64/SHA256"
+  iso_checksum       = "none"
   iso_url            = ""
   iso_urls           = ["file://${var.isos_pardir}/openbsd/${var.iso_name_x64}.img","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_x64}.img"]
   machine_type       = "pc"
+  net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{ .Name }}"], ["-device", "virtio-net,netdev=user.0"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-display", "gtk,show-cursor=on"], ["-vga", "cirrus"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"]]
-  shutdown_command   = "shutdown -p +3 || poweroff"
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{ .Name }}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-display", "gtk,show-cursor=on"], ["-vga", "cirrus"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"]]
+  shutdown_command   = "/sbin/shutdown -p +3 || /sbin/poweroff"
   ssh_password       = "${var.passwd_plain}"
-  ssh_timeout        = "2h45m"
+  ssh_timeout        = "4h45m"
   ssh_username       = "root"
   vm_name            = "${var.variant}-x86_64-${var.vol_mgr}"
 }
 
-source "virtualbox-iso" "virtualbox_x86_64" {
-  boot_command         = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>", "mount_mfs -s 100m md1 /tmp ; mount_mfs -s 100m md2 /mnt ; mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; dhclient -L /tmp/dhclient.lease.em0 em0 ; dhclient -L /tmp/dhclient.lease.vio0 vio0 ; cd /tmp ; ftp -o /tmp/custom.disklabel http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/custom.disklabel ; ftp -o /tmp/disk_setup.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/disklabel_setup_vmopenbsd.sh ; ftp -o /tmp/install.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/${var.vol_mgr}-install.sh ; (cd /dev ; sh MAKEDEV sd0) ; sh -x /tmp/disk_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems<enter><wait10><wait10><wait10>env REL=${var.REL} sh -x /tmp/install.sh ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
-  boot_wait            = "10s"
-  disk_image           = "true"
-  disk_size            = "${var.disk_size}"
-  format               = "ova"
-  guest_additions_mode = "disable"
-  guest_additions_path = "VBoxGuestAdditions_{{ .Version }}.iso"
-  guest_os_type        = "OpenBSD_64"
-  hard_drive_interface = "sata"
-  headless             = "${var.headless}"
-  http_directory       = "init"
-  iso_checksum         = "file:file://${var.isos_pardir}/openbsd/amd64/SHA256"
-  iso_interface        = "sata"
-  iso_url              = ""
-  iso_urls             = ["file://${var.isos_pardir}/openbsd/${var.iso_name_x64}.img","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_x64}.img"]
-  output_directory     = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  shutdown_command     = "shutdown -p +3 || poweroff"
-  ssh_password         = "${var.passwd_plain}"
-  ssh_timeout          = "2h45m"
-  ssh_username         = "root"
-  vboxmanage           = [["storagectl", "{{ .Name }}", "--name", "SCSI Controller", "--add", "scsi", "--bootable", "on"], ["modifyvm", "{{ .Name }}", "--firmware", "bios", "--nictype1", "virtio", "--memory", "2048", "--vram", "64", "--rtcuseutc", "on", "--cpus", "2", "--clipboard", "bidirectional", "--draganddrop", "bidirectional", "--accelerate3d", "on", "--groups", "/init_vm"]]
-  vm_name              = "${var.variant}-x86_64-${var.vol_mgr}"
-}
-
 build {
-  sources = ["source.qemu.qemu_aarch64", "source.qemu.qemu_x86_64", "source.virtualbox-iso.virtualbox_x86_64"]
+  sources = ["source.qemu.qemu_aarch64", "source.qemu.qemu_x86_64"]
 
   provisioner "shell-local" {
-    inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls", "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/", "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/", "tar -cf /tmp/scripts.tar init/common init/${var.variant} -C scripts ${var.variant}"]
+    inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls", "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/", "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/", "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
   }
 
   provisioner "shell-local" {
@@ -191,7 +183,7 @@ build {
   provisioner "file" {
     destination = "/tmp/scripts.tar"
     generated   = true
-    source      = "/tmp/scripts.tar"
+    source      = "/tmp/scripts_${var.variant}.tar"
   }
 
   provisioner "shell" {
@@ -209,12 +201,12 @@ build {
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
     execute_command  = "chmod +x {{ .Path }} ; env {{ .Vars }} sh -c {{ .Path }}"
-    only             = ["virtualbox-iso.virtualbox_x86_64"]
+    except           = ["qemu.qemu_x86_64", "qemu.qemu_aarch64"]
     scripts          = ["init/common/bsd/zerofill.sh"]
   }
 
   post-processor "checksum" {
-    checksum_types = ["md5", "sha256"]
+    checksum_types = ["sha256"]
     only           = ["qemu.qemu_x86_64"]
     output         = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}.{{ .BuilderType }}.{{ .ChecksumType }}"
   }
@@ -230,7 +222,7 @@ build {
     only   = ["qemu.qemu_x86_64"]
   }
   post-processor "checksum" {
-    checksum_types = ["md5", "sha256"]
+    checksum_types = ["sha256"]
     only           = ["qemu.qemu_aarch64"]
     output         = "output-vms/${var.variant}-aarch64-${var.vol_mgr}/${var.variant}-aarch64-${var.vol_mgr}.{{ .BuilderType }}.{{ .ChecksumType }}"
   }

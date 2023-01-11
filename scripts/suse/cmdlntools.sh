@@ -38,6 +38,21 @@ if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
 	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|" \
 		/etc/sysconfig/network ;
 fi
+if [ ! -e /etc/systemd/system/machineid-save.service ] ; then
+  cat << EOF > /etc/systemd/system/machineid-save.service ;
+[Unit]
+Before=network.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/dbus-uuidgen --ensure
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+
+EOF
+fi
+systemctl enable machineid-save.service ;
+
 
 ntpd -u ntp:ntp ; ntpq -p ; sleep 3
 systemctl enable ntpd.service

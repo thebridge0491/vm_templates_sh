@@ -7,9 +7,9 @@
 #sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
 #sh /tmp/disk_setup.sh mount_filesystems std vg0
 
-# passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
+# passwd crypted hash: [md5|sha256|sha512|yescrypt] - [$1|$5|$6|$y$j9T]$...
 # stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
-# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# stty -echo ; perl -le 'print STDERR "Password:\n" ; $_=<STDIN> ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT")' ; stty echo
 # ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
 # python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
@@ -21,13 +21,13 @@ elif [ -e /dev/sda ] ; then
 fi
 
 export GRP_NM=${GRP_NM:-vg0}
-# (x86_64) mirror.clarkson.edu/voidlinux/current
-# (aarch64) mirror.clarkson.edu/voidlinux/current/aarch64
-export MIRROR=${MIRROR:-mirror.clarkson.edu/voidlinux} ; UNAME_M=$(uname -m)
+# (x86_64) repo-default.voidlinux.org/current
+# (aarch64) repo-default.voidlinux.org/current/aarch64
+export MIRROR=${MIRROR:-repo-default.voidlinux.org} ; UNAME_M=$(uname -m)
 
 export INIT_HOSTNAME=${1:-void-boxv0000}
-#export PASSWD_PLAIN=${2:-abcd0123}
-export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+#export PASSWD_PLAIN=${2:-packer}
+export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
 
 echo "Create /etc/fstab" ; sleep 3

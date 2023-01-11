@@ -7,9 +7,9 @@
 #sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
 #sh /tmp/disk_setup.sh mount_filesystems std vg0
 
-# passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
+# passwd crypted hash: [md5|sha256|sha512|yescrypt] - [$1|$5|$6|$y$j9T]$...
 # stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
-# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# stty -echo ; perl -le 'print STDERR "Password:\n" ; $_=<STDIN> ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT")' ; stty echo
 # ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
 # python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
@@ -24,8 +24,8 @@ export MIRROR=${MIRROR:-dl-cdn.alpinelinux.org/alpine} ; UNAME_M=$(uname -m)
 RELEASE=${RELEASE:-latest-stable}
 
 export INIT_HOSTNAME=${1:-alpine-boxv0000}
-#export PASSWD_PLAIN=${2:-abcd0123}
-export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+#export PASSWD_PLAIN=${2:-packer}
+export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
 
 echo "Create /etc/fstab" ; sleep 3
@@ -100,7 +100,7 @@ cat /etc/apk/repositories ; sleep 5
 
 
 echo "Add software package selection(s)" ; sleep 3
-apk --arch ${UNAME_M} add tzdata sudo linux-lts linux-lts-dev dosfstools e2fsprogs xfsprogs mkinitfs dhcp bash util-linux shadow openssh grub-efi efibootmgr multipath-tools cryptsetup
+apk --arch ${UNAME_M} add tzdata sudo mkpasswd linux-lts linux-lts-dev dosfstools e2fsprogs xfsprogs mkinitfs dhcp bash util-linux shadow openssh grub-efi efibootmgr multipath-tools cryptsetup
 #apk --arch ${UNAME_M} add xfce4
 if [ "x86_64" = "${UNAME_M}" ] ; then
   apk --arch ${UNAME_M} add grub-bios
@@ -220,6 +220,9 @@ else
   efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
 fi
 efibootmgr -v ; sleep 3
+
+
+mkpasswd -m help ; sleep 10
 
 
 apk --arch ${UNAME_M} -v cache clean

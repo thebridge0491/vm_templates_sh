@@ -4,8 +4,13 @@
   <memory unit='KiB'>2097152</memory>
   <currentMemory unit='KiB'>2097152</currentMemory>
   <vcpu placement='static'>2</vcpu>
+  <cpu match='minimum'>
+    <!--<model fallback='allow'>SandyBridge</model>-->
+    <model>SandyBridge</model>
+  </cpu>
   <os>
-    <type arch='x86_64' machine='pc-i440fx-2.8'>hvm</type>
+    <!--<type arch='x86_64' machine='pc-[i440fx|q35]-7.1'>hvm</type>-->
+    <type arch='x86_64' machine='q35'>hvm</type>
     <loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.fd</loader>
     <nvram>/var/lib/libvirt/qemu/nvram/freebsd-x86_64-zfs_VARS.fd</nvram>
     <boot dev='hd'/>

@@ -28,6 +28,15 @@ if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
 	echo "${NAME}" > /etc/hostname ;
 	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|g" /etc/hosts ;
 fi
+if [ -z "$(grep -e 'dbus-uuidgen --ensure' /etc/local.d/machineid-save.start)" ] ; then
+  #echo dbus-uuidgen --ensure=/var/lib/dbus/machine-id >> \
+  #  /etc/local.d/machineid-save.start ;
+  echo dbus-uuidgen --ensure=/etc/machine-id >> \
+    /etc/local.d/machineid-save.start ;
+  chmod +x /etc/local.d/machineid-save.start ;
+  rc-update add local default ;
+fi
+
 
 set +e ; set +u
 ntpd -u ntp:ntp ; ntpq -p ; sleep 3

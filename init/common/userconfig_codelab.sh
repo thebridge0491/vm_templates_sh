@@ -10,12 +10,12 @@ LANGS=${@:-py c jvm} ; export LANGS
 
 if grep -q -E "csh" "$SHELL" ; then
   shell_rc=${shell_rc:-$HOME/.cshrc} ;
-elif grep -q -E "sh" "$SHELL" ; then
-  shell_rc=${shell_rc:-$HOME/.shrc} ;
+elif grep -q -E "bash" "$SHELL" ; then
+  shell_rc=${shell_rc:-$HOME/.bashrc} ;
 elif grep -q -E "zsh" "$SHELL" ; then
   shell_rc=${shell_rc:-$HOME/.zshrc} ;
 else
-  shell_rc=${shell_rc:-$HOME/.bashrc} ;
+  shell_rc=${shell_rc:-$HOME/.shrc} ;
 fi
 if command -v bind > /dev/null ; then
   if ! grep -q -E "history.*-search" $HOME/.inputrc ; then
@@ -288,7 +288,7 @@ EOF
 ## wrapper for maven (./mvnw[.cmd], .mvn/wrapper/___.[properties|jar]):
 ##  curl -LO https://repo1.maven.org/maven2/org/apache/maven/wrapper/maven-wrapper-distribution/[3.1.0]/maven-wrapper-distribution-[3.1.0]-bin.zip
 ##  unzip maven-wrapper-distribution-[3.1.0]-bin.zip
-##  cat <<EOF > .mvn/wrapper/maven-wrapper.properties
+##  cat << EOF > .mvn/wrapper/maven-wrapper.properties
 ##  distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/[3.3.9]/apache-maven-[3.3.9]-bin.zip
 ##  wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/[3.1.0]/maven-wrapper-[3.1.0].jar
 ##  EOF
@@ -296,7 +296,7 @@ EOF
 ## ----------------------------------------------
 ## wrapper for gradle (./gradlew[.bat], gradle/wrapper/___.[properties|jar]):
 ##  curl --create-dirs -Lo gradle/wrapper/gradle-wrapper.[properties|jar] https://github.com/gradle/gradle/raw/[master|v6.9.0]/gradle/wrapper/gradle-wrapper.[properties|jar]
-##  java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain wrapper [--gradle-version 6.9.0]
+##  java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain wrapper [--gradle-version 6.9]
 ##  ./gradlew[.bat] help
 ## ----------------------------------------------
 ## wrapper for sbt (./sbtw):
@@ -304,7 +304,7 @@ EOF
 ##  chmod +x ./sbtw ; ./sbtw [-sbt-version 1.5.2] -sbt-create
 ## OR
 ##  java -jar ivy.jar -dependency org.scala-sbt sbt-launch [1.5.2] -retrieve "$HOME/.sbt/launchers/[revision]/[artifact](-[classifier]).[ext]"
-##  echo "java -cp $HOME/.sbt/launchers/[1.5.2]/sbt-launch.jar xsbt.boot.Boot \$@" > sbtw
+##  echo "java -cp \$HOME/.sbt/launchers/[1.5.2]/sbt-launch.jar xsbt.boot.Boot \$@" > sbtw
 ##  chmod +x ./sbtw ; ./sbtw help
 ## ----------------------------------------------
 ## wrapper for leiningen (./leinw):

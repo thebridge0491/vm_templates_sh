@@ -78,6 +78,30 @@ if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
 	echo "${NAME}" > /etc/hostname ;
 	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|g" /etc/hosts ;
 fi
+if command -v systemctl > /dev/null ; then
+  if [ ! -e /etc/systemd/system/machineid-save.service ] ; then
+    cat << EOF > /etc/systemd/system/machineid-save.service ;
+[Unit]
+Before=network.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/dbus-uuidgen --ensure
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+
+EOF
+  fi ;
+  #systemctl enable machineid-save.service ;
+  svc_enable machineid-save ;
+else
+  if [ -z "$(grep -e 'dbus-uuidgen --ensure' /etc/rc.local)" ] ; then
+    #echo dbus-uuidgen --ensure=/etc/machine-id >> /etc/rc.local ;
+    echo dbus-uuidgen --ensure >> /etc/rc.local ;
+    chmod +x /etc/rc.local ;
+  fi
+fi
+
 
 set +e ; set +u
 ntpd -u ntp:ntp ; ntpq -p ; sleep 3

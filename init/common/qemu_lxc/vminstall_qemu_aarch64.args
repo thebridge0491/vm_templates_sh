@@ -1,5 +1,5 @@
 #mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}
-#qemu-img create -f qcow2 ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/${GUEST:-freebsd-aarch64-std}.qcow2 30720M
+#qemu-img create -f qcow2 ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/${GUEST:-freebsd-aarch64-std}.qcow2 ${DISK_SZ:-30720M}
 
 qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
   -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST:-freebsd-aarch64-std} \

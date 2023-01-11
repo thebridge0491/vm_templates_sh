@@ -34,6 +34,10 @@ sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
   /usr/share/X11/xorg.conf.d/10-evdev.conf
 sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
   /usr/share/X11/xorg.conf.d/40-libinput.conf
+## ??? egrep -i 'synap|alps|etps|elan' /proc/bus/input/devices
+#libinput list-devices ; xinput --list
+#xinput list-props XX [; xinput disable YY] # by id, list-props or disable
+#xinput set-prop <deviceid|devicename> <deviceproperty> <value>
 
 # update XDG user dir config
 export LANG=en_US.UTF-8 ; export CHARSET=UTF-8

@@ -1,5 +1,5 @@
 {
-  "_usage_build": "packer build [-var machine=x86_64] [-var variant=freebsd] [-var vm_name=freebsd-x86_64-std] [-var author=thebridge0491] [-var build_timestamp=???] -only=[box-libvirt|box-bhyve] box-vagrant.json",
+  "_usage_example": "[PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=box-libvirt box-vagrant.json",
 
   "builders": [{
     "type": "null",

@@ -45,6 +45,29 @@ if [ "$(hostname | grep -e 'box.0000')" ] ; then
 	done ;
 	hostname --file /etc/hostname ;
 fi
+if command -v systemctl > /dev/null ; then
+  if [ ! -e /etc/systemd/system/machineid-save.service ] ; then
+    cat << EOF > /etc/systemd/system/machineid-save.service ;
+[Unit]
+Before=network.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/dbus-uuidgen --ensure
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+
+EOF
+  fi ;
+  #systemctl enable machineid-save.service ;
+  svc_enable machineid-save ;
+else
+  if [ -z "$(grep -e 'dbus-uuidgen --ensure' /etc/rc.local)" ] ; then
+    #echo dbus-uuidgen --ensure=/etc/machine-id >> /etc/rc.local ;
+    echo dbus-uuidgen --ensure >> /etc/rc.local ;
+    chmod +x /etc/rc.local ;
+  fi
+fi
 
 
 set +e ; set +u

@@ -50,9 +50,9 @@ echo '##########'
 echo 'Manually copy updated scripts tarball, then run provision xferscripts.'
 echo "  cd #{repo_dir} ; cp -a $HOME/.ssh/publish_krls init/common/skel/_ssh/"
 echo "  cp -a $HOME/.pki/publish_crls init/common/skel/_pki/"
-echo "  tar -cf /tmp/scripts.tar init/common init/#{variant} -C scripts #{variant}"
-echo '  xfr: scp /tmp/scripts.tar packer@10.0.2.10:/tmp/scripts.tar'
-echo '  xfr: ssh packer@10.0.2.10 "cat - > /tmp/scripts.tar" < /tmp/scripts.tar'
+echo "  tar -cf /tmp/scripts_#{variant}.tar init/common init/#{variant} -C scripts #{variant}"
+echo '  xfr: scp /tmp/scripts_#{variant}.tar packer@10.0.2.10:/tmp/scripts.tar'
+echo '  xfr: ssh packer@10.0.2.10 "cat - > /tmp/scripts.tar" < /tmp/scripts_#{variant}.tar'
 echo '##########'
 EOF
   end
@@ -73,7 +73,7 @@ EOF
   config.vm.provision 'runscript', type: 'shell', run: 'never' do |s|
     s.env = {'HOME_DIR': '/home/vagrant', 'WITH_X11': 'nox11',
       'FETCH_RETRY': '20', 'FETCH_TIMEOUT': '300',
-      'PASSWD_PLAIN': "#{ENV.fetch('PASSWD_PLAIN', 'abcd0123')}"}
+      'PASSWD_PLAIN': "#{ENV.fetch('PASSWD_PLAIN', 'packer')}"}
     s.inline = "sh /root/scripts/#{RUNSCRIPT_ARGS[0]}"
     s.args = RUNSCRIPT_ARGS[1..-1]
   end

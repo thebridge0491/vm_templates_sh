@@ -7,9 +7,9 @@
 #sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
 #sh /tmp/disk_setup.sh mount_filesystems std vg0
 
-# passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
+# passwd crypted hash: [md5|sha256|sha512|yescrypt] - [$1|$5|$6|$y$j9T]$...
 # stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
-# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# stty -echo ; perl -le 'print STDERR "Password:\n" ; $_=<STDIN> ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT")' ; stty echo
 # ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
 # python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
@@ -31,8 +31,8 @@ fi
 service_mgr=${service_mgr:-sysvinit} # sysvinit | runit | openrc
 
 export INIT_HOSTNAME=${1:-debian-boxv0000}
-#export PASSWD_PLAIN=${2:-abcd0123}
-export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+#export PASSWD_PLAIN=${2:-packer}
+export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
 
 echo "Create /etc/fstab" ; sleep 3
@@ -135,7 +135,7 @@ modprobe dm-mod ; vgscan ; vgchange -ay ; lvs
 
 
 echo "Config keyboard ; localization" ; sleep 3
-apt-get --yes install --no-install-recommends locales console-setup
+DEBIAN_FRONTEND=noninteractive apt-get --yes install --no-install-recommends locales console-setup
 #dpkg-reconfigure locales ; dpkg-reconfigure keyboard-configuration
 kbd_mode -u ; loadkeys us
 sed -i '/en_US.UTF-8 UTF-8/ s|^# ||' /etc/locale.gen

@@ -1,7 +1,7 @@
 # nc -l [-p] {port} > file ## nc -w3 {host} {port} < file  # netcat xfr
-# passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
+# passwd crypted hash: [md5|sha256|sha512|yescrypt] - [$1|$5|$6|$y$j9T]$...
 # stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
-# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# stty -echo ; perl -le 'print STDERR "Password:\n" ; $_=<STDIN> ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT")' ; stty echo
 # ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
 # python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
@@ -243,13 +243,13 @@ ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
 #pkg install -y nano sudo xfce
 pkg install -y nano sudo
 
-#echo -n "${PASSWD_PLAIN:-abcd0123}" | pw usermod root -h 0
-echo -n "${PASSWD_CRYPTED:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}" | pw usermod root -H 0
+#echo -n "${PASSWD_PLAIN:-packer}" | pw usermod root -h 0
+echo -n "${PASSWD_CRYPTED:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}" | pw usermod root -H 0
 pw groupadd usb ; pw groupmod usb -m root
 
 mkdir -p /home/packer
-#echo -n "${PASSWD_PLAIN:-abcd0123}" | pw useradd packer -h 0 -m -G wheel,operator -s /bin/tcsh -d /home/packer -c "Packer User"
-echo -n "${PASSWD_CRYPTED:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}" | pw useradd packer -H 0 -m -G wheel,operator -s /bin/tcsh -d /home/packer -c "Packer User"
+#echo -n "${PASSWD_PLAIN:-packer}" | pw useradd packer -h 0 -m -G wheel,operator -s /bin/tcsh -d /home/packer -c "Packer User"
+echo -n "${PASSWD_CRYPTED:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}" | pw useradd packer -H 0 -m -G wheel,operator -s /bin/tcsh -d /home/packer -c "Packer User"
 chown -R packer:$(id -gn packer) /home/packer
 
 #sh -c 'cat >> /usr/local/etc/sudoers.d/99_packer' << EOF

@@ -7,9 +7,9 @@
 #sh /tmp/disk_setup.sh part_format sgdisk std vg0 pvol0
 #sh /tmp/disk_setup.sh mount_filesystems std vg0
 
-# passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
+# passwd crypted hash: [md5|sha256|sha512|yescrypt] - [$1|$5|$6|$y$j9T]$...
 # stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
-# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# stty -echo ; perl -le 'print STDERR "Password:\n" ; $_=<STDIN> ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT")' ; stty echo
 # ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
 # python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
@@ -34,8 +34,8 @@ else
 fi
 
 export INIT_HOSTNAME=${1:-redhat-boxv0000}
-#export PASSWD_PLAIN=${2:-abcd0123}
-export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+#export PASSWD_PLAIN=${2:-packer}
+export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
 export YUMCMD="yum --setopt=requires_policy=strong --setopt=group_package_types=mandatory --releasever=${RELEASE}"
 export DNFCMD="dnf --setopt=install_weak_deps=False --releasever=${RELEASE}"
@@ -129,45 +129,51 @@ VERSION_MAJOR=\$(echo \${VERSION_ID} | cut -d. -f1)
 #yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/AppStream/${UNAME_M}/os
 #yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/extras/${UNAME_M}/os
 
-yum -y check-update
-${YUMCMD} -y reinstall dnf dnf-plugins-core yum yum-utils
-${YUMCMD} -y install dnf dnf-plugins-core yum yum-utils
-dnf --releasever=${RELEASE} -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-\${VERSION_MAJOR}.noarch.rpm
+${DNFCMD} -y check-update
+${DNFCMD} -y reinstall dnf dnf-plugins-core yum yum-utils 'dnf-command(config-manager)'
+${DNFCMD} -y install dnf dnf-plugins-core yum yum-utils 'dnf-command(config-manager)'
+${DNFCMD} -y config-manager --set-enabled crb
+${DNFCMD} -y install epel-release
+${DNFCMD} --releasever=\${VERSION_MAJOR} -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-\${VERSION_MAJOR}.noarch.rpm
 # Release version errors w/ CentOS Stream for EPEL/EPEL Modular
-dnf --releasever=${RELEASE} config-manager --set-disabled epel epel-modular
+${DNFCMD} --releasever=\${VERSION_MAJOR} config-manager --set-disabled epel epel-modular
+${DNFCMD} --releasever=\${VERSION_MAJOR} config-manager --set-disabled epel
 #cat /etc/yum.repos.d/* ; sleep 5
-dnf repolist ; sleep 5
+${DNFCMD} repolist ; sleep 5
 
 
 echo "Add software package selection(s)" ; sleep 3
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  ${DNFCMD} -y install @core linux-firmware sudo tar kbd openssl grub2-efi-aa64 grub2 efibootmgr
+  ${DNFCMD} -y install @core linux-firmware sudo tar kbd openssl shim-* grub2-* efibootmgr
 else
-  ${DNFCMD} -y install @core linux-firmware microcode_ctl sudo tar kbd openssl grub2-pc grub2-efi-x64 grub2 efibootmgr
+  ${DNFCMD} -y install @core linux-firmware microcode_ctl sudo tar kbd openssl shim-* grub2-* efibootmgr
 fi
 ${DNFCMD} -y install network-scripts dhcp-client
+${DNFCMD} -y install NetworkManager-initscripts-updown dhcp-client
 ${DNFCMD} -y install dracut-tools dracut-config-generic dracut-config-rescue
 # @xfce-desktop
 # @^minimal @minimal-environment redhat-lsb-core dracut-tools dracut-config-generic dracut-config-rescue
-dnf -y check-update
+${DNFCMD} -y check-update
 ${DNFCMD} -y install 'dnf-command(versionlock)'
 
 
 # Use EL release kernel packages (avoid dkms build errors)
 if [ "7" = "\${VERSION_MAJOR}" ] ; then
-dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${UNAME_M} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel kernel-devel
+${DNFCMD} -y --enablerepo=epel install kernel kernel-devel
 else
-dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${UNAME_M}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel kernel-devel
+${DNFCMD} -y --enablerepo=epel --enablerepo=epel-modular install kernel kernel-devel
+${DNFCMD} -y --enablerepo=epel install kernel kernel-devel
 fi
 
 
-kver=\$(dnf list --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1)
+kver=\$(${DNFCMD} list --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1)
 echo \$kver ; sleep 5
 ## Use EL release kernel packages (avoid dkms build errors)
 #if [ "7" = "\${VERSION_MAJOR}" ] ; then
-#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/os/${UNAME_M} --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel install kernel-headers-\$kver.${UNAME_M} kernel-devel-\$kver.${UNAME_M}
+#${DNFCMD} -y --enablerepo=epel install kernel-headers-\$kver.${UNAME_M} kernel-devel-\$kver.${UNAME_M}
 #else
-#dnf --releasever=\${VERSION_MAJOR} -y --repofrompath quickrepo\${VERSION_MAJOR},http://${MIRROR}/\${VERSION_MAJOR}/BaseOS/${UNAME_M}/os --repo quickrepo\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular install kernel-headers-\$kver.${UNAME_M} kernel-devel-\$kver.${UNAME_M}
+#${DNFCMD} -y --enablerepo=epel --enablerepo=epel-modular install kernel-headers-\$kver.${UNAME_M} kernel-devel-\$kver.${UNAME_M}
+#${DNFCMD} -y --enablerepo=epel install kernel-headers-\$kver.${UNAME_M} kernel-devel-\$kver.${UNAME_M}
 #fi
 
 ## for centos-stream VERSION_ID=8, not similar 8.4
@@ -178,11 +184,14 @@ if [ $(echo ${RELEASE} | grep -e '-stream') ] ; then
 fi
 sleep 3
 
-dnf --releasever=\${VERSION_MAJOR} -y install http://download.zfsonlinux.org/epel/zfs-release.el${ZFS_REL:-\${VERSION_ID/./_}}.noarch.rpm
+${DNFCMD} -y install http://download.zfsonlinux.org/epel/zfs-release.el${ZFS_REL:-\${VERSION_ID/./_}}.noarch.rpm
+${DNFCMD} -y install http://download.zfsonlinux.org/epel/zfs-release-2-2.el\${VERSION_MAJOR}.noarch.rpm
 rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux
-dnf repolist ; sleep 5
-#dnf config-manager --set-disabled zfs
-dnf --releasever=\${VERSION_MAJOR} --enablerepo=epel --enablerepo=epel-modular --enablerepo=zfs -y install zfs zfs-dracut ; sleep 3
+${DNFCMD} repolist ; sleep 5
+#${DNFCMD} config-manager --set-disabled zfs
+${DNFCMD} --enablerepo=epel --enablerepo=epel-modular --enablerepo=zfs -y install zfs zfs-dracut
+${DNFCMD} --enablerepo=epel --enablerepo=zfs -y install zfs zfs-dracut
+sleep 3
 echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
 dkms status ; modprobe zfs ; zfs version ; sleep 5
 
@@ -281,8 +290,8 @@ dracut --force --kver \$kver.${UNAME_M}
 grub2-probe /boot
 
 echo "Hold zfs & kernel package upgrades (require manual upgrade)"
-dnf versionlock add zfs zfs-dkms zfs-dracut kernel kernel-core kernel-modules kernel-tools kernel-tools-libs kernel-devel kernel-headers
-dnf versionlock list ; sleep 3
+${DNFCMD} versionlock add zfs zfs-dkms zfs-dracut kernel kernel-core kernel-modules kernel-tools kernel-tools-libs kernel-devel kernel-headers
+${DNFCMD} versionlock list ; sleep 3
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
@@ -346,7 +355,7 @@ efibootmgr -v ; sleep 3
 # install/enable ssh just before finish
 ${DNFCMD} -y install openssh-clients openssh-server
 
-dnf -y clean all
+${DNFCMD} -y clean all
 zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM}
 sync
 

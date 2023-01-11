@@ -11,7 +11,7 @@ elif [ -n "`fdisk wd0`" ] ; then
   export DEVX=wd0 ;
 fi
 
-export PASSWD_PLAIN=${1:-abcd0123}
+export PASSWD_PLAIN=${1:-packer}
 
 (cd /dev ; sh MAKEDEV $DEVX)
 fdisk -iy -g -b 960 $DEVX ; sync ; fdisk $DEVX ; sleep 3

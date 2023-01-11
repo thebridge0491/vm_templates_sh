@@ -1,4 +1,4 @@
-# usage: packer build [-var machine=x86_64] [-var variant=freebsd] [-var vm_name=freebsd-x86_64-std] [-var author=thebridge0491] [-var build_timestamp=???] -only=[null.box-libvirt|null.box-bhyve] <dir>[/box-vagrant.pkr.hcl]
+# usage example: (packer init <dir>[/box-vagrant.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=null.box-libvirt <dir>[/box-vagrant.pkr.hcl])
 
 variable "author" {
   type    = string
@@ -10,11 +10,6 @@ variable "firmware_bhyve_x64" {
   default = "/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd"
 }
 
-variable "machine" {
-  type    = string
-  default = "x86_64"
-}
-
 variable "firmware_qemu_aa64" {
   type    = string
   default = "/usr/share/AAVMF/AAVMF_CODE.fd"
@@ -23,6 +18,11 @@ variable "firmware_qemu_aa64" {
 variable "firmware_qemu_x64" {
   type    = string
   default = "/usr/share/OVMF/OVMF_CODE.fd"
+}
+
+variable "machine" {
+  type    = string
+  default = "x86_64"
 }
 
 variable "variant" {

@@ -7,9 +7,9 @@
 #sh /tmp/disk_setup.sh part_format
 #sh /tmp/disk_setup.sh mount_filesystems
 
-# passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
+# passwd crypted hash: [md5|sha256|sha512|yescrypt] - [$1|$5|$6|$y$j9T]$...
 # stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
-# perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+# stty -echo ; perl -le 'print STDERR "Password:\n" ; $_=<STDIN> ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT")' ; stty echo
 # ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
 # python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))'
 
@@ -25,8 +25,8 @@ export REL=${REL:-$(sysctl -n kern.osrelease)}
 export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/OpenBSD}
 
 export INIT_HOSTNAME=${1:-openbsd-boxv0000}
-export PASSWD_PLAIN=${2:-abcd0123}
-#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+export PASSWD_PLAIN=${2:-packer}
+#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
 echo "Create /etc/fstab" ; sleep 3
 mkdir -p /mnt/etc /mnt/root
@@ -50,6 +50,7 @@ sed -i 's|rw|rw,noatime|' /mnt/etc/fstab
 
 # ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
 # dhclient [-L /tmp/dhclient.lease.{ifdev}] {ifdev}
+# ifconfig {ifdev} inet autoconf
 
 #ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 #wlan_adapter=$(ifconfig | grep -B3 -i wireless) # ath0 ?
@@ -76,7 +77,8 @@ ftp -o ${DESTDIR:-/mnt}/bsd.mp http://${MIRROR}/${REL}/${ARCH_S}/bsd.mp
 # ?? missing from new install
 cp /etc/group /etc/passwd /etc/master.passwd /mnt/etc/
 
-encrypted_passwd=$(echo -n ${PASSWD_PLAIN} | encrypt)
+#encrypted_passwd=$(echo -n ${PASSWD_PLAIN} | encrypt)
+encrypted_passwd=$(printf '%s' ${PASSWD_PLAIN} | encrypt)
 
 
 cat << EOFchroot | chroot /mnt /bin/sh
@@ -124,7 +126,7 @@ dhcp
 inet6 autoconf
 
 EOF
-ifconfig ; dhclient \${ifdev} ; sleep 5
+ifconfig ; dhclient \${ifdev} ; ifconfig \${ifdev} inet autoconf ; sleep 5
 
 
 echo "Update services" ; sleep 3

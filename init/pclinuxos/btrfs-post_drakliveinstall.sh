@@ -9,8 +9,8 @@ export GRP_NM=${GRP_NM:-vg0}
 export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos} ; UNAME_M=$(uname -m)
 
 export INIT_HOSTNAME=${1:-pclinuxos-boxv0000}
-export PASSWD_PLAIN=${2:-abcd0123}
-#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+export PASSWD_PLAIN=${2:-packer}
+#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
 
 echo "Re-mount filesystems" ; sleep 3

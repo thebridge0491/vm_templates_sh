@@ -1,7 +1,8 @@
 ## crypted_passwd: echo -n 'password' | encrypt
+##            or   printf '%s' 'password' | encrypt
 System hostname = openbsd-boxv0000
-#Password for root account = abcd0123
-Password for root account = $2b$09$Yh2jVfdZhpjzWkJf2vUgm./BulGGUBG.AjV1LgwrVDs.Rf8SlrpTC
+#Password for root account = packer
+Password for root account = $2b$09$G.8NG0ahA70GyVFLJ2ie2eYVfv/5zAD5Ekn2tKc9a6Em7K3Y4gmqu
 Which network interface do you wish to configure = vio0
 IPv4 address for vio0 = dhcp
 IPv6 address for vio0 = autoconf
@@ -13,8 +14,8 @@ Do you expect to run the X Window System = yes
 Change the default console to com0 = no
 Setup a user = packer
 Full name for user packer = Packer User
-#Password for user packer = abcd0123
-Password for user packer = $2b$09$Yh2jVfdZhpjzWkJf2vUgm./BulGGUBG.AjV1LgwrVDs.Rf8SlrpTC
+#Password for user packer = packer
+Password for user packer = $2b$09$G.8NG0ahA70GyVFLJ2ie2eYVfv/5zAD5Ekn2tKc9a6Em7K3Y4gmqu
 Allow root ssh login = yes
 What timezone are you in = Etc/UTC
 Which disk is the root disk = sd0

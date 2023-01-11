@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE profile>
 <!-- http://doc.opensuse.org/projects/autoyast/configuration.html -->
-<!-- passwd crypted hash: [md5|sha256|sha512] - [$1|$5|$6]$...
+<!-- passwd crypted hash: [md5|sha256|sha512|yescrypt] - [$1|$5|$6|$y$j9T]$...
   stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
-  perl -e 'use Term::ReadKey ; print STDERR "Password:\n" ; ReadMode "noecho" ; $_=<STDIN> ; ReadMode "normal" ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT") . "\n"'
+  stty -echo ; perl -le 'print STDERR "Password:\n" ; $_=<STDIN> ; chomp $_ ; print crypt($_, "\$6\$16CHARACTERSSALT")' ; stty echo
   ruby -e '["io/console","digest/sha2"].each {|i| require i} ; STDERR.puts "Password:" ; puts STDIN.noecho(&:gets).chomp.crypt("$6$16CHARACTERSSALT")'
   python -c 'import crypt,getpass ; print(crypt.crypt(getpass.getpass(), "$6$16CHARACTERSSALT"))' -->
 <profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
@@ -381,14 +381,14 @@
   <users t="list">
     <user t="map">
       <encrypted t="boolean">true</encrypted>
-      <!--<user_password>abcd0123</user_password>-->
-      <user_password>$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91</user_password>
+      <!--<user_password>packer</user_password>-->
+      <user_password>$6$16CHARACTERSSALT$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1</user_password>
       <username>root</username>
     </user>
     <user>
       <encrypted t="boolean">true</encrypted>
-      <!--<user_password>abcd0123</user_password>-->
-      <user_password>$6$16CHARACTERSSALT$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91</user_password>
+      <!--<user_password>packer</user_password>-->
+      <user_password>$6$16CHARACTERSSALT$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1</user_password>
       <gid>100</gid>
       <uid>1000</uid>
       <home>/home/packer</home>

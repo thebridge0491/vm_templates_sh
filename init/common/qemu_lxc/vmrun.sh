@@ -17,6 +17,10 @@ FIRMWARE_BHYVE_X64=${FIRMWARE_BHYVE_X64:-/usr/local/share/uefi-firmware/BHYVE_UE
 FIRMWARE_QEMU_X64=${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd}
 FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
 
+#mac_last3=$(hexdump -n3 -e '/1 ":%02x"' /dev/random | cut -c2-)
+#mac_last3=$(od -N3 -tx1 -An /dev/random | awk '$1=$1' | tr ' ' :)
+mac_last3=$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||')
+
 #-------- create Vagrant ; use box image --------
 box_vagrant() {
   GUEST=${1:-freebsd-${MACHINE}-zfs} ; PROVIDER=${PROVIDER:-libvirt}
@@ -145,7 +149,7 @@ EOF
 
 diff_qemuimage() {
   GUEST=${1:-freebsd-${MACHINE}-zfs} ; BOXPREFIX=${BOXPREFIX:-${GUEST}*/}
-  qemu-img create -f qcow2 -F qcow2 -o backing_file=$(cd ${STORAGE_DIR} ; find . -path "*${BOXPREFIX}*${IMGEXT}" | tail -n1) \
+  qemu-img create -f qcow2 -F qcow2 -o backing_file=$(cd ${STORAGE_DIR} ; find ${BOXPREFIX} -path "*${IMGEXT}" | tail -n1) \
     ${STORAGE_DIR}/${GUEST}${IMGEXT}
   echo ''
   qemu-img info --backing-chain ${STORAGE_DIR}/${GUEST}${IMGEXT} ; sleep 5
@@ -169,7 +173,8 @@ import_lxc() {
   GUEST=${1:-debian-boxe0000}
   CONNECT_OPT=${CONNECT_OPT:---connect lxc:///}
 
-  virt-install ${CONNECT_OPT} --init /sbin/init --memory 768 --vcpus 1 \
+  virt-install ${CONNECT_OPT} --init /sbin/init --cpu SandyBridge \
+    --memory 768 --vcpus 1 \
     --controller virtio-serial --console pty,target_type=virtio \
     --network network=default,model=virtio-net,mac=RANDOM --boot menu=on \
     ${VIRTFS_OPTS:---filesystem type=mount,mode=passthrough,source=/mnt/Data0,target=9p_Data0} \
@@ -184,7 +189,8 @@ import_qemu() {
   CONNECT_OPT=${CONNECT_OPT:---connect qemu:///system}
   VUEFI_OPTS=${VUEFI_OPTS:---boot uefi}
 
-  virt-install ${CONNECT_OPT} --arch ${MACHINE} --memory 2048 --vcpus 2 \
+  virt-install ${CONNECT_OPT} --arch ${MACHINE} --cpu SandyBridge \
+    --memory 2048 --vcpus 2 \
     --controller usb,model=ehci --controller virtio-serial \
     --console pty,target_type=virtio --graphics vnc,port=-1 \
     --network network=default,model=virtio-net,mac=RANDOM \
@@ -222,7 +228,7 @@ run_bhyve() {
     -s 30,xhci,tablet -l bootrom,${FIRMWARE_BHYVE_X64}}
 
   bhyve -A -H -P -c 2 -m 2048M -l com1,stdio -s 0,hostbridge -s 1,lpc \
-    -s 2,virtio-net,${NET_OPT:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+    -s 2,virtio-net,${NET_OPT:-tap0},mac=52:54:00:${mac_last3} \
     -s 3,virtio-blk,${STORAGE_DIR}/${IMGFILE} \
     ${BUEFI_OPTS} ${VIRTFS_OPTS:--s 4,virtio-9p,9p_Data0=/mnt/Data0} \
     ${GUEST} &
@@ -243,7 +249,7 @@ run_qemu() {
     QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64}"}
     qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
       -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST} \
-      -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+      -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
       -device virtio-blk-pci,drive=hd0 \
       -drive file=${STORAGE_DIR}/${IMGFILE},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT} \
@@ -251,10 +257,10 @@ run_qemu() {
       ${QUEFI_OPTS} ${VIRTFS_OPTS} &
   else
     QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_X64}"}
-    qemu-system-x86_64 -machine q35,accel=kvm:hvf:tcg \
+    qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
       -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
       -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST} \
-      -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
+      -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
       -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
       -drive file=${STORAGE_DIR}/${IMGFILE},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT} \

@@ -30,6 +30,11 @@ if [ "$(hostname | grep -e 'box.0000')" ] ; then
 	done ;
 	hostname `cat /etc/hostname` ;
 fi
+if [ -z "$(grep -e 'dbus-uuidgen --ensure' /etc/rc.local)" ] ; then
+  #echo dbus-uuidgen --ensure=/etc/machine-id >> /etc/rc.local ;
+  echo dbus-uuidgen --ensure >> /etc/rc.local ;
+  chmod +x /etc/rc.local ;
+fi
 
 
 set +e ; set +u

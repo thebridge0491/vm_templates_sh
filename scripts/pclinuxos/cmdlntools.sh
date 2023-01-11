@@ -32,6 +32,7 @@ if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
 		/etc/sysconfig/network ;
 fi
 
+
 set +e ; set +u
 
 ntpd -u ntp:ntp ; ntpq -p ; sleep 3
@@ -53,8 +54,8 @@ drakfirewall ; sleep 600 ; cat /etc/shorewall/rules.drakx ; sleep 5
 #chkconfig --add freshclam ; chkconfig --add clamd
 
 
-systemctl enable avahi-daemon ; systemctl enable nfs-common
-systemctl enable cups ; systemctl enable cups-browsed
+chkconfig --add avahi-daemon ; chkconfig --add nfs-common
+chkconfig --add cups ; chkconfig --add cups-browsed
 
 #sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
 sh /root/init/common/misc_config.sh cfg_printer_pdf \

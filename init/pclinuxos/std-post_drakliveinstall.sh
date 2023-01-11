@@ -9,8 +9,8 @@ export GRP_NM=${GRP_NM:-vg0}
 export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos} ; UNAME_M=$(uname -m)
 
 export INIT_HOSTNAME=${1:-pclinuxos-boxv0000}
-export PASSWD_PLAIN=${2:-abcd0123}
-#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$o/XwaDmfuxBWVf1nEaH34MYX8YwFlAMo66n1.L3wvwdalv0IaV2b/ajr7xNcX/RFIPvfBNj.2Qxeh7v4JTjJ91}
+export PASSWD_PLAIN=${2:-packer}
+#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
 
 echo "Re-mount filesystems" ; sleep 3
@@ -94,7 +94,7 @@ echo "Add software package selection(s)" ; sleep 3
 apt-get -y update
 apt-get -y --fix-broken install
 
-pkgs_nms="basesystem bash apt rpm locales-en sudo dhcp-client man-pages nano dosfstools xfsprogs grub2 grub2-efi microcode_ctl efibootmgr" # task-xfce"
+pkgs_nms="basesystem bash apt rpm locales-en sudo whois dhcp-client man-pages nano dosfstools xfsprogs grub2 grub2-efi microcode_ctl efibootmgr" # task-xfce"
 apt-get -y install \$pkgs_nms
 # fix AND re-attempt install for infrequent errors
 apt-get -y --fix-broken install
@@ -219,6 +219,9 @@ apt-get --fix-broken install -y
 # install/enable ssh just before finish
 apt-get install -y openssh-server
 service sshd stop #; service network stop
+
+
+whois-mkpasswd -m help ; sleep 10
 
 
 apt-get -y clean

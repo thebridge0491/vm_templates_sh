@@ -21,7 +21,8 @@ case $OS_NAME in
     fi ;
     #sudo tar -xf /root/scripts.tar ;
     sudo find /root/init -name 'distro_pkg*' -exec cp {} /tmp/ \; ;
-    . /tmp/distro_pkgs.ini ; . /tmp/distro_pkgmgr_funcs.sh ;;
+    . /tmp/distro_pkgs.ini ; . /tmp/distro_pkgmgr_funcs.sh ;
+    ${pkgmgr_update} ;;
 esac
 
 #===========================================================================#
@@ -120,6 +121,37 @@ bsd_info() {
     concat_sep '/var/run/os-release' ;
   fi
 
+    cat << EOF
+$sep
+sudo cat /var/run/dmesg.boot | grep -e "CPU:"
+$(sudo cat /var/run/dmesg.boot | grep -e "CPU:")
+EOF
+    cat << EOF
+$sep
+sudo cat /var/run/dmesg.boot | grep -e "real memory"
+$(sudo cat /var/run/dmesg.boot | grep -e "real memory")
+EOF
+    cat << EOF
+$sep
+sudo cat /var/run/dmesg.boot | grep -e "network.*adapter"
+$(sudo cat /var/run/dmesg.boot | grep -e "network.*adapter")
+EOF
+    cat << EOF
+$sep
+pciconf -lv | grep -ie VGA
+$(pciconf -lv | grep -ie VGA)
+EOF
+    cat << EOF
+$sep
+pciconf -lv | grep -ie Wireless
+$(pciconf -lv | grep -ie Wireless)
+EOF
+    cat << EOF
+$sep
+pciconf -lv | grep -ie Ethernet
+$(pciconf -lv | grep -ie Ethernet)
+EOF
+
   cat << EOF
 $sep
 grep sshd_enable /etc/rc.conf
@@ -209,6 +241,27 @@ linux_info() {
   elif [ -f /usr/lib/os-release ] ; then
     concat_sep '/usr/lib/os-release' ;
   fi
+
+    cat << EOF
+$sep
+lscpu | grep -e 'Architecture:' -e 'Model name:'
+$(lscpu | grep -e 'Architecture:' -e 'Model name:')
+EOF
+    cat << EOF
+$sep
+lspci -kv | sed -n '/VGA/,/^\s*$/p'
+$(lspci -kv | sed -n '/VGA/,/^\s*$/p')
+EOF
+    cat << EOF
+$sep
+lspci -kv | sed -n '/Wireless/,/^\s*$/p'
+$(lspci -kv | sed -n '/Wireless/,/^\s*$/p')
+EOF
+    cat << EOF
+$sep
+lspci -kv | sed -n '/Ethernet/,/^\s*$/p'
+$(lspci -kv | sed -n '/Ethernet/,/^\s*$/p')
+EOF
 
 #  cat << EOF
 #$sep
@@ -352,6 +405,15 @@ EOF
 macos_info() {
   echo "($NAME ${MACHINE})" 'collect_info'
   concat_sep 'uname -a' ; concat_sep 'sw_vers'
+  concat_sep 'sysctl machdep.cpu.brand_string'
+  concat_sep 'system_profiler SPDisplaysDataType'
+  concat_sep 'system_profiler SPSoftwareDataType'
+
+  cat << EOF
+$sep
+system_profiler SPHardwareDataType | grep -ve ID -ve Serial
+$(system_profiler SPHardwareDataType | grep -ve ID -ve Serial)
+EOF
 
   concat_sep 'date'
   cat << EOF
