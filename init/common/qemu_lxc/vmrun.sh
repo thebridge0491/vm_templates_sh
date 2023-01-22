@@ -15,7 +15,9 @@ STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)} ; IMGFMT=${IMGFMT:-qcow2}
 MACHINE=${MACHINE:-x86_64} ; IMGEXT=${IMGEXT:-.qcow2}
 FIRMWARE_BHYVE_X64=${FIRMWARE_BHYVE_X64:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
 FIRMWARE_QEMU_X64=${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd}
+NVRAM_QEMU_X64=${NVRAM_QEMU_X64:-/usr/share/OVMF/OVMF_VARS.fd}
 FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
+NVRAM_QEMU_AA64=${NVRAM_QEMU_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd}
 
 #mac_last3=$(hexdump -n3 -e '/1 ":%02x"' /dev/random | cut -c2-)
 #mac_last3=$(od -N3 -tx1 -An /dev/random | awk '$1=$1' | tr ' ' :)
@@ -110,16 +112,16 @@ EOF
     qemu-img convert -f qcow2 -O qcow2 ${STORAGE_DIR}/${IMGFILE} \
       ${STORAGE_DIR}/box.img ;
     if [ "aarch64" = "${MACHINE}" ] ; then
-      cp -a ${FIRMWARE_QEMU_AA64} ${STORAGE_DIR}/ ;
+      cp -a ${FIRMWARE_QEMU_AA64} ${NVRAM_QEMU_AA64} ${STORAGE_DIR}/ ;
     else
-      cp -a ${FIRMWARE_QEMU_X64} ${STORAGE_DIR}/ ;
+      cp -a ${FIRMWARE_QEMU_X64} ${NVRAM_QEMU_X64} ${STORAGE_DIR}/ ;
     fi ;
   elif [ "bhyve" = "${PROVIDER}" ] ; then
     IMGFILE=${IMGFILE:-${GUEST}.raw}
     mv ${STORAGE_DIR}/${IMGFILE} ${STORAGE_DIR}/box.img ;
     cp -a ${FIRMWARE_BHYVE_X64} ${STORAGE_DIR}/ ;
   fi
-  (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${build_timestamp}.${PROVIDER}.box metadata.json info.json Vagrantfile `ls vmrun* *_CODE.fd` box.img)
+  (cd ${STORAGE_DIR} ; tar -cvzf ${GUEST}-${build_timestamp}.${PROVIDER}.box metadata.json info.json Vagrantfile `ls vmrun* *.fd` box.img)
 
   if command -v erb > /dev/null ; then
     erb author=${author} guest=${GUEST} datestamp=${build_timestamp} \
@@ -246,7 +248,11 @@ run_qemu() {
   VIRTFS_OPTS=${VIRTFS_OPTS:--virtfs local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough}
 
   if [ "aarch64" = "${MACHINE}" ] ; then
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${FIRMWARE_QEMU_AA64} -drive if=pflash,unit=1,format=raw,file=${STORAGE_DIR}/nvram/${GUEST}_VARS.fd"}
+    mkdir -p ${STORAGE_DIR}/nvram
+    cp -an ${NVRAM_QEMU_AA64} ${STORAGE_DIR}/nvram/${GUEST}_VARS.fd
+    chmod +w ${STORAGE_DIR}/nvram/${GUEST}_VARS.fd
+
     qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
       -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
@@ -256,7 +262,11 @@ run_qemu() {
       -display default,show-cursor=on -vga none -device virtio-gpu-pci \
       ${QUEFI_OPTS} ${VIRTFS_OPTS} &
   else
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_X64}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${FIRMWARE_QEMU_X64} -drive if=pflash,unit=1,format=raw,file=${STORAGE_DIR}/nvram/${GUEST}_VARS.fd"}
+    mkdir -p ${STORAGE_DIR}/nvram
+    cp -an ${NVRAM_QEMU_X64} ${STORAGE_DIR}/nvram/${GUEST}_VARS.fd
+    chmod +w ${STORAGE_DIR}/nvram/${GUEST}_VARS.fd
+
     qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
       -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
       -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST} \

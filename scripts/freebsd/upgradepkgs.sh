@@ -13,6 +13,9 @@ fi
 
 major_version="$(uname -r | awk -F. '{print $1}')"
 
+grep -ie CreateBootEnv /etc/freebsd-update.conf
+bectl list ; bectl list -c creation ; sleep 5
+
 # Update FreeBSD
 if [ "$major_version" -lt 10 ] ; then
   # Allow freebsd-update to run fetch without stdin attached to a terminal
@@ -47,10 +50,14 @@ if command -v zpool > /dev/null ; then
   ZPOOLNM=${ZPOOLNM:-fspool0} ;
   #zpool-ng trim ${ZPOOLNM} ; zpool-ng set autotrim=on ${ZPOOLNM} ;
   zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
+
+  zfs list -t snapshot ; sleep 5 ;
 else
   GRP_NM=${GRP_NM:-bsd0} ;
   fsck_ffs -E -Z /dev/gpt/${GRP_NM}-fsRoot ;
   fsck_ffs -E -Z /dev/gpt/${GRP_NM}-fsVar ;
+
+  find / -flags snapshot ; snapinfo / ; sleep 5 ;
 fi
 sync
 

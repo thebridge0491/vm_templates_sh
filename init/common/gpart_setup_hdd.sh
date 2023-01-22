@@ -48,19 +48,30 @@ gpart_disk() {
   gpart add -b 1M -a 1M -s 512K -t freebsd-boot -l bios_boot $DEVX
   gpart add -a 1M -s 200M -t efi -l ESP $DEVX
 
+  gpart add -a 1M -s 1G -t linux-data -l "vg0-osBoot" $DEVX
+  gpart add -a 1M -s 4G -t linux-swap -l "vg0-osSwap" $DEVX
+  gpart add -a 1M -s 80G -t linux-lvm -l "pvol0" $DEVX
+
+  gpart add -a 1M -s 1G -t linux-data -l "vg1-osBoot" $DEVX
+  gpart add -a 1M -s 80G -t linux-lvm -l "pvol1" $DEVX
+
+  gpart add -a 1M -s 4G -t freebsd-swap -l "${GRP_NM}-fsSwap" $DEVX
+
   if [ "zfs" = "$VOL_MGR" ] ; then
+    gpart add -a 1M -s 80G -t freebsd-zfs -l "${GRP_NM}-fsPool" $DEVX ;
+
     gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 $DEVX ;
-
-    gpart add -a 1M -s 4G -t freebsd-swap -l "${GRP_NM}-fsSwap" $DEVX ;
-    gpart add -a 1M -t freebsd-zfs -l "${GRP_NM}-fsPool" $DEVX ;
   else
-    gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 $DEVX ;
+    gpart add -a 1M -s 20G -t freebsd-ufs -l "${GRP_NM}-fsRoot" $DEVX ;
+    gpart add -a 1M -s 8G -t freebsd-ufs -l "${GRP_NM}-fsVar" $DEVX ;
+    gpart add -a 1M -s 32G -t freebsd-ufs -l "${GRP_NM}-fsHome" $DEVX ;
+    gpart add -a 1M -s 20G -t freebsd-ufs -l "${GRP_NM}-free" $DEVX ;
 
-    gpart add -a 1M -s 4G -t freebsd-swap -l "${GRP_NM}-fsSwap" $DEVX ;
-    gpart add -a 1M -s 13G -t freebsd-ufs -l "${GRP_NM}-fsRoot" $DEVX ;
-    gpart add -a 1M -s 5G -t freebsd-ufs -l "${GRP_NM}-fsVar" $DEVX ;
-    gpart add -a 1M -t freebsd-ufs -l "${GRP_NM}-fsHome" $DEVX ;
+    gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 $DEVX ;
   fi
+
+  gpart add -a 1M -s 120G -t ms-basic-data -l data0 $DEVX
+  gpart add -a 1M -t ms-basic-data -l data1 $DEVX
 
   gpart bootcode -b /boot/pmbr $DEVX
   #gpart set -a active -i 1 $DEVX ; gpart set -a bootme -i 1 $DEVX
@@ -122,16 +133,16 @@ zfspart_create() {
   zfs create -o atime=on $zpoolnm/var/mail
   zfs create -o setuid=off $zpoolnm/var/tmp
 
-  zfs set quota=7680M $zpoolnm/usr/home
-  zfs set quota=5G $zpoolnm/var
+  zfs set quota=32G $zpoolnm/usr/home
+  zfs set quota=8G $zpoolnm/var
   zfs set quota=2G $zpoolnm/tmp
 
   zpool set bootfs=$zpoolnm/ROOT/default $zpoolnm # ??
   zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm ; sync
 
   zpool export $zpoolnm ; sync ; sleep 3
+  zpool import -R /mnt -N $zpoolnm
   zpool import -d /dev/${DEVX}p${idx} -R /mnt -N $zpoolnm
-  #zpool import -R /mnt -N $zpoolnm
   zfs mount $zpoolnm/ROOT/default ; zfs mount -a ; sync
   mkdir -p /mnt/etc/zfs
 
@@ -185,11 +196,42 @@ mount_filesystems() {
   if [ "zfs" = "$VOL_MGR" ] ; then
     zfs mount -a ;
     zpool set cachefile=/etc/zfs/zpool.cache ${ZPOOLNM:-fspool0} ;
+
+    mkdir -p /mnt/etc /mnt/compat/linux/proc ;
+    mkdir -p /mnt/boot/efi ; mount -t msdosfs /dev/${DEVX}p2 /mnt/boot/efi ;
+    (cd /mnt/boot/efi ; mkdir -p EFI/freebsd EFI/BOOT) ;
+    cp /boot/loader.efi /boot/zfsloader /mnt/boot/efi/EFI/freebsd/ ;
+    cp /boot/loader.efi /boot/zfsloader /mnt/boot/efi/EFI/BOOT/ ;
   else
     mount /dev/gpt/${GRP_NM}-fsRoot /mnt ; mkdir -p /mnt/var /mnt/usr/home ;
     mount /dev/gpt/${GRP_NM}-fsVar /mnt/var ;
     mount /dev/gpt/${GRP_NM}-fsHome /mnt/usr/home ;
+
+    tunefs -n enable -t enable /dev/gpt/${GRP_NM}-fsRoot ;
+    tunefs -n enable -t enable /dev/gpt/${GRP_NM}-fsVar ;
+    tunefs -n enable -t enable /dev/gpt/${GRP_NM}-fsHome ;
+
+    mkdir -p /mnt/etc /mnt/compat/linux/proc ;
+    mkdir -p /mnt/boot/efi ; mount -t msdosfs /dev/${DEVX}p2 /mnt/boot/efi ;
+    (cd /mnt/boot/efi ; mkdir -p EFI/freebsd EFI/BOOT) ;
+    cp /boot/loader.efi /mnt/boot/efi/EFI/freebsd/ ;
+    cp /boot/loader.efi /mnt/boot/efi/EFI/BOOT/ ;
+    sh -c 'cat > /mnt/etc/fstab' << EOF ;
+/dev/gpt/${GRP_NM}-fsRoot    /           ufs     rw      1   1
+/dev/gpt/${GRP_NM}-fsVar     /var        ufs     rw      2   2
+/dev/gpt/${GRP_NM}-fsHome    /usr/home   ufs     rw      2   2
+EOF
   fi
+  cat << EOF >> /mnt/etc/fstab ;
+/dev/gpt/${GRP_NM}-fsSwap    none        swap    sw      0   0
+
+procfs             /proc       procfs  rw      0   0
+linprocfs          /compat/linux/proc  linprocfs   rw  0   0
+
+#/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,gid=wheel,uid=0,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
+#/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,dmask=0000,fmask=0111,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
+
+EOF
   swapon /dev/gpt/${GRP_NM}-fsSwap
 }
 

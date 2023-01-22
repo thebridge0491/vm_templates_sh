@@ -39,32 +39,21 @@ gpt_disk() {
   gpt add -b 40 -a 1M -s 512K -t bios -l bios_boot $DEVX
   gpt add -a 1M -s 200M -t efi -l ESP $DEVX
 
-  gpt add -a 1M -s 1G -t linux-data -l "vg0-osBoot" $DEVX
-  gpt add -a 1M -s 4G -t linux-swap -l "vg0-osSwap" $DEVX
-  gpt add -a 1M -s 80G -t linux-lvm -l "pvol0" $DEVX
-
-  gpt add -a 1M -s 1G -t linux-data -l "vg1-osBoot" $DEVX
-  gpt add -a 1M -s 80G -t linux-lvm -l "pvol1" $DEVX
-
-  gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" $DEVX
-
   if [ "zfs" = "$VOL_MGR" ] ; then
-    gpt add -a 1M -s 80G -t fbsd-zfs -l "${GRP_NM}-fsPool" $DEVX ;
+    gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" $DEVX ;
+    gpt add -a 1M -t fbsd-zfs -l "${GRP_NM}-fsPool" $DEVX ;
 
     #gpt biosboot -A -i 4 $DEVX
     gpt biosboot -L "${GRP_NM}-fsPool" $DEVX
   else
-    gpt add -a 1M -s 20G -t ffs -l "${GRP_NM}-fsRoot" $DEVX ;
-    gpt add -a 1M -s 8G -t ffs -l "${GRP_NM}-fsVar" $DEVX ;
-    gpt add -a 1M -s 32G -t ffs -l "${GRP_NM}-fsHome" $DEVX ;
-    gpt add -a 1M -s 20G -t ffs -l "${GRP_NM}-free" $DEVX ;
+    gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" $DEVX ;
+    gpt add -a 1M -s 13312M -t ffs -l "${GRP_NM}-fsRoot" $DEVX ;
+    gpt add -a 1M -s 5G -t ffs -l "${GRP_NM}-fsVar" $DEVX ;
+    gpt add -a 1M -t ffs -l "${GRP_NM}-fsHome" $DEVX ;
 
     #gpt biosboot -A -i 3 $DEVX
     gpt biosboot -L "${GRP_NM}-fsRoot" $DEVX
   fi
-
-  gpt add -a 1M -s 120G -t ms-basic-data -l data0 $DEVX
-  gpt add -a 1M -t ms-basic-data -l data1 $DEVX
 
   #gpt set -a active -i 1 $DEVX ; gpt set -a bootme -i 1 $DEVX
 
@@ -126,8 +115,8 @@ zfspart_create() {
   zfs create -o atime=on $zpoolnm/var/mail
   zfs create -o setuid=off $zpoolnm/var/tmp
 
-  zfs set quota=32G $zpoolnm/usr/home
-  zfs set quota=8G $zpoolnm/var
+  zfs set quota=7680M $zpoolnm/usr/home
+  zfs set quota=5G $zpoolnm/var
   zfs set quota=2G $zpoolnm/tmp
 
   zpool set bootfs=$zpoolnm/ROOT/default $zpoolnm # ??
@@ -191,6 +180,8 @@ mount_filesystems() {
   echo "Mounting file systems" ; sleep 3
   if [ "zfs" = "$VOL_MGR" ] ; then
     zfs mount -a ;
+
+    mkdir -p /mnt/etc /mnt/kern /mnt/proc /mnt/compat/linux/proc ;
   else
     dkRoot=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsRoot" | cut -d: -f1) ;
     dkVar=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsVar" | cut -d: -f1) ;
@@ -198,7 +189,35 @@ mount_filesystems() {
 
     mount /dev/$dkRoot /mnt ; mkdir -p /mnt/var /mnt/usr/home ;
     mount /dev/$dkVar /mnt/var ; mount /dev/$dkHome /mnt/usr/home ;
+
+    mkdir -p /mnt/etc /mnt/kern /mnt/proc /mnt/compat/linux/proc ;
+    sh -c 'cat > /mnt/etc/fstab' << EOF
+##/dev/${DEVX}${idxRoot}    /           ffs     rw,noatime      1   1
+#/dev/${dkRoot}    /           ffs     rw,noatime      1   1
+#/dev/${dkVar}     /var        ffs     rw,noatime,nodev,nosuid      1   2
+#/dev/${dkHome}    /home   ffs     rw,noatime,nodev,nosuid      1   2
+
+NAME=${GRP_NM}-fsRoot    /           ffs     rw,noatime      1   1
+NAME=${GRP_NM}-fsVar     /var        ffs     rw,noatime,nodev,nosuid      1   2
+NAME=${GRP_NM}-fsHome    /home   ffs     rw,noatime,nodev,nosuid      1   2
+
+EOF
   fi
+  sh -c 'cat >> /mnt/etc/fstab' << EOF
+#/dev/${dkSwap}    none        swap    sw,dp      0   0
+
+NAME=${GRP_NM}-fsSwap    none        swap    sw,dp      0   0
+
+swap			         /tmp		mfs		rw,-s=512m		0	0
+tmpfs			         /var/shm	tmpfs	rw,nodev,nosuid,-m1777,-s=512m		0	0
+
+kernfs             /kern       kernfs  rw      0   0
+ptyfs              /dev/pts    ptyfs   rw      0   0
+procfs             /proc       procfs  rw      0   0
+fdesc              /dev        fdesc   ro,-o=union    0   0
+#linprocfs          /compat/linux/proc  linprocfs   rw  0   0
+
+EOF
   dkSwap=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsSwap" | cut -d: -f1)
   swapon /dev/$dkSwap # OR: swapctl -a -p 1 $dkSwap
 

@@ -22,7 +22,7 @@ case $OS_NAME in
     #sudo tar -xf /root/scripts.tar ;
     sudo find /root/init -name 'distro_pkg*' -exec cp {} /tmp/ \; ;
     . /tmp/distro_pkgs.ini ; . /tmp/distro_pkgmgr_funcs.sh ;
-    ${pkgmgr_update} ;;
+    sudo ${pkgmgr_update} ;;
 esac
 
 #===========================================================================#
@@ -194,6 +194,7 @@ EOF
    	concat_sep $file ;
   done
   concat_sep 'sysctl -n kern.hostuuid' ; concat_sep 'sysctl -n hw.uuid'
+  concat_sep 'ls -l /etc/hostid'
   pkg_repos_sources
 
   concat_sep 'sudo fdisk sd0' ; concat_sep 'sudo dkctl sd0 listwedges'
@@ -204,8 +205,9 @@ EOF
   done
   printf "${sep}\nZFS info\n"
   concat_sep 'zfs version' ; concat_sep 'zpool list -v'
-  concat_sep 'zfs list'
+  concat_sep 'zfs list -t all'
 
+  concat_sep 'snapinfo /'
   concat_sep /etc/fstab
   concat_sep 'df -hT -c' ; concat_sep 'df -h'
   concat_sep 'sudo du -hd 1 / 2> /dev/null' | column -xc 78
@@ -317,7 +319,7 @@ EOF
   for file in /etc/hostname /etc/hosts /etc/network/interfaces /etc/resolv.conf ; do
     concat_sep "$file" ;
   done
-  concat_sep 'ls -l /etc/machine-id /var/lib/dbus/machine-id'
+  concat_sep 'ls -l /etc/machine-id /var/lib/dbus/machine-id /etc/hostid'
   pkg_repos_sources
   hddev=$(lsblk -lnpo name,label,partlabel | sed -n '/ESP/ s|.*\(/dev/[sv][a-z]*\)[0-9]*.*|\1|p')
   if sudo -i command -v sgdisk > /dev/null ; then
@@ -356,7 +358,7 @@ EOF
   if sudo -i command -v zfs > /dev/null ; then
     printf "${sep}\nZFS info\n" ;
     concat_sep 'sudo zfs version' ; concat_sep 'sudo zpool list -v' ;
-    concat_sep 'sudo zfs list' ;
+    concat_sep 'sudo zfs list -t all' ;
   fi
   if sudo -i command -v btrfs > /dev/null ; then
     printf "${sep}\nBtrfs info\n" ;

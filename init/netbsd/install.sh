@@ -20,39 +20,13 @@ elif [ -e /dev/wd0 ] ; then
   export DEVX=wd0 ;
 fi
 
+export VOL_MGR=${VOL_MGR:-std}
 export GRP_NM=${GRP_NM:-bsd1} ; export ZPOOLNM=${ZPOOLNM:-fspool0}
-export REL=${REL:-$(sysctl -n kern.osrelease)} ; export MACHINE=${MACHINE:-$(uname -m)}
-export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/NetBSD}
-
-export INIT_HOSTNAME=${1:-netbsd-boxv0000}
-export PASSWD_PLAIN=${2:-packer}
-#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
-
-idxESP=$(echo $(gpt show -l $DEVX | grep -e ESP) | cut -d' ' -f3)
-#idxRoot=$(echo $(gpt show -l $DEVX | grep -e "${GRP_NM}-fsRoot") | cut -d' ' -f3)
-#dkRoot=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsRoot" | cut -d: -f1)
-#dkVar=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsVar" | cut -d: -f1)
-#dkHome=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsHome" | cut -d: -f1)
-dkSwap=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsSwap" | cut -d: -f1)
-dkESP=$(dkctl $DEVX listwedges | grep -e ESP | cut -d: -f1)
-
-echo "Create /etc/fstab" ; sleep 3
-mkdir -p /mnt/etc /mnt/kern /mnt/proc /mnt/compat/linux/proc
-sh -c 'cat > /mnt/etc/fstab' << EOF
-#/dev/${dkSwap}    none        swap    sw,dp      0   0
-
-NAME=${GRP_NM}-fsSwap    none        swap    sw,dp      0   0
-
-swap			/tmp		mfs		rw,-s=512m		0	0
-tmpfs			/var/shm	tmpfs	rw,nodev,nosuid,-m1777,-s=512m		0	0
-
-kernfs             /kern       kernfs  rw      0   0
-ptyfs              /dev/pts    ptyfs   rw      0   0
-procfs             /proc       procfs  rw      0   0
-fdesc              /dev        fdesc   ro,-o=union    0   0
-#linprocfs          /compat/linux/proc  linprocfs   rw  0   0
-
-EOF
+export MACHINE=${MACHINE:-$(uname -m)}
+# ftp.netbsd.org/pub/NetBSD | mirror.math.princeton.edu/pub/NetBSD
+export MIRROR=${MIRROR:-ftp.netbsd.org/pub/NetBSD}
+export REL=${REL:-$(sysctl -n kern.osrelease)}
+export DISTARCHIVE_FETCH=${DISTARCHIVE_FETCH:-0}
 
 
 # ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
@@ -63,34 +37,49 @@ ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 #sysctl net.wlan.devices ; sleep 3
 
 
-echo "Extracting netbsd dist archives" ; sleep 3
-for file in kern-GENERIC base comp etc man misc modules tests text ; do
-    (ftp -o - http://${MIRROR}/NetBSD-${REL}/${MACHINE}/binary/sets/${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
-done
-cd /${MACHINE}/binary/kernel
-(cd /mnt ; tar -xpJf /${MACHINE}/binary/kernel/netbsd-GENERIC.tar.xz ; mv netbsd-GENERIC netbsd)
-#cd /${MACHINE}/binary/sets
-#for file in kern-GENERIC base comp etc man misc modules tests text ; do
-#    (cat ${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
-#done
-##cd /mnt ; mv netbsd netbsd.gen ; ln -fh netbsd.gen netbsd
+idxESP=$(echo $(gpt show -l $DEVX | grep -e ESP) | cut -d' ' -f3)
+idxRoot=$(echo $(gpt show -l $DEVX | grep -e "${GRP_NM}-fsRoot") | cut -d' ' -f3)
+dkRoot=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsRoot" | cut -d: -f1)
+dkVar=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsVar" | cut -d: -f1)
+dkHome=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsHome" | cut -d: -f1)
+dkSwap=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsSwap" | cut -d: -f1)
+dkESP=$(dkctl $DEVX listwedges | grep -e ESP | cut -d: -f1)
 
 
-(cd /mnt/dev ; sh MAKEDEV all)
-mount_kernfs kernfs /mnt/kern ; mount_procfs procfs /mnt/proc
-mount_tmpfs tmpfs /mnt/var/shm ; mount_ptyfs ptyfs /mnt/dev/pts
+bootstrap() {
+  echo "Extracting netbsd dist archives" ; sleep 3
+  if [ "0" = "${DISTARCHIVE_FETCH}" ] || [ -z "${DISTARCHIVE_FETCH}" ] ; then
+    cd /${MACHINE}/binary/kernel ;
+    (cd /mnt ; gunzip -c /${MACHINE}/binary/kernel/netbsd-GENERIC.gz > netbsd-GENERIC ; mv netbsd-GENERIC netbsd) ;
+    cd /${MACHINE}/binary/sets ;
+    for file in kern-GENERIC base comp etc man misc modules tests text ; do
+      (cat ${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
+    done ;
+    #cd /mnt ; mv netbsd netbsd.gen ; ln -fh netbsd.gen netbsd
+  else
+    for file in kern-GENERIC base comp etc man misc modules tests text ; do
+      (ftp -o - http://${MIRROR}/NetBSD-${REL}/${MACHINE}/binary/sets/${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
+    done ;
+  fi
 
-hash_passwd=$(pwhash ${PASSWD_PLAIN})
 
-echo 'zfs=YES' >> /mnt/etc/rc.conf
+  (cd /mnt/dev ; sh MAKEDEV all)
+  mount_kernfs kernfs /mnt/kern ; mount_procfs procfs /mnt/proc
+  mount_tmpfs tmpfs /mnt/var/shm ; mount_ptyfs ptyfs /mnt/dev/pts
+}
 
+system_config() {
+  export INIT_HOSTNAME=${1:-netbsd-boxv0000}
+  export PASSWD_PLAIN=${2:-packer}
+  #export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
-cat << EOFchroot | chroot /mnt /bin/sh
+  hash_passwd=$(pwhash ${PASSWD_PLAIN})
+
+  cat << EOFchroot | chroot /mnt /bin/sh
 set -x
 
-chmod 1777 /tmp ; chmod 1777 /var/tmp
 #ln -s /usr/home /home
-
+chmod 1777 /tmp ; chmod 1777 /var/tmp
 
 cat >> /etc/rc.conf << EOF
 #if [ -r /etc/defaults/rc.conf ] ; then
@@ -158,7 +147,7 @@ EOF
 
 echo "#PKG_PATH=http://${MIRROR}" >> /etc/pkg_install.conf
 echo "PKG_PATH=ftp://ftp.netbsd.org/pub/pkgsrc/packages/NetBSD/${MACHINE}/${REL}/All" >> /etc/pkg_install.conf
-PKG_PATH=http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/${MACHINE}/${REL}/All
+PKG_PATH=http://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/${MACHINE}/${REL}/All
 
 pkg_add -u
 pkg_add -v pkgin sudo gtar gmake
@@ -197,8 +186,34 @@ sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /usr/pkg/etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /usr/pkg/etc/sudoers
 
 
-cp /boot.cfg /boot.cfg.orig
-cat > /boot.cfg << EOF
+#pkg_add -u
+pkgin upgrade
+pkgin -y clean
+
+exit
+
+EOFchroot
+# end chroot commands
+}
+
+bootloader() {
+  if [ "zfs" = "$VOL_MGR" ] ; then
+    echo 'zfs=YES' >> /mnt/etc/rc.conf ;
+  fi
+
+  mkdir -p /mnt/efi ; mount_msdos -l /dev/${dkESP} /mnt/efi
+  (cd /mnt/efi ; mkdir -p EFI/netbsd EFI/BOOT)
+  if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
+    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
+    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+  else
+    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
+    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+  fi
+
+  if [ "zfs" = "$VOL_MGR" ] ; then
+    cp /boot.cfg /boot.cfg.orig ;
+    cat > /boot.cfg << EOF ;
 menu=Boot normally:load solaris;load zfs;rndseed /etc/entropy-file;boot netbsd
 menu=Boot single user:load solaris;load zfs;rndseed /etc/entropy-file;boot netbsd -s
 menu=Disable ACPI:load solaris;load zfs;rndseed /etc/entropy-file;boot netbsd -2
@@ -209,37 +224,45 @@ timeout=15
 clear=1
 
 EOF
-cat /boot.cfg ; sleep 3
+  else
+    #cat >> /mnt/boot.cfg << EOF
+#menu=Boot normally:rndseed /etc/entropy-file;boot netbsd
+#menu=Boot single user:rndseed /etc/entropy-file;boot netbsd -s
+#menu=Disable ACPI:rndseed /etc/entropy-file;boot netbsd -2
+#menu=Disable ACPI and SMP:rndseed /etc/entropy-file;boot netbsd -12
+#menu=Drop to boot prompt:prompt
+#default=1
+#timeout=15
+#clear=1
+#
+#EOF
+  fi
+  cat /mnt/boot.cfg ; sleep 3
 
+  #fsck_ffs /dev/${dkRoot}
+  #fsck_ffs /dev/${dkVar}
+  sync
+}
 
-#pkg_add -u
-pkgin upgrade
+unmount_reboot() {
+  read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
+  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+    umount /mnt/efi ; rm -r /mnt/efi ;
+    sync ; swapctl -d /dev/$dkSwap ; umount -a ;
+    reboot ; #shutdown -p +3 ;
+  fi
+}
 
-pkgin -y clean
+run_install() {
+  INIT_HOSTNAME=${1:-}
+  PASSWD_PLAIN=${2:-}
+  #PASSWD_CRYPTED=${2:-}
 
-sync
+  bootstrap
+  system_config $INIT_HOSTNAME $PASSWD_PLAIN
+  bootloader
+  unmount_reboot
+}
 
-exit
-
-EOFchroot
-# end chroot commands
-
-tar -xf /tmp/scripts.tar -C /mnt/root/ ; sleep 5
-
-
-mkdir -p /mnt/efi ; mount_msdos -l /dev/${dkESP} /mnt/efi
-(cd /mnt/efi ; mkdir -p EFI/netbsd EFI/BOOT)
-if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
-  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
-  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
-else
-  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
-  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
-fi
-
-read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
-  umount /mnt/efi ; rm -r /mnt/efi ;
-  sync ; swapctl -d /dev/$dkSwap ; umount -a ;
-  reboot ; #shutdown -p +3 ;
-fi
+#----------------------------------------
+$@

@@ -1,5 +1,5 @@
-#mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}
-#truncate -s ${DISK_SZ:-30720M} ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/${GUEST:-freebsd-x86_64-zfs}.raw
+mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}
+truncate -s ${DISK_SZ:-30720M} ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/${GUEST:-freebsd-x86_64-zfs}.raw
 
 printf "%40s\n" | tr ' ' '#'
 echo '### Warning: FreeBSD bhyve currently requires root/sudo permission ###'

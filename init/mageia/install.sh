@@ -20,36 +20,14 @@ elif [ -e /dev/sda ] ; then
   export DEVX=sda ;
 fi
 
-export GRP_NM=${GRP_NM:-vg0} ; RELEASE=${RELEASE:-8}
-export MIRROR=${MIRROR:-mirrors.kernel.org/mageia} ; UNAME_M=$(uname -m)
-
-export INIT_HOSTNAME=${1:-mageia-boxv0000}
-#export PASSWD_PLAIN=${2:-packer}
-export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
+export VOL_MGR=${VOL_MGR:-std}
+export GRP_NM=${GRP_NM:-vg0}
+export MIRROR=${MIRROR:-mirrors.kernel.org/mageia}
+export RELEASE=${RELEASE:-8}
+export UNAME_M=$(uname -m)
 
 export YUMCMD="yum --setopt=requires_policy=strong --setopt=group_package_types=mandatory --releasever=${RELEASE}"
 export DNFCMD="dnf --setopt=install_weak_deps=False --releasever=${RELEASE}"
-
-
-echo "Create /etc/fstab" ; sleep 3
-mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
-sh -c 'cat > /mnt/etc/fstab' << EOF
-PARTLABEL=${PV_NM:-pvol0}  /          auto    noatime,compress=lzo,subvol=/@   0   0
-PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
-PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
-PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
-
-PARTLABEL=${PV_NM:-pvol0}  /.snapshots  auto    noatime,compress=lzo,subvol=/@/.snapshots   0   0
-PARTLABEL=${PV_NM:-pvol0}  /var  auto    noatime,compress=lzo,subvol=/@/var   0   0
-PARTLABEL=${PV_NM:-pvol0}  /tmp  auto    noatime,compress=lzo,subvol=/@/tmp   0   0
-PARTLABEL=${PV_NM:-pvol0}  /home  auto    noatime,compress=lzo,subvol=/@/home   0   0
-
-proc                            /proc       proc    defaults    0   0
-sysfs                           /sys        sysfs   defaults    0   0
-
-#9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
-
-EOF
 
 
 # ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
@@ -59,50 +37,54 @@ EOF
 #ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
-echo "Bootstrap base pkgs" ; sleep 3
-if command -v dnf > /dev/null ; then
-  #${DNFCMD} --nogpgcheck -y --installroot=/mnt --repofrompath=quickrepo${RELEASE},http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/ --repo=quickrepo${RELEASE} install urpmi dnf dnf-plugins-core locales-en btrfs-progs ;
-  ${DNFCMD} --nogpgcheck -y --installroot=/mnt config-manager --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
-  dnf -y --installroot=/mnt check-update ;
-  ${DNFCMD} --nogpgcheck -y --installroot=/mnt install basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
-  dnf -y --installroot=/mnt repolist ;
-elif command -v yum-config-manager > /dev/null ; then
-  rm -r /mnt/var/lib/rpm /mnt/var/cache/dnf ;
-  mkdir -p /mnt/var/lib/rpm /mnt/var/cache/dnf ;
-  rpm -v --root /mnt --initdb ;
-  # [wget -O file url | curl -L -o file url]
-  #wget -O /tmp/repos.rpm http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/mageia-repos-7-3.mga7.${UNAME_M}.rpm ;
-  #rpm -v -qip /tmp/repos.rpm ; sleep 5 ;
-  #rpm -v --root /mnt --nodeps -i /tmp/repos.rpm ;
-  yum-config-manager --releasever=${RELEASE} --nogpgcheck -y --installroot=/mnt --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
-  yum -y --installroot=/mnt check-update ;
-  ${YUMCMD} --nogpgcheck -y --installroot=/mnt install basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
-  yum -y --installroot=/mnt repolist ;
-elif command -v urpmi > /dev/null ; then
-  #urpmi.addmedia --urpmi-root /mnt --distrib --mirrorlist '$MIRRORLIST'
-	urpmi.addmedia --urpmi-root /mnt --distrib http://${MIRROR}/distrib/${RELEASE}/${UNAME_M} ;
-	urpmi.update --urpmi-root /mnt -a ;
-	urpmi --no-recommends --auto --urpmi-root /mnt basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
-	urpmq --list-url ;
-fi
-sleep 5
+bootstrap() {
+  echo "Bootstrap base pkgs" ; sleep 3
+  if command -v dnf > /dev/null ; then
+    #${DNFCMD} --nogpgcheck --installroot=/mnt --repofrompath=quickrepo${RELEASE},http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/ --repo=quickrepo${RELEASE} install -y urpmi dnf dnf-plugins-core locales-en ;
+    ${DNFCMD} --nogpgcheck --installroot=/mnt config-manager -y --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
+    ${DNFCMD} --installroot=/mnt check-update -y ;
+    ${DNFCMD} --nogpgcheck --installroot=/mnt install -y basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
+    ${DNFCMD} --installroot=/mnt repolist -y ;
+  elif command -v yum-config-manager > /dev/null ; then
+    rm -r /mnt/var/lib/rpm /mnt/var/cache/dnf ;
+    mkdir -p /mnt/var/lib/rpm /mnt/var/cache/dnf ;
+    rpm -v --root /mnt --initdb ;
+    # [wget -O file url | curl -Lo file url]
+    #wget -O /tmp/repos.rpm http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/mageia-repos-8-1.mga8.${UNAME_M}.rpm ;
+    #rpm -v -qip /tmp/repos.rpm ; sleep 5 ;
+    #rpm -v --root /mnt --nodeps -i /tmp/repos.rpm ;
+    yum-config-manager --releasever=${RELEASE} --nogpgcheck --installroot=/mnt -y --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
+    ${YUMCMD} --installroot=/mnt check-update -y ;
+    ${YUMCMD} --nogpgcheck --installroot=/mnt install -y basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
+    ${YUMCMD} --installroot=/mnt repolist -y ;
+  elif command -v urpmi > /dev/null ; then
+    #urpmi.addmedia --urpmi-root /mnt --distrib --mirrorlist '$MIRRORLIST'
+    urpmi.addmedia --urpmi-root /mnt --distrib http://${MIRROR}/distrib/${RELEASE}/${UNAME_M} ;
+    urpmi.update --urpmi-root /mnt -a ;
+    urpmi --no-recommends --auto --urpmi-root /mnt basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
+    urpmq --list-url ;
+  fi
 
+  echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
+  cp /etc/mtab /mnt/etc/mtab
+  mkdir -p /mnt/dev /mnt/proc /mnt/sys /mnt/run
+  mount --rbind /proc /mnt/proc ; mount --rbind /sys /mnt/sys
+  mount --rbind /dev /mnt/dev
 
-echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
-cp /etc/mtab /mnt/etc/mtab
-mkdir -p /mnt/dev /mnt/proc /mnt/sys /mnt/run
-mount --rbind /proc /mnt/proc ; mount --rbind /sys /mnt/sys
-mount --rbind /dev /mnt/dev
+  mount --rbind /dev/pts /mnt/dev/pts ; mount --rbind /run /mnt/run
+  modprobe efivarfs
+  mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars/
 
-mount --rbind /dev/pts /mnt/dev/pts ; mount --rbind /run /mnt/run
-modprobe efivarfs
-mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars/
+  #mkdir -p /mnt/var/empty /mnt/var/lock/subsys /mnt/etc/sysconfig/network-scripts
+  #cp /etc/sysconfig/network-scripts/ifcfg-$ifdev /mnt/etc/sysconfig/network-scripts/ifcfg-${ifdev}.bak
+  cp /etc/resolv.conf /mnt/etc/resolv.conf
+  sleep 5
+}
 
-
-#mkdir -p /mnt/var/empty /mnt/var/lock/subsys /mnt/etc/sysconfig/network-scripts
-#cp /etc/sysconfig/network-scripts/ifcfg-$ifdev /mnt/etc/sysconfig/network-scripts/ifcfg-${ifdev}.bak
-cp /etc/resolv.conf /mnt/etc/resolv.conf
-
+system_config() {
+export INIT_HOSTNAME=${1:-mageia-boxv0000}
+#export PASSWD_PLAIN=${2:-packer}
+export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
 # LANG=[C|en_US].UTF-8
 cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en chroot /mnt /bin/sh
@@ -128,23 +110,21 @@ echo "Config pkg repo mirror(s)" ; sleep 3
 #urpmi.addmedia --distrib http://${MIRROR}/distrib/\${VERSION_ID}/${UNAME_M}
 #urpmq --list-url ; sleep 5
 ${DNFCMD} config-manager --set-enabled \${ID}-${UNAME_M} updates-${UNAME_M}
-${DNFCMD} -y --refresh distro-sync
+${DNFCMD} --refresh distro-sync -y
 #cat /etc/yum.repos.d/* ; sleep 5
-${DNFCMD} -y repolist enabled ; sleep 5
+${DNFCMD} repolist -y enabled ; sleep 5
 
 
 echo "Add software package selection(s)" ; sleep 3
-pkgs_nms="basesystem kernel-desktop-latest microcode_ctl locales-en sudo dhcp-client man-pages dosfstools xfsprogs openssh-server nano mandi-ifw shorewall shorewall-ipv6 urpmi dnf dnf-plugins-core harddrake-ui grub grub2-efi efibootmgr btrfs-progs" # task-xfce"
+pkgs_nms="basesystem-minimal locales-en sudo whois dhcp-client man-pages dosfstools xfsprogs openssh-server nano mandi-ifw shorewall shorewall-ipv6 urpmi dnf dnf-plugins-core harddrake-ui systemd" # task-xfce"
 #urpmi.update -a
-${DNFCMD} -y check-update
+${DNFCMD} check-update -y
 for pkgX in \$pkgs_nms ; do
   #urpmi --no-recommends --auto \$pkgX ;
-  ${DNFCMD} -y install \$pkgX ;
+  ${DNFCMD} install -y \$pkgX ;
 done
-dnf -y check-update
-${DNFCMD} -y install 'dnf-command(versionlock)'
-
-modprobe btrfs
+${DNFCMD} check-update -y
+${DNFCMD} install -y 'dnf-command(versionlock)'
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -202,6 +182,7 @@ echo "Update services" ; sleep 3
 service shorewall stop ; service shorewall6 stop
 systemctl disable shorewall ; systemctl disable shorewall6
 service -s ; service --status-all ; sleep 5
+systemctl enable sshd
 
 
 echo "Set root passwd ; add user" ; sleep 3
@@ -226,15 +207,49 @@ sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
 echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
+${DNFCMD} clean -y all
+
+exit
+
+EOFchroot
+# end chroot commands
+}
+
+kernel_bootloader() {
+  # LANG=[C|en_US].UTF-8
+  cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en chroot /mnt /bin/sh
+set -x
+
+. /etc/os-release
+#urpmi.update -a
+${DNFCMD} check-update -y
+
+pkgs_nms="basesystem kernel-desktop-latest microcode_ctl grub grub2-efi efibootmgr"
+for pkgX in \$pkgs_nms ; do
+  #urpmi --no-recommends --auto \$pkgX ;
+  ${DNFCMD} install -y \$pkgX ;
+done
+
+if [ "btrfs" = "$VOL_MGR" ] ; then
+  #urpmi --no-recommends --auto btrfs-progs ;
+  ${DNFCMD} install -y btrfs-progs ;
+  modprobe btrfs ; sleep 5 ;
+elif [ "lvm" = "$VOL_MGR" ] ; then
+  #urpmi --no-recommends --auto lvm2 ;
+  ${DNFCMD} install -y lvm2 ;
+  # cryptsetup
+  modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
+fi
 
 echo "Config dracut"
 echo 'hostonly="yes"' >> /etc/dracut.conf
 mkdir -p /etc/dracut.conf.d
-kver="\$(ls -A /lib/modules/ | tail -1)"
-#dracut --force --kver \$(uname -r)
+kver="\$(ls -A /lib/modules/ | tail -1)" # or ? $(uname -r)
+#mkinitrd /boot/initrd-\$kver \$kver
 dracut --force --kver \$kver
-mkinitrd
 
+
+grub2-probe /boot
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
@@ -257,9 +272,15 @@ fi
 #sed -i -e "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 #echo "#GRUB_CMDLINE_LINUX='cryptdevice=/dev/sda2:cryptroot'" >> /etc/default/grub
-echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5 resume=/dev/foo"|'  \
   /etc/default/grub
+
+if [ "btrfs" = "$VOL_MGR" ] ; then
+  echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
+elif [ "lvm" = "$VOL_MGR" ] ; then
+  echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
+fi
+
 if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
@@ -276,24 +297,46 @@ else
 fi
 efibootmgr -v ; sleep 3
 
-
-# enable ssh just before finish
-systemctl enable sshd
-
-
-${DNFCMD} -y clean all
-fstrim -av
-sync
+whois-mkpasswd -m help ; sleep 10
 
 exit
 
 EOFchroot
 # end chroot commands
 
-tar -xf /tmp/scripts.tar -C /mnt/root/ ; sleep 5
+  . /mnt/etc/os-release
+  snapshot_name=${ID}_install-$(date "+%Y%m%d")
 
-read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
-  sync ; swapoff -va ; umount -vR /mnt ;
-  reboot ; #poweroff ;
-fi
+  if [ "btrfs" = "$VOL_MGR" ] ; then
+    btrfs subvolume snapshot /mnt /mnt/.snapshots/${snapshot_name} ;
+    # example remove: btrfs subvolume delete /.snapshots/snap1
+    btrfs subvolume list /mnt ;
+  elif [ "lvm" = "$VOL_MGR" ] ; then
+    lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+    lvs ;
+  fi
+  sleep 5 ; fstrim -av
+  sync
+}
+
+unmount_reboot() {
+  read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
+  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+    sync ; swapoff -va ; umount -vR /mnt ;
+    reboot ; #poweroff ;
+  fi
+}
+
+run_install() {
+  INIT_HOSTNAME=${1:-}
+  #PASSWD_PLAIN=${2:-}
+  PASSWD_CRYPTED=${2:-}
+
+  bootstrap
+  system_config $INIT_HOSTNAME $PASSWD_CRYPTED
+  kernel_bootloader
+  unmount_reboot
+}
+
+#----------------------------------------
+$@

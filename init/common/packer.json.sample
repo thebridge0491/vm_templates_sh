@@ -33,8 +33,8 @@
     "iso_url": "",
     "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base_x64`}}-disc1.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_base_x64`}}-disc1.iso"],
     "boot_command": [
-      "<esc><wait5>boot -s<wait><enter><wait10><wait10>/bin/sh<enter><wait>",
-      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-install.sh ; geom -t ; sleep 3 ; sh -x /tmp/disk_setup.sh part_format {{user `vol_mgr`}} ; sh -x /tmp/disk_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} sh -x /tmp/install.sh {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
+      "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "l<wait5>root<enter><wait10>",
+      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/install.sh ; geom -t ; sleep 3 ; sh -x /tmp/gpart_setup.sh part_format {{user `vol_mgr`}} ; sh -x /tmp/gpart_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} DISTARCHIVE_FETCH={{user `distarchive_fetch`}} VOL_MGR={{user `vol_mgr`}} sh -x /tmp/install.sh run_install {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
     ]
   },
   {
@@ -72,7 +72,7 @@
     "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base_x64`}}-disc1.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_base_x64`}}-disc1.iso"],
     "boot_command": [
       "2<enter><wait10><wait10><enter><wait>",
-      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch -o /tmp/disk_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup_vmfreebsd.sh ; fetch -o /tmp/installscript http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installscript ; export PASSWD_CRYPTED='{{user `passwd_crypted`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; geom -t ; sleep 3 ; bsdinstall script /tmp/installscript<enter>"
+      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installscript ; export PASSWD_CRYPTED='{{user `passwd_crypted`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; geom -t ; sleep 3 ; bsdinstall script /tmp/{{user `vol_mgr`}}-installscript<enter>"
     ]
   }],
 
@@ -149,7 +149,7 @@
       "vagrantfile_template": "Vagrantfile.template",
       "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
         "init/common/qemu_lxc/vmrun_qemu_x86_64.args",
-        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `firmware_qemu_x64`}}"],
+        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `firmware_qemu_x64`}}", "{{user `nvram_qemu_x64`}}"],
       "output": "output-vms/{{user `variant`}}-x86_64-{{user `vol_mgr`}}/{{user `variant`}}-x86_64-{{user `vol_mgr`}}-{{user `build_timestamp`}}.{{.Provider}}.box",
       "only": ["qemu_x86_64"]
     },
@@ -178,15 +178,17 @@
     "iso_base_x64": "FreeBSD-13.1-RELEASE-amd64",
 
     "firmware_qemu_x64": "/usr/share/OVMF/OVMF_CODE.fd",
+    "nvram_qemu_x64": "/usr/share/OVMF/OVMF_VARS.fd",
     "disk_size": "30720M",
     "headless": "",
     "passwd_plain": "packer",
-    "passwd_crypted": "$6$16CHARACTERSSALT$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1",
+    "passwd_crypted": "",
     "author": "imcomputer",
     "home": "{{env `HOME`}}",
     "build_timestamp": "{{isotime `2006.01`}}",
     "datestamp": "{{isotime `2006.01.02`}}",
-    "mac_last3": "{{isotime `15:04:05`}}"
+    "mac_last3": "{{isotime `15:04:05`}}",
+    "distarchive_fetch": "1"
   },
   "sensitive-variables": ["passwd_plain", "passwd_crypted"]
 }

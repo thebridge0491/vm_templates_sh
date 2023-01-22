@@ -1,5 +1,10 @@
 # usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
+variable "RELEASE" {
+  type    = string
+  default = ""
+}
+
 variable "author" {
   type    = string
   default = "thebridge0491"
@@ -60,9 +65,14 @@ variable "mkfs_cmd" {
   default = "mkfs.ext4"
 }
 
+variable "nvram_qemu_x64" {
+  type    = string
+  default = "/usr/share/OVMF/OVMF_VARS.fd"
+}
+
 variable "passwd_crypted" {
   type    = string
-  default = "$6$16CHARACTERSSALT$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1"
+  default = ""
   sensitive = true
 }
 
@@ -102,11 +112,14 @@ locals {
   #datestamp       = "${legacy_isotime("2006.01.02")}"
   build_timestamp  = "${formatdate("YYYY.MM", timestamp())}"
   datestamp        = "${formatdate("YYYY.MM.DD", timestamp())}"
-  mac_last3          = "${formatdate("hh:mm:ss", timestamp())}"
+  mac_last3        = "${formatdate("hh:mm:ss", timestamp())}"
 }
 
 source "qemu" "qemu_x86_64" {
-  boot_command       = ["<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 keyb=us<enter>initrd /isolinux/initrd.gz<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10><enter>", "guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lib64hal1 lvm2 btrfs-progs ; apt-get -y --fix-broken install ; ", "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{ .HTTPIP }}:{{ .HTTPPort }}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/post_install.sh 'http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/${var.vol_mgr}-post_drakliveinstall.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sfdisk ${var.vol_mgr} ; echo '' ; echo '(btrfs) USE Custom partitioning in draklive-install WITH Mount options advanced for / (root): subvol=@' ; echo '' ; sleep 30 ; draklive-install --expert --noauto ; sh -x /tmp/post_install.sh ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+  #boot_command       = ["<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 keyb=us textmode=1 text 3<enter>initrd /isolinux/initrd.gz<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10><enter>", "guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lib64hal1 lvm2 btrfs-progs ; apt-get -y --fix-broken install ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sfdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+
+  boot_command       = ["<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 keyb=us<enter>initrd /isolinux/initrd.gz<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10><enter>", "guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lib64hal1 lvm2 btrfs-progs ; apt-get -y --fix-broken install ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/post_drakliveinstall.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sfdisk ${var.vol_mgr} ; echo '' ; echo '(btrfs) USE Custom partitioning in draklive-install WITH Mount options advanced for / (root): subvol=@' ; echo '' ; sleep 30 ; draklive-install --expert --noauto ; env VOL_MGR=${var.vol_mgr} sh -x /tmp/post_drakliveinstall.sh run_postinstall ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -120,7 +133,7 @@ source "qemu" "qemu_x86_64" {
   machine_type       = "q35"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{ .Name }}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"
@@ -148,19 +161,19 @@ build {
 
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
-    execute_command  = "env {{ .Vars }} sudo sh -x '{{ .Path }}'"
+    execute_command  = "env {{.Vars}} sudo sh -x '{{.Path}}'"
     inline           = ["tar -xf /tmp/scripts.tar -C /tmp ; mv /tmp/${var.variant} /tmp/scripts", "cp -a /tmp/init /tmp/scripts /root/"]
   }
 
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
-    execute_command  = "env {{ .Vars }} sudo -E sh -eux '{{ .Path }}'"
+    execute_command  = "env {{.Vars}} sudo -E sh -eux '{{.Path}}'"
     scripts          = ["init/${var.variant}/vagrantuser.sh"]
   }
 
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
-    execute_command  = "env {{ .Vars }} sudo -E sh -eux '{{ .Path }}'"
+    execute_command  = "env {{.Vars}} sudo -E sh -eux '{{.Path}}'"
     except           = ["qemu.qemu_x86_64"]
     scripts          = ["init/common/linux/zerofill.sh"]
   }
@@ -168,13 +181,13 @@ build {
   post-processor "checksum" {
     checksum_types = ["sha256"]
     only           = ["qemu.qemu_x86_64"]
-    output         = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}.{{ .BuilderType }}.{{ .ChecksumType }}"
+    output         = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}.{{.BuilderType}}.{{.ChecksumType}}"
   }
   post-processor "vagrant" {
     keep_input_artifact  = true
-    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_x86_64.args", "init/common/qemu_lxc/vmrun_bhyve.args", "${var.firmware_qemu_x64}"]
+    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_x86_64.args", "init/common/qemu_lxc/vmrun_bhyve.args", "${var.firmware_qemu_x64}", "${var.nvram_qemu_x64}"]
     only                 = ["qemu.qemu_x86_64"]
-    output               = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}-${local.build_timestamp}.{{ .Provider }}.box"
+    output               = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}-${local.build_timestamp}.{{.Provider}}.box"
     vagrantfile_template = "Vagrantfile.template"
   }
   post-processor "shell-local" {

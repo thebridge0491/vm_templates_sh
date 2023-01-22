@@ -20,40 +20,16 @@ elif [ -e /dev/sda ] ; then
   export DEVX=sda ;
 fi
 
-export GRP_NM=${GRP_NM:-vg0}
+export VOL_MGR=${VOL_MGR:-std}
+export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
 # [deb.devuan.org/merged | deb.debian.org/debian]
 export MIRROR=${MIRROR:-deb.devuan.org/merged}
 if [ "aarch64" = "$(uname -m)" ] ; then
-  MACHINE=arm64 ;
+  export MACHINE=arm64 ;
 elif [ "x86_64" = "$(uname -m)" ] ; then
-  MACHINE=amd64 ;
+  export MACHINE=amd64 ;
 fi
-service_mgr=${service_mgr:-sysvinit} # sysvinit | runit | openrc
-
-export INIT_HOSTNAME=${1:-debian-boxv0000}
-#export PASSWD_PLAIN=${2:-packer}
-export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
-
-
-echo "Create /etc/fstab" ; sleep 3
-mkdir -p /mnt/etc /mnt/media ; chmod 0755 /mnt/media
-sh -c 'cat > /mnt/etc/fstab' << EOF
-LABEL=${GRP_NM}-osRoot   /           auto    errors=remount-ro   0   1
-LABEL=${GRP_NM}-osVar    /var        auto    defaults    0   2
-LABEL=${GRP_NM}-osHome   /home       auto    defaults    0   2
-PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
-PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
-PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
-
-proc                            /proc       proc    defaults    0   0
-sysfs                           /sys        sysfs   defaults    0   0
-
-#9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
-
-#PARTLABEL=data0    /mnt/Data0   exfat   auto,failok,rw,gid=sudo,uid=0   0    0
-#PARTLABEL=data0    /mnt/Data0   exfat   auto,failok,rw,dmask=0000,fmask=0111   0    0
-
-EOF
+export service_mgr=${service_mgr:-sysvinit} # sysvinit | runit | openrc
 
 
 # ip link ; dhclient {ifdev} #; iw dev
@@ -62,26 +38,33 @@ EOF
 #ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
-echo "Bootstrap base pkgs" ; sleep 3
-#debootstrap --no-check-gpg --arch ${MACHINE} --variant minbase ${RELEASE:-stable} /mnt file:/cdrom/debian/
-debootstrap --verbose --no-check-gpg --arch ${MACHINE} ${RELEASE:-stable} /mnt http://${MIRROR}
+bootstrap() {
+  echo "Bootstrap base pkgs" ; sleep 3
+  #debootstrap --no-check-gpg --arch ${MACHINE} --variant minbase ${RELEASE:-stable} /mnt file:/cdrom/debian/
+  debootstrap --verbose --no-check-gpg --arch ${MACHINE} ${RELEASE:-stable} /mnt http://${MIRROR}
 
-echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
-cp /etc/mtab /mnt/etc/mtab
-mkdir -p /mnt/dev /mnt/proc /mnt/sys /mnt/run
-mount --rbind /proc /mnt/proc ; mount --rbind /sys /mnt/sys
-mount --rbind /dev /mnt/dev
+  echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
+  cp /etc/mtab /mnt/etc/mtab
+  mkdir -p /mnt/dev /mnt/proc /mnt/sys /mnt/run
+  mount --rbind /proc /mnt/proc ; mount --rbind /sys /mnt/sys
+  mount --rbind /dev /mnt/dev
 
-mount --rbind /dev/pts /mnt/dev/pts ; mount --rbind /run /mnt/run
-modprobe efivarfs
-mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars/
-
-
-cp /etc/resolv.conf /mnt/etc/resolv.conf
+  mount --rbind /dev/pts /mnt/dev/pts ; mount --rbind /run /mnt/run
+  modprobe efivarfs
+  mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars/
 
 
-# LANG=[C|en_US].UTF-8
-cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en chroot /mnt /bin/sh
+  cp /etc/resolv.conf /mnt/etc/resolv.conf
+  sleep 5
+}
+
+system_config() {
+  export INIT_HOSTNAME=${1:-debian-boxv0000}
+  #export PASSWD_PLAIN=${2:-packer}
+  export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
+
+  # LANG=[C|en_US].UTF-8
+  cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en chroot /mnt /bin/sh
 set -x
 
 chmod 1777 /tmp ; chmod 1777 /var/tmp
@@ -115,7 +98,7 @@ cd /dev ; MAKEDEV generic
 
 
 echo "Config pkg repo components(main contrib non-free)" ; sleep 3
-sed -i 's|VERSION_CODENAME="\(.*\) .*"|VERSION_CODENAME="\1"|' /etc/os-release
+#sed -i 's|VERSION_CODENAME="\(.*\) .*"|VERSION_CODENAME="\1"|' /etc/os-release
 . /etc/os-release
 sed -i "s| stable| \${VERSION_CODENAME}|" /etc/apt/sources.list
 sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
@@ -125,13 +108,11 @@ cat /etc/apt/sources.list ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
 apt-get --yes update --allow-releaseinfo-change
-for pkgX in linux-image-${MACHINE} grub-efi-${MACHINE} efibootmgr grub-pc-bin sudo curl tasksel bsdextrautils linux-headers-${MACHINE} lvm2 ; do
-  apt-get --yes install --no-install-recommends \$pkgX
+for pkgX in sudo whois curl tasksel bsdextrautils ; do
+  apt-get --yes install --no-install-recommends \$pkgX ;
 done
 # xfce4
 tasksel install standard
-
-modprobe dm-mod ; vgscan ; vgchange -ay ; lvs
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -219,21 +200,86 @@ if [ "devuan" = "\${ID}" ] || [ "debian" = "\${ID}" ] ; then
   fi ;
   apt-get --yes install --no-install-recommends \${service_pkgs} ;
 fi
+
+apt-get --yes install --no-install-recommends openssh-server
+
 if command -v sv > /dev/null ; then
-  ln -s /etc/sv/lvm2-lvmpolld /etc/service ;
   ln -s /etc/sv/eudev /etc/service ;
+  sv down ssh ; ln -s /etc/sv/ssh /etc/service/ ;
 elif command -v rc-update > /dev/null ; then
-  rc-update add lvm2-lvmpolld default ;
   rc-update add eudev default ;
+  rc-service sshd stop ; rc-update add sshd defaults ;
 elif command -v update-rc.d > /dev/null ; then
-  update-rc.d lvm2-lvmpolld defaults ;
   update-rc.d eudev defaults ;
+  invoke-rc.d ssh stop ; update-rc.d ssh defaults ;
+  invoke-rc.d sshd stop ; update-rc.d sshd defaults ;
 elif command -v systemctl > /dev/null ; then
-  systemctl enable lvmetad ;
-  systemctl enable lvm2-lvmpolld ;
   systemctl enable udev ;
+  systemctl stop ssh ; systemctl enable ssh ;
 fi
 
+apt-get -y clean
+
+exit
+
+EOFchroot
+# end chroot commands
+}
+
+kernel_bootloader() {
+  # LANG=[C|en_US].UTF-8
+  cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en chroot /mnt /bin/sh
+set -x
+
+#sed -i 's|VERSION_CODENAME="\(.*\) .*"|VERSION_CODENAME="\1"|' /etc/os-release
+. /etc/os-release
+
+apt-get --yes install --no-install-recommends linux-image-${MACHINE} linux-headers-${MACHINE} grub-efi-${MACHINE} efibootmgr
+
+if [ "amd64" = "${MACHINE}" ] ; then
+  apt-get --yes install --no-install-recommends grub-pc-bin ;
+fi
+
+if [ "zfs" = "$VOL_MGR" ] ; then
+  apt-get --yes install --no-install-recommends dkms ;
+  # spl-dkms dpkg-dev
+  DEBIAN_FRONTEND=noninteractive apt-get --yes install \
+    -t \${VERSION_CODENAME}-backports zfs-initramfs ;
+  # zfs-dkms zfsutils-linux
+  echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ;
+  modprobe zfs ; zfs version ; sleep 5 ;
+
+  zgenhostid -f -o /etc/hostid ; sleep 5 ;
+
+  echo "Hold zfs & kernel package upgrades (require manual upgrade)" ;
+  apt-mark hold linux-image-${MACHINE} linux-headers-${MACHINE} \
+    linux-image-\$(uname -r) linux-headers-\$(uname -r) \
+    zfs-dkms zfsutils-linux zfs-initramfs ;
+  #dpkg -l | grep "^hi" ;
+  apt-mark showhold ; sleep 3 ;
+elif [ "btrfs" = "$VOL_MGR" ] ; then
+  apt-get --yes install --no-install-recommends btrfs-progs ;
+  modprobe btrfs ; sleep 5 ;
+elif [ "lvm" = "$VOL_MGR" ] ; then
+  apt-get --yes install --no-install-recommends lvm2 ;
+  # cryptsetup
+  modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
+
+  if command -v sv > /dev/null ; then
+    ln -s /etc/sv/lvm2-lvmpolld /etc/service ;
+  elif command -v rc-update > /dev/null ; then
+    rc-update add lvm2-lvmpolld default ;
+  elif command -v update-rc.d > /dev/null ; then
+    update-rc.d lvm2-lvmpolld defaults ;
+  elif command -v systemctl > /dev/null ; then
+    systemctl enable lvmetad ; systemctl enable lvm2-lvmpolld ;
+  fi ;
+fi
+
+update-initramfs -c -k all
+
+
+grub-probe /boot
 
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
@@ -256,9 +302,18 @@ fi
 #sed -i -e "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 #echo "#GRUB_CMDLINE_LINUX='cryptdevice=/dev/sda2:cryptroot'" >> /etc/default/grub
-echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5"|'  \
   /etc/default/grub
+
+if [ "zfs" = "$VOL_MGR" ] ; then
+  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|nomodeset rootdelay|nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay|' /etc/default/grub ;
+  echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub ;
+elif [ "btrfs" = "$VOL_MGR" ] ; then
+  echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
+elif [ "lvm" = "$VOL_MGR" ] ; then
+  echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
+fi
+
 if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
@@ -273,23 +328,58 @@ else
 fi
 efibootmgr -v ; sleep 3
 
-
-# install/enable ssh just before finish
-apt-get --yes install --no-install-recommends openssh-server
-
-apt-get -y clean
-fstrim -av
-sync
+mkpasswd -m help ; sleep 10
 
 exit
 
 EOFchroot
-# end chroot commands
 
-tar -xf /tmp/scripts.tar -C /mnt/root/ ; sleep 5
+  . /mnt/etc/os-release
+  #snapshot_name=${ID}_install-$(date "+%Y%m%d")
+  snapshot_name=${VERSION_CODENAME}_install-$(date "+%Y%m%d")
 
-read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
-  sync ; swapoff -va ; umount -vR /mnt ;
-  reboot ; #poweroff ;
-fi
+  if [ "zfs" = "$VOL_MGR" ] ; then
+    zfs snapshot ${ZPOOLNM}/ROOT/default@${snapshot_name} ;
+    # example remove: zfs destroy ospool0/ROOT/default@snap1
+    zfs list -t snapshot ; sleep 5 ;
+
+    zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
+  else
+    if [ "btrfs" = "$VOL_MGR" ] ; then
+      btrfs subvolume snapshot /mnt /mnt/.snapshots/${snapshot_name} ;
+      # example remove: btrfs subvolume delete /.snapshots/snap1
+      btrfs subvolume list /mnt ;
+    elif [ "lvm" = "$VOL_MGR" ] ; then
+      lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+      lvs ;
+    fi ;
+    sleep 5 ; fstrim -av ;
+  fi
+  sync
+}
+
+unmount_reboot() {
+  read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
+  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+    sync ; swapoff -va ; umount -vR /mnt ;
+    if [ "zfs" = "$VOL_MGR" ] ; then
+      #zfs umount -a ; zpool export -a ;
+      zfs umount -a ; zpool export $ZPOOLNM ;
+    fi ;
+    reboot ; #poweroff ;
+  fi
+}
+
+run_install() {
+  INIT_HOSTNAME=${1:-}
+  #PASSWD_PLAIN=${2:-}
+  PASSWD_CRYPTED=${2:-}
+
+  bootstrap
+  system_config $INIT_HOSTNAME $PASSWD_CRYPTED
+  kernel_bootloader
+  unmount_reboot
+}
+
+#----------------------------------------
+$@

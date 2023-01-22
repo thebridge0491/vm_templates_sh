@@ -6,8 +6,8 @@
 #pkgmgr_install='urpmi --no-recommends'
 #pkgmgr_search='urpmq'
 #pkgmgr_update='urpmi.update -a'
-pkgmgr_install='dnf -y --setopt=install_weak_deps=False install'
-pkgmgr_search='dnf search'
+pkgmgr_install='dnf -C --setopt=install_weak_deps=False -y install'
+pkgmgr_search='dnf -C search'
 pkgmgr_update='dnf -y check-update'
 
 pkg_repos_sources() {

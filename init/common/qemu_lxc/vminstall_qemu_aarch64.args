@@ -1,5 +1,9 @@
-#mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}
-#qemu-img create -f qcow2 ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/${GUEST:-freebsd-aarch64-std}.qcow2 ${DISK_SZ:-30720M}
+mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}
+qemu-img create -f qcow2 ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/${GUEST:-freebsd-aarch64-std}.qcow2 ${DISK_SZ:-30720M}
+
+mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/nvram
+cp -an ${NVRAM_QEMU_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd} ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/nvram/${GUEST:-freebsd-aarch64-zfs}_VARS.fd
+chmod +w ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/nvram/${GUEST:-freebsd-aarch64-zfs}_VARS.fd
 
 qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
   -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST:-freebsd-aarch64-std} \
@@ -8,5 +12,5 @@ qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tc
   -device virtio-blk-pci,drive=hd0 \
   -drive file=${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/${GUEST:-freebsd-aarch64-std}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
   -display default,show-cursor=on -vga none -device virtio-gpu-pci \
-  ${QUEFI_OPTS:--smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}} \
+  ${QUEFI_OPTS:--smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd} -drive if=pflash,unit=1,format=raw,file=${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/nvram/${GUEST:-freebsd-aarch64-std}_VARS.fd} \
   -cdrom ${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-aarch64-disc1.iso' | tail -n1)} -no-reboot

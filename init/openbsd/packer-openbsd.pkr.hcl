@@ -20,6 +20,11 @@ variable "disk_size" {
   default = "30720M"
 }
 
+variable "distarchive_fetch" {
+  type    = string
+  default = "1"
+}
+
 variable "firmware_qemu_aa64" {
   type    = string
   default = "/usr/share/AAVMF/AAVMF_CODE.fd"
@@ -70,9 +75,19 @@ variable "isos_pardir" {
   default = "/mnt/Data0/distros"
 }
 
+variable "nvram_qemu_aa64" {
+  type    = string
+  default = "/usr/share/AAVMF/AAVMF_VARS.fd"
+}
+
+variable "nvram_qemu_x64" {
+  type    = string
+  default = "/usr/share/OVMF/OVMF_VARS.fd"
+}
+
 variable "passwd_crypted" {
   type    = string
-  default = "$6$16CHARACTERSSALT$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1"
+  default = ""
   sensitive = true
 }
 
@@ -107,11 +122,11 @@ locals {
   #datestamp       = "${legacy_isotime("2006.01.02")}"
   build_timestamp  = "${formatdate("YYYY.MM", timestamp())}"
   datestamp        = "${formatdate("YYYY.MM.DD", timestamp())}"
-  mac_last3          = "${formatdate("hh:mm:ss", timestamp())}"
+  mac_last3        = "${formatdate("hh:mm:ss", timestamp())}"
 }
 
 source "qemu" "qemu_aarch64" {
-  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>dhclient vio0 ; ifconfig vio0 inet autoconf<enter><wait>", "ftp -o /tmp/custom.disklabel http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/custom.disklabel ; ftp -o /tmp/install.resp http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/install.resp ; ftp -o /tmp/autoinstall.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"]
+  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>dhclient vio0 ; ifconfig vio0 inet autoconf<enter><wait>", "cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.resp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"]
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -120,14 +135,15 @@ source "qemu" "qemu_aarch64" {
   disk_size          = "${var.disk_size}"
   headless           = "${var.headless}"
   http_directory     = "init"
-  iso_checksum       = "file:file://${var.isos_pardir}/openbsd/arm64/SHA256"
+  #iso_checksum       = "file:file://${var.isos_pardir}/openbsd/arm64/SHA256"
+  iso_checksum       = "none"
   iso_url            = ""
   iso_urls           = ["file://${var.isos_pardir}/openbsd/${var.iso_name_aa64}.img","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_aa64}.img"]
   machine_type       = "virt"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-aarch64-${var.vol_mgr}"
   qemu_binary        = "qemu-system-aarch64"
-  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{ .Name }}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"]]
+  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"]]
   shutdown_command   = "/sbin/shutdown -p +3 || /sbin/poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"
@@ -136,9 +152,9 @@ source "qemu" "qemu_aarch64" {
 }
 
 source "qemu" "qemu_x86_64" {
-  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>dhclient vio0 ; ifconfig vio0 inet autoconf<enter><wait>", "ftp -o /tmp/custom.disklabel http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/custom.disklabel ; ftp -o /tmp/install.resp http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/install.resp ; ftp -o /tmp/autoinstall.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"]
+  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>dhclient vio0 ; ifconfig vio0 inet autoconf<enter><wait>", "cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.resp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"]
 
-  #boot_command         = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>", "mount_mfs -s 100m md1 /tmp ; mount_mfs -s 100m md2 /mnt ; mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; dhclient -L /tmp/dhclient.lease.em0 em0 ; dhclient -L /tmp/dhclient.lease.vio0 vio0 ; ifconfig em0 inet autoconf ; ifconfig vio0 inet autoconf ; cd /tmp ; ftp -o /tmp/custom.disklabel http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/custom.disklabel ; ftp -o /tmp/disk_setup.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/disklabel_setup_vmopenbsd.sh ; ftp -o /tmp/install.sh http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/${var.vol_mgr}-install.sh ; (cd /dev ; sh MAKEDEV sd0) ; sh -x /tmp/disk_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems<enter><wait10><wait10><wait10>env REL=${var.REL} sh -x /tmp/install.sh ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+  #boot_command         = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>", "mount_mfs -s 100m md1 /tmp ; mount_mfs -s 100m md2 /mnt ; mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; dhclient -L /tmp/dhclient.lease.em0 em0 ; dhclient -L /tmp/dhclient.lease.vio0 vio0 ; ifconfig em0 inet autoconf ; ifconfig vio0 inet autoconf ; cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/disklabel_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; (cd /dev ; sh MAKEDEV sd0) ; sh -x /tmp/disklabel_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/disklabel_setup.sh mount_filesystems<enter><wait10><wait10><wait10>REL=${var.REL} DISTARCHIVE_FETCH=${var.distarchive_fetch} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
 
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
@@ -155,7 +171,7 @@ source "qemu" "qemu_x86_64" {
   machine_type       = "pc"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{ .Name }}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-display", "gtk,show-cursor=on"], ["-vga", "cirrus"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"]]
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-display", "gtk,show-cursor=on"], ["-vga", "cirrus"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"]]
   shutdown_command   = "/sbin/shutdown -p +3 || /sbin/poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"
@@ -188,19 +204,19 @@ build {
 
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
-    execute_command  = "chmod +x {{ .Path }} ; env {{ .Vars }} sh -c {{ .Path }}"
+    execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
     inline           = ["tar -xf /tmp/scripts.tar -C /tmp ; mv /tmp/${var.variant} /tmp/scripts", "cp -a /tmp/init /tmp/scripts /root/"]
   }
 
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
-    execute_command  = "chmod +x {{ .Path }} ; env {{ .Vars }} sh -c {{ .Path }}"
+    execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
     scripts          = ["init/${var.variant}/vagrantuser.sh"]
   }
 
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
-    execute_command  = "chmod +x {{ .Path }} ; env {{ .Vars }} sh -c {{ .Path }}"
+    execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
     except           = ["qemu.qemu_x86_64", "qemu.qemu_aarch64"]
     scripts          = ["init/common/bsd/zerofill.sh"]
   }
@@ -208,13 +224,13 @@ build {
   post-processor "checksum" {
     checksum_types = ["sha256"]
     only           = ["qemu.qemu_x86_64"]
-    output         = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}.{{ .BuilderType }}.{{ .ChecksumType }}"
+    output         = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}.{{.BuilderType}}.{{.ChecksumType}}"
   }
   post-processor "vagrant" {
     keep_input_artifact  = true
-    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_x86_64.args", "init/common/qemu_lxc/vmrun_bhyve.args", "${var.firmware_qemu_x64}"]
+    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_x86_64.args", "init/common/qemu_lxc/vmrun_bhyve.args", "${var.firmware_qemu_x64}", "${var.nvram_qemu_x64}"]
     only                 = ["qemu.qemu_x86_64"]
-    output               = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}-${local.build_timestamp}.{{ .Provider }}.box"
+    output               = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}-${local.build_timestamp}.{{.Provider}}.box"
     vagrantfile_template = "Vagrantfile.template"
   }
   post-processor "shell-local" {
@@ -224,13 +240,13 @@ build {
   post-processor "checksum" {
     checksum_types = ["sha256"]
     only           = ["qemu.qemu_aarch64"]
-    output         = "output-vms/${var.variant}-aarch64-${var.vol_mgr}/${var.variant}-aarch64-${var.vol_mgr}.{{ .BuilderType }}.{{ .ChecksumType }}"
+    output         = "output-vms/${var.variant}-aarch64-${var.vol_mgr}/${var.variant}-aarch64-${var.vol_mgr}.{{.BuilderType}}.{{.ChecksumType}}"
   }
   post-processor "vagrant" {
     keep_input_artifact  = true
-    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "${var.firmware_qemu_aa64}"]
+    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "${var.firmware_qemu_aa64}", "${var.nvram_qemu_aa64}"]
     only                 = ["qemu.qemu_aarch64"]
-    output               = "output-vms/${var.variant}-aarch64-${var.vol_mgr}/${var.variant}-aarch64-${var.vol_mgr}-${local.build_timestamp}.{{ .Provider }}.box"
+    output               = "output-vms/${var.variant}-aarch64-${var.vol_mgr}/${var.variant}-aarch64-${var.vol_mgr}-${local.build_timestamp}.{{.Provider}}.box"
     vagrantfile_template = "Vagrantfile.template"
   }
   post-processor "shell-local" {

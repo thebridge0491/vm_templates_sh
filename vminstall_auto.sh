@@ -25,7 +25,9 @@
 STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros} ; DISK_SZ=${DISK_SZ:-30720M}
 FIRMWARE_QEMU_X64=${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd}
+NVRAM_QEMU_X64=${NVRAM_QEMU_X64:-/usr/share/OVMF/OVMF_VARS.fd}
 FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
+NVRAM_QEMU_AA64=${NVRAM_QEMU_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd}
 
 #mac_last3=$(hexdump -n3 -e '/1 ":%02x"' /dev/random | cut -c2-)
 #mac_last3=$(od -N3 -tx1 -An /dev/random | awk '$1=$1' | tr ' ' :)
@@ -110,7 +112,11 @@ _install_x86_64() {
     #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml ;
   else
     #------------ using qemu-system-* ---------------
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_X64}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${FIRMWARE_QEMU_X64} -drive if=pflash,unit=1,format=raw,file=${OUT_DIR}/nvram/${GUEST}_VARS.fd"}
+    mkdir -p ${OUT_DIR}/nvram
+    cp -an ${NVRAM_QEMU_X64} ${OUT_DIR}/nvram/${GUEST}_VARS.fd
+    chmod +w ${OUT_DIR}/nvram/${GUEST}_VARS.fd
+
     if [ "$(uname -s)" = "Linux" ] ; then
       echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
       cat /etc/qemu/bridge.conf ; sleep 5 ;
@@ -183,7 +189,11 @@ _install_aarch64() {
     #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml ;
   else
     #------------ using qemu-system-* ---------------
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${FIRMWARE_QEMU_AA64} -drive if=pflash,unit=1,format=raw,file=${OUT_DIR}/nvram/${GUEST}_VARS.fd"}
+    mkdir -p ${OUT_DIR}/nvram
+    cp -an ${NVRAM_QEMU_AA64} ${OUT_DIR}/nvram/${GUEST}_VARS.fd
+    chmod +w ${OUT_DIR}/nvram/${GUEST}_VARS.fd
+
     if [ "$(uname -s)" = "Linux" ] ; then
       echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
       cat /etc/qemu/bridge.conf ; sleep 5 ;
@@ -229,13 +239,14 @@ _freebsd() {
   ##!! if late, Live CD -> root/-
 
   #mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; cd /tmp
+  #mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5
   #ifconfig ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev} {ifdev}
 
   ## (FreeBSD) install with bsdinstall script
   ## NOTE, transfer [dir(s) | file(s)]: init/common, init/freebsd
 
   #geom -t
-  #[PASSWD_CRYPTED=$PASSWD_CRYPTED] [INIT_HOSTNAME=freebsd-boxv0000] bsdinstall script init/freebsd/[std | zfs]-installscript
+  #[PASSWD_CRYPTED=passwd_crypted] [INIT_HOSTNAME=freebsd-boxv0000] bsdinstall script init/freebsd/[std | zfs]-installscript
 }
 freebsd_x86_64() {
   VOL_MGR=${VOL_MGR:-std} ; variant=freebsd
@@ -330,7 +341,7 @@ _alpine() {
   #APKREPOSOPTS=http://${MIRROR}/latest-stable/main BOOT_SIZE=200 USE_EFI=1 [BOOTFS=ext4 VARFS=ext4] setup-alpine -f init/alpine/[std | lvm]-answers
   # .. reboot
   # .. after reboot
-  #sh init/alpine/[std | lvm]-post_autoinstall.sh [$PASSWD_CRYPTED]
+  #[VOL_MGR=[std | lvm]] sh init/alpine/post_autoinstall.sh run_postinstall [passwd_crypted]
 }
 alpine_x86_64() {
   VOL_MGR=${VOL_MGR:-std} ; variant=alpine
@@ -359,7 +370,7 @@ _suse() {
   repo_host=${repo_host:-download.opensuse.org} ; repo_directory=${repo_directory:-/distribution/openSUSE-current/repo/oss}
 
   #CFGHOST [http://<host>:<port> | file://]
-  EXTRA_ARGS=${EXTRA_ARGS:- netsetup=dhcp lang=en_US install=http://${repo_host}${repo_directory} hostname=${init_hostname} domain= autoyast=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} textmode=1}
+  EXTRA_ARGS=${EXTRA_ARGS:- netsetup=dhcp lang=en_US install=http://${repo_host}${repo_directory} hostname=${init_hostname} domain= autoyast=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} textmode=1 text 3}
   cp -a init/suse/${VOL_MGR}-autoinst.xml /tmp/${cfg_file}
 
   ## NOTE, yast2 clone_system -> auto install config: /root/autoinst.xml

@@ -26,7 +26,9 @@ STORAGE_DIR=${STORAGE_DIR:-$(dirname $0)} ; PROVIDER=${PROVIDER:-libvirt}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros} ; DISK_SZ=${DISK_SZ:-30720M}
 FIRMWARE_BHYVE_X64=${FIRMWARE_BHYVE_X64:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
 FIRMWARE_QEMU_X64=${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd}
+NVRAM_QEMU_X64=${NVRAM_QEMU_X64:-/usr/share/OVMF/OVMF_VARS.fd}
 FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
+NVRAM_QEMU_AA64=${NVRAM_QEMU_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd}
 
 #mac_last3=$(hexdump -n3 -e '/1 ":%02x"' /dev/random | cut -c2-)
 #mac_last3=$(od -N3 -tx1 -An /dev/random | awk '$1=$1' | tr ' ' :)
@@ -131,7 +133,11 @@ EOF
     vncviewer :${VNCPORT:-5901} &
   else
     #------------ using qemu-system-* ---------------
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_X64}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${FIRMWARE_QEMU_X64} -drive if=pflash,unit=1,format=raw,file=${OUT_DIR}/nvram/${GUEST}_VARS.fd"}
+    mkdir -p ${OUT_DIR}/nvram
+    cp -an ${NVRAM_QEMU_X64} ${OUT_DIR}/nvram/${GUEST}_VARS.fd
+    chmod +w ${OUT_DIR}/nvram/${GUEST}_VARS.fd
+
     if [ "$(uname -s)" = "Linux" ] ; then
       echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
       cat /etc/qemu/bridge.conf ; sleep 5 ;
@@ -177,7 +183,11 @@ _install_aarch64() {
     #sleep 5 ; virsh ${CONNECT_OPT} dumpxml ${GUEST} > ${OUT_DIR}/${GUEST}.xml ;
   else
     #------------ using qemu-system-* ---------------
-    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -bios ${FIRMWARE_QEMU_AA64}"}
+    QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${FIRMWARE_QEMU_AA64} -drive if=pflash,unit=1,format=raw,file=${OUT_DIR}/nvram/${GUEST}_VARS.fd"}
+    mkdir -p ${OUT_DIR}/nvram
+    cp -an ${NVRAM_QEMU_AA64} ${OUT_DIR}/nvram/${GUEST}_VARS.fd
+    chmod +w ${OUT_DIR}/nvram/${GUEST}_VARS.fd
+
     if [ "$(uname -s)" = "Linux" ] ; then
       echo "Verify bridge device allowed in /etc/qemu/bridge.conf" ; sleep 3 ;
       cat /etc/qemu/bridge.conf ; sleep 5 ;
@@ -205,16 +215,17 @@ _install_aarch64() {
   ##!! if late, Live CD -> root/-
 
   #mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; cd /tmp
+  #mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5
   #ifconfig ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev} {ifdev}
 
   ## (FreeBSD) install via chroot
   ## NOTE, transfer [dir(s) | file(s)]: scripts_freebsd.tar (init/common, init/freebsd, scripts/freebsd)
 
   #geom -t
-  #sh init/common/gpart_setup_vmfreebsd.sh part_format [std | zfs]
-  #sh init/common/gpart_setup_vmfreebsd.sh mount_filesystems [std | zfs]
+  #sh init/common/gpart_setup.sh part_format [std | zfs]
+  #sh init/common/gpart_setup.sh mount_filesystems [std | zfs]
 
-  #sh init/freebsd/[std | zfs]-install.sh [hostname [$PASSWD_CRYPTED]]
+  #[VOL_MGR=[std | zfs]] sh init/freebsd/install.sh run_install [hostname [passwd_crypted]]
 
 freebsd_x86_64() {
   FREEBSDGUEST=1
@@ -311,7 +322,7 @@ archlinux_x86_64() {
 #----------------------------------------
 
 ## debian ##
-  ##append to boot parameters: 3 text textmode=1
+  ##append to boot parameters: textmode=1 text 3 [systemd.unit=multi-user.target]
 
   ##!! (debian) login user/passwd: user/live
   ##!! (devuan) login user/passwd: devuan/devuan
@@ -330,7 +341,7 @@ archlinux_x86_64() {
 
   #sed -i 's|^#deb|deb|g' /etc/apt/sources.list
   #apt-get --yes update --allow-releaseinfo-change
-  #apt-get --yes install -t ${VERSION_CODENAME/ */}-backports --no-install-recommends zfs-dkms zfsutils-linux
+  #apt-get --yes install -t ${VERSION_CODENAME/ */}-backports --no-install-recommends zfs-dkms zfsutils-linux zfs-initramfs
 
   #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
@@ -384,7 +395,7 @@ alpine_aarch64() {
 #----------------------------------------
 
 ## suse ##
-  ##append to boot parameters: 3 text textmode=1
+  ##append to boot parameters: textmode=1 text 3 systemd.unit=multi-user.target
 
   ##!! login user/passwd: linux/-
 
@@ -428,6 +439,8 @@ suse_aarch64() {
 #----------------------------------------
 
 ##redhat ##
+  ##append to boot parameters: textmode=1 text 3 systemd.unit=multi-user.target
+
   ##!! login user/passwd: liveuser/-
 
   #. /etc/os-release ; export MIRRORHOST=dl.rockylinux.org/pub/rocky
@@ -443,13 +456,12 @@ suse_aarch64() {
   #kver=$(dnf list --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1)
   ##(-stream) ZFS_REL=`echo $kver | sed 's|.*\.el\(.*\)$|\1|'` ; echo $ZFS_REL
   #[dnf | yum] -y install http://download.zfsonlinux.org/epel/zfs-release.el${ZFS_REL:-${VERSION_ID/./_}}.noarch.rpm
+  #[dnf | yum] -y install http://download.zfsonlinux.org/epel/zfs-release-2-2$(rpm --eval "%{dist}").noarch.rpm
   #rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux
-  #dnf config-manager --disable zfs ; dnf config-manager --enable zfs-kmod
-  #[dnf | yum] -y install zfs
+  #[dnf | yum] --enablerepo=epel --enablerepo=zfs install -y zfs
   #echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
 
   #dkms status ; modprobe zfs ; zfs version ; sleep 5
-  #dnf config-manager --disable zfs-kmod ; dnf config-manager --enable zfs
   #-----------------------------------------
 
 redhat_x86_64() {
@@ -471,7 +483,7 @@ redhat_aarch64() {
 #----------------------------------------
 
 ## mageia ##
-  ##append to boot parameters: 3 text textmode=1
+  ##append to boot parameters: textmode=1 text 3 systemd.unit=multi-user.target
 
   ##!! login user/passwd: live/-
 
@@ -489,6 +501,8 @@ mageia_x86_64() {
 #----------------------------------------
 
 ## pclinuxos ##
+  ##append to boot parameters: [textmode=1 text 3]
+
   # (PCLinuxOS distro) install using draklive-install, then post chroot cmds
   ##!! login user/passwd: guest/-
   ## NOTE, transfer [dir(s) | file(s)]: scripts_pclinuxos.tar (init/common, init/pclinuxos, scripts/pclinuxos)
@@ -503,12 +517,12 @@ mageia_x86_64() {
 
   #[[sgdisk -p | sfdisk -l] /dev/[sv]da | parted /dev/[sv]da -s unit GiB print]
   #mkdir -p /mnt
-  #[MKFS_CMD=mkfs.ext4] sh init/common/disk_setup_vmlinux.sh part_format [sgdisk | sfdisk | parted] [std | lvm | btrfs] [ .. ]
+  #[MKFS_CMD=mkfs.ext4] sh init/common/disk_setup.sh part_format [sgdisk | sfdisk | parted] [std | lvm | btrfs] [ .. ]
 
   ## (btrfs) After partitioning (by hand or script), USE Custom partitioning in
   ## draklive-install with Mount options advanced for / (root): subvol=@
   #draklive-install --expert --noauto
-  #sh init/pclinuxos/[std | lvm | btrfs]-post_drakliveinstall.sh [hostname [$PASSWD_PLAIN]]
+  #[VOL_MGR=[std | lvm | btrfs]] sh init/pclinuxos/post_drakliveinstall.sh run_postinstall [hostname [$PASSWD_PLAIN]]
 
 pclinuxos_x86_64() {
   variant=${variant:-pclinuxos} ; GUEST=${1:-${variant}-x86_64-std}
@@ -533,10 +547,10 @@ pclinuxos_x86_64() {
   ## NOTE, transfer [dir(s) | file(s)]: scripts_netbsd.tar (init/common, init/netbsd, scripts/netbsd)
 
   #gpt show -l sd0
-  #sh init/netbsd/gpt_setup_vmnetbsd.sh part_format [std]
-  #sh init/netbsd/gpt_setup_vmnetbsd.sh mount_filesystems [std]
+  #sh init/netbsd/gpt_setup.sh part_format [std]
+  #sh init/netbsd/gpt_setup.sh mount_filesystems [std]
 
-  #sh init/netbsd/std-install.sh [hostname [$PASSWD_PLAIN]]
+  #[VOL_MGR=std] sh init/netbsd/install.sh run_install [hostname [$PASSWD_PLAIN]]
 
 netbsd_x86_64() {
   variant=${variant:-netbsd} ; GUEST=${1:-${variant}-x86_64-std}
@@ -568,10 +582,10 @@ netbsd_aarch64() {
   ## NOTE, transfer [dir(s) | file(s)]: scripts_openbsd.tar (init/common, init/openbsd, scripts/openbsd)
 
   #fdisk sd0
-  #sh init/openbsd/disklabel_setup_vmopenbsd.sh part_format
-  #sh init/openbsd/disklabel_setup_vmopenbsd.sh mount_filesystems
+  #sh init/openbsd/disklabel_setup.sh part_format
+  #sh init/openbsd/disklabel_setup.sh mount_filesystems
 
-  #sh init/openbsd/std-install.sh [hostname [$PASSWD_PLAIN]]
+  #[VOL_MGR=std] sh init/openbsd/install.sh run_install [hostname [$PASSWD_PLAIN]]
 
 openbsd_x86_64() {
   variant=${variant:-openbsd} ; GUEST=${1:-${variant}-x86_64-std}
@@ -645,8 +659,8 @@ ${@:-freebsd_x86_64 freebsd-x86_64-std}
 ## NOTE, transfer [dir(s) | file(s)]: scripts_<variant>.tar (init/common, init/<variant>, scripts/<variant>)
 
 #  [[sgdisk -p | sfdisk -l] /dev/[sv]da | parted /dev/[sv]da -s unit GiB print]
-#  [MKFS_CMD=mkfs.ext4] sh init/common/disk_setup_vmlinux.sh part_format [sgdisk | sfdisk | parted] [std | lvm | btrfs | zfs] [ .. ]
-#  sh init/common/disk_setup_vmlinux.sh mount_filesystems [std | lvm | btrfs | zfs] [ .. ]
+#  [MKFS_CMD=mkfs.ext4] sh init/common/disk_setup.sh part_format [sgdisk | sfdisk | parted] [std | lvm | btrfs | zfs] [ .. ]
+#  sh init/common/disk_setup.sh mount_filesystems [std | lvm | btrfs | zfs] [ .. ]
 
-#  sh init/<variant>/[std | lvm | btrfs | zfs]-install.sh [hostname [$PASSWD_CRYPTED]]
+#  [VOL_MGR=[std | lvm | btrfs | zfs]] sh init/<variant>/install.sh run_install [hostname [passwd_crypted]]
 #----------------------------------------

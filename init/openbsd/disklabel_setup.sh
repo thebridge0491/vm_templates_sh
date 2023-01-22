@@ -67,6 +67,23 @@ mount_filesystems() {
   mount /dev/${DEVX}d /mnt/var ; mount /dev/${DEVX}e /mnt/usr/local
   mount /dev/${DEVX}f /mnt/home
 
+  mkdir -p /mnt/etc /mnt/root
+  sh -c 'cat > /mnt/etc/fstab' << EOF
+/dev/${DEVX}a	/			ffs		rw					1	1
+/dev/${DEVX}d	/var		ffs		rw,nodev,nosuid		1	2
+/dev/${DEVX}e	/usr/local	ffs		rw,wxallowed,nodev	1	2
+/dev/${DEVX}f	/home		ffs		rw,nodev,nosuid		1	2
+
+/dev/${DEVX}b	none		swap	sw		0	0
+
+swap			/tmp		mfs		rw,nodev,nosuid,-s=512m		0	0
+
+#procfs             /proc       procfs  rw      0   0
+#linprocfs          /compat/linux/proc  linprocfs   rw  0   0
+
+EOF
+  sed -i 's|rw|rw,noatime|' /mnt/etc/fstab
+
   swapon /dev/${DEVX}b #swapctl -p 1 /dev/${DEVX}b
   swapctl -l ; sleep 3 ; mount ; sleep 3
 }

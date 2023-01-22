@@ -20,32 +20,13 @@ elif [ -n "`fdisk wd0`" ] ; then
   export DEVX=wd0 ;
 fi
 
+export VOL_MGR=${VOL_MGR:-std}
+export GRP_NM=${GRP_NM:-bsd0}
+# ftp.openbsd.org/pub/OpenBSD | mirror.math.princeton.edu/pub/OpenBSD
+export MIRROR=${MIRROR:-ftp.openbsd.org/pub/OpenBSD}
 export ARCH_S=${ARCH_S:-$(arch -s)}
 export REL=${REL:-$(sysctl -n kern.osrelease)}
-export MIRROR=${MIRROR:-mirror.math.princeton.edu/pub/OpenBSD}
-
-export INIT_HOSTNAME=${1:-openbsd-boxv0000}
-export PASSWD_PLAIN=${2:-packer}
-#export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
-
-echo "Create /etc/fstab" ; sleep 3
-mkdir -p /mnt/etc /mnt/root
-sh -c 'cat > /mnt/etc/fstab' << EOF
-/dev/${DEVX}a	/			ffs		rw					1	1
-/dev/${DEVX}d	/var		ffs		rw,nodev,nosuid		1	2
-/dev/${DEVX}e	/usr/local	ffs		rw,wxallowed,nodev	1	2
-/dev/${DEVX}f	/home		ffs		rw,nodev,nosuid		1	2
-
-/dev/${DEVX}b	none		swap	sw		0	0
-
-swap			/tmp		mfs		rw,nodev,nosuid,-s=512m		0	0
-
-#procfs             /proc       procfs  rw      0   0
-#linprocfs          /compat/linux/proc  linprocfs   rw  0   0
-
-EOF
-
-sed -i 's|rw|rw,noatime|' /mnt/etc/fstab
+export DISTARCHIVE_FETCH=${DISTARCHIVE_FETCH:-1}
 
 
 # ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
@@ -57,41 +38,48 @@ sed -i 's|rw|rw,noatime|' /mnt/etc/fstab
 #sysctl net.wlan.devices ; sleep 3
 
 
-echo "Extracting openbsd dist archives" ; sleep 3
-SUF=$(echo ${REL} | sed 's|\.||g')
-for file in man${SUF} comp${SUF} base${SUF} ; do
-    (ftp -o - http://${MIRROR}/${REL}/${ARCH_S}/${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
-done
-ftp -o ${DESTDIR:-/mnt}/bsd http://${MIRROR}/${REL}/${ARCH_S}/bsd
-ftp -o ${DESTDIR:-/mnt}/bsd.rd http://${MIRROR}/${REL}/${ARCH_S}/bsd.rd
-ftp -o ${DESTDIR:-/mnt}/bsd.mp http://${MIRROR}/${REL}/${ARCH_S}/bsd.mp
-#mount_cd9660 /dev/cd0a /mnt2 ; sync ; cd /mnt2/${REL}/${ARCH_S}
-#for file in man${SUF} comp${SUF} base${SUF} ; do
-#    (cat ${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
-#done
-#cp /mnt2/${REL}/${ARCH_S}/bsd* ${DESTDIR:-/mnt}
+bootstrap() {
+  echo "Extracting openbsd dist archives" ; sleep 3
+  SUF=$(echo ${REL} | sed 's|\.||g')
+  if [ "0" = "${DISTARCHIVE_FETCH}" ] || [ -z "${DISTARCHIVE_FETCH}" ] ; then
+    mkdir -p /mnt2 ;
+    mount_cd9660 /dev/cd0a /mnt2 ; sync ; cd /mnt2/${REL}/${ARCH_S} ;
+    for file in man${SUF} comp${SUF} base${SUF} ; do
+      (cat ${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
+    done ;
+    cp /mnt2/${REL}/${ARCH_S}/bsd* ${DESTDIR:-/mnt} ;
+  else
+    for file in man${SUF} comp${SUF} base${SUF} ; do
+      (ftp -o - http://${MIRROR}/${REL}/${ARCH_S}/${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
+    done ;
+    ftp -o ${DESTDIR:-/mnt}/bsd http://${MIRROR}/${REL}/${ARCH_S}/bsd ;
+    ftp -o ${DESTDIR:-/mnt}/bsd.rd http://${MIRROR}/${REL}/${ARCH_S}/bsd.rd ;
+    ftp -o ${DESTDIR:-/mnt}/bsd.mp http://${MIRROR}/${REL}/${ARCH_S}/bsd.mp ;
+  fi
+}
 
 
-(cd /mnt/dev ; sh MAKEDEV all)
+system_config() {
+  export INIT_HOSTNAME=${1:-netbsd-boxv0000}
+  export PASSWD_PLAIN=${2:-packer}
+  #export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
-# ?? missing from new install
-cp /etc/group /etc/passwd /etc/master.passwd /mnt/etc/
+  (cd /mnt/dev ; sh MAKEDEV all)
 
-#encrypted_passwd=$(echo -n ${PASSWD_PLAIN} | encrypt)
-encrypted_passwd=$(printf '%s' ${PASSWD_PLAIN} | encrypt)
+  # ?? missing from new install
+  cp /etc/group /etc/passwd /etc/master.passwd /mnt/etc/
 
+  #encrypted_passwd=$(echo -n ${PASSWD_PLAIN} | encrypt)
+  encrypted_passwd=$(printf '%s' ${PASSWD_PLAIN} | encrypt)
 
-cat << EOFchroot | chroot /mnt /bin/sh
+  cat << EOFchroot | chroot /mnt /bin/sh
 set -x
 
-mkdir -p /tmp /var/tmp
 chmod 1777 /tmp ; chmod 1777 /var/tmp
 #ln -s /usr/home /home
 
-
 ldconfig /usr/local/lib
 sysmerge
-
 
 #echo "Config keymap" ; sleep 3
 ##kbdmap
@@ -128,11 +116,9 @@ inet6 autoconf
 EOF
 ifconfig ; dhclient \${ifdev} ; ifconfig \${ifdev} inet autoconf ; sleep 5
 
-
 echo "Update services" ; sleep 3
 #rcctl enable ntpd
 rcctl enable sshd
-
 
 #echo "http://${MIRROR}" > /etc/installurl
 echo "https://cdn.openbsd.org/pub/OpenBSD" > /etc/installurl
@@ -140,7 +126,6 @@ pkg_add -u
 pkg_add sudo-- gtar-- gmake--
 #vim-- nano-- bzip2-- findutils-- ggrep-- zip-- unzip--
 #xfce4
-
 
 echo 'root::0:0:daemon:0:0:Charlie &:/root:/bin/ksh' >> /etc/master.passwd
 chown 0:0 /etc/master.passwd ; chmod 0600 /etc/master.passwd
@@ -162,10 +147,7 @@ chown -R packer:\$(id -gn packer) /home/packer
 #EOF
 #chmod 0440 /etc/sudoers.d/99_packer
 
-
 cd /etc/mail ; make aliases
-
-
 
 echo "Temporarily permit root login via ssh password" ; sleep 3
 echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
@@ -175,13 +157,7 @@ sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
 sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
 sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
-
 pkg_add -u
-
-#fsck_ffs /dev/${DEVX}a
-#fsck_ffs /dev/${DEVX}d
-sync
-
 
 echo "Update system patches" ; sleep 3
 #syspatch -c ; sleep 5
@@ -198,31 +174,51 @@ exit
 
 EOFchroot
 # end chroot commands
+}
 
-tar -xf /tmp/scripts.tar -C /mnt/root/ ; sleep 5
+bootloader() {
+  mkdir -p /mnt/efi ; mount -t msdos /dev/${DEVX}i /mnt/efi
+  (cd /mnt/efi ; mkdir -p EFI/openbsd EFI/BOOT)
+  if [ "arm64" = "${ARCH_S}" ] || [ "aarch64" = "${ARCH_S}" ] ; then
+    ftp -o /mnt/usr/mdec/BOOTAA64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTAA64.EFI ;
+    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
+    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+  else
+    ftp -o /mnt/usr/mdec/BOOTX64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTX64.EFI ;
+    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
+    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+  fi
 
+  cp /mnt/usr/mdec/boot /mnt/boot
+  installboot -v ${DEVX}a ; installboot -v /dev/r${DEVX}a
+  installboot -v ${DEVX}a /mnt/usr/mdec/biosboot /mnt/usr/mdec/boot
+  installboot -v /dev/r${DEVX}a /mnt/usr/mdec/biosboot /mnt/usr/mdec/boot
+  sync ; sleep 5
 
-mkdir -p /mnt/efi ; mount -t msdos /dev/${DEVX}i /mnt/efi
-(cd /mnt/efi ; mkdir -p EFI/openbsd EFI/BOOT)
-if [ "arm64" = "${ARCH_S}" ] || [ "aarch64" = "${ARCH_S}" ] ; then
-  ftp -o /mnt/usr/mdec/BOOTAA64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTAA64.EFI ;
-  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
-  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
-else
-  ftp -o /mnt/usr/mdec/BOOTX64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTX64.EFI ;
-  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
-  cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
-fi
+  #fsck_ffs /dev/${DEVX}a
+  #fsck_ffs /dev/${DEVX}d
+  sync
+}
 
-cp /mnt/usr/mdec/boot /mnt/boot
-installboot -v ${DEVX}a ; installboot -v /dev/r${DEVX}a
-installboot -v ${DEVX}a /mnt/usr/mdec/biosboot /mnt/usr/mdec/boot
-installboot -v /dev/r${DEVX}a /mnt/usr/mdec/biosboot /mnt/usr/mdec/boot
-sync ; sleep 5
+unmount_reboot() {
+  read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
+  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+    umount /mnt/efi ; rm -r /mnt/efi ;
+    sync ; swapctl -d /dev/${DEVX}b ; umount -a ;
+    reboot ; #shutdown -p +3 ;
+  fi
+}
 
-read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
-  umount /mnt/efi ; rm -r /mnt/efi ;
-  sync ; swapctl -d /dev/${DEVX}b ; umount -a ;
-  reboot ; #shutdown -p +3 ;
-fi
+run_install() {
+  INIT_HOSTNAME=${1:-}
+  PASSWD_PLAIN=${2:-}
+  #PASSWD_CRYPTED=${2:-}
+
+  bootstrap
+  system_config $INIT_HOSTNAME $PASSWD_PLAIN
+  bootloader
+  unmount_reboot
+}
+
+#----------------------------------------
+$@

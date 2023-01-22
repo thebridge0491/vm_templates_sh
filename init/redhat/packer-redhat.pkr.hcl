@@ -115,9 +115,19 @@ variable "mkfs_cmd" {
   default = "mkfs.ext4"
 }
 
+variable "nvram_qemu_aa64" {
+  type    = string
+  default = "/usr/share/AAVMF/AAVMF_VARS.fd"
+}
+
+variable "nvram_qemu_x64" {
+  type    = string
+  default = "/usr/share/OVMF/OVMF_VARS.fd"
+}
+
 variable "passwd_crypted" {
   type    = string
-  default = "$6$16CHARACTERSSALT$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1"
+  default = ""
   sensitive = true
 }
 
@@ -176,11 +186,11 @@ locals {
   #datestamp       = "${legacy_isotime("2006.01.02")}"
   build_timestamp  = "${formatdate("YYYY.MM", timestamp())}"
   datestamp        = "${formatdate("YYYY.MM.DD", timestamp())}"
-  mac_last3          = "${formatdate("hh:mm:ss", timestamp())}"
+  mac_last3        = "${formatdate("hh:mm:ss", timestamp())}"
 }
 
 source "qemu" "qemu_aarch64" {
-  boot_command       = ["<wait>c<wait>linux /images/pxeboot/vmlinuz* inst.stage2=hd:LABEL=${var.isolive_cdlabel_aa64} ro ${var.boot_cmdln_options} ", "inst.ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.repo_host}${var.repo_directory_aa64} ip=::::${var.init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrd /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
+  boot_command       = ["<wait>c<wait>linux /images/pxeboot/vmlinuz* inst.stage2=hd:LABEL=${var.isolive_cdlabel_aa64} ro ${var.boot_cmdln_options} ", "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.repo_host}${var.repo_directory_aa64} ip=::::${var.init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrd /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -195,7 +205,7 @@ source "qemu" "qemu_aarch64" {
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-aarch64-${var.vol_mgr}"
   qemu_binary        = "qemu-system-aarch64"
-  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{ .Name }}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"
@@ -204,11 +214,11 @@ source "qemu" "qemu_aarch64" {
 }
 
 source "qemu" "qemu_x86_64" {
-  #boot_command         = ["<wait>c<wait>linuxefi /images/pxeboot/vmlinuz* ${var.boot_cmdln_options} ", "inst.ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.repo_host}${var.repo_directory} ip=::::${var.init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrdefi /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
+  #boot_command         = ["<wait>c<wait>linuxefi /images/pxeboot/vmlinuz* ${var.boot_cmdln_options} ", "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.repo_host}${var.repo_directory} ip=::::${var.init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrdefi /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
 
-  #boot_command       = ["<wait>c<wait>linuxefi /isolinux/vmlinuz* inst.stage2=hd:LABEL=${var.isolive_cdlabel_x64} ro ${var.boot_cmdln_options} ", "inst.ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.repo_host}${var.repo_directory} ip=::::${var.init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrdefi /isolinux/initrd*.img<enter><wait10>boot<enter><wait10>"]
+  #boot_command       = ["<wait>c<wait>linuxefi /isolinux/vmlinuz* inst.stage2=hd:LABEL=${var.isolive_cdlabel_x64} ro ${var.boot_cmdln_options} ", "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.repo_host}${var.repo_directory} ip=::::${var.init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrdefi /isolinux/initrd*.img<enter><wait10>boot<enter><wait10>"]
 
-  boot_command       = ["<wait><wait><wait>c<wait>linuxefi /isolinux/vmlinuz* root=live:LABEL=${var.isolive_cdlabel_x64} ro rd.live.image rhgb text ${var.boot_cmdln_options} systemd.unit=multi-user.target<enter>initrdefi /isolinux/initrd*.img<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>liveuser<enter><wait10>sudo su<enter><wait10>dnf -y check-update ; setenforce 0 ; sestatus ; dnf -y install ${var.foreign_pkgmgr} nmap-ncat lvm2 ; sleep 5 ; ", "cd /tmp ; wget -O /tmp/disk_setup.sh 'http://{{ .HTTPIP }}:{{ .HTTPPort }}/common/disk_setup_vmlinux.sh' ; wget -O /tmp/install.sh 'http://{{ .HTTPIP }}:{{ .HTTPPort }}/${var.variant}/${var.vol_mgr}-install.sh' ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then . /etc/os-release ; dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(echo $${VERSION_ID} | cut -d. -f1).noarch.rpm ; dnf -y install kernel kernel-devel ; dnf -y install http://download.zfsonlinux.org/epel/zfs-release.el$${ZFS_REL:-$${VERSION_ID/./_}}.noarch.rpm ; rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux ; dnf config-manager --disable zfs ; dnf config-manager --enable zfs-kmod ; dnf -y install zfs ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ; dkms status ; dnf config-manager --disable zfs-kmod ; dnf config-manager --enable zfs ; sleep 5 ; fi ; ", "env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} sh -x /tmp/install.sh ${var.init_hostname} '${var.passwd_crypted}'<enter><wait>"]
+  boot_command       = ["<down><up><wait><wait><wait>c<wait>linuxefi /isolinux/vmlinuz* root=live:LABEL=${var.isolive_cdlabel_x64} ro rd.live.image rhgb text ${var.boot_cmdln_options} textmode=1 text 3 systemd.unit=multi-user.target<enter>initrdefi /isolinux/initrd*.img<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>liveuser<enter><wait10>sudo su<enter><wait10>dnf -y check-update ; setenforce 0 ; sestatus ; dnf -y install ${var.foreign_pkgmgr} nmap-ncat lvm2 ; sleep 5 ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then . /etc/os-release ; dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(echo $${VERSION_ID} | cut -d. -f1).noarch.rpm ; dnf -y install kernel kernel-devel ; dnf -y install http://download.zfsonlinux.org/epel/zfs-release-2-2.el$${VERSION_ID/.*/}.noarch.rpm ; rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux ; dnf config-manager --disable zfs ; dnf config-manager --enable zfs-kmod ; dnf -y install zfs ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ; dkms status ; dnf config-manager --disable zfs-kmod ; dnf config-manager --enable zfs ; sleep 5 ; fi ; ", "env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_crypted}'<enter><wait>"]
 
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
@@ -223,7 +233,7 @@ source "qemu" "qemu_x86_64" {
   machine_type       = "q35"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=4"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"], ["-name", "{{ .Name }}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=4"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"
@@ -256,19 +266,19 @@ build {
 
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
-    execute_command  = "env {{ .Vars }} sudo sh -x '{{ .Path }}'"
+    execute_command  = "env {{.Vars}} sudo sh -x '{{.Path}}'"
     inline           = ["tar -xf /tmp/scripts.tar -C /tmp ; mv /tmp/${var.variant} /tmp/scripts", "cp -a /tmp/init /tmp/scripts /root/"]
   }
 
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
-    execute_command  = "env {{ .Vars }} sudo -E sh -eux '{{ .Path }}'"
+    execute_command  = "env {{.Vars}} sudo -E sh -eux '{{.Path}}'"
     scripts          = ["init/${var.variant}/vagrantuser.sh"]
   }
 
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
-    execute_command  = "env {{ .Vars }} sudo -E sh -eux '{{ .Path }}'"
+    execute_command  = "env {{.Vars}} sudo -E sh -eux '{{.Path}}'"
     except           = ["qemu.qemu_x86_64", "qemu.qemu_aarch64"]
     scripts          = ["init/common/linux/zerofill.sh"]
   }
@@ -276,13 +286,13 @@ build {
   post-processor "checksum" {
     checksum_types = ["sha256"]
     only           = ["qemu.qemu_x86_64"]
-    output         = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}.{{ .BuilderType }}.{{ .ChecksumType }}"
+    output         = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}.{{.BuilderType}}.{{.ChecksumType}}"
   }
   post-processor "vagrant" {
     keep_input_artifact  = true
-    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_x86_64.args", "init/common/qemu_lxc/vmrun_bhyve.args", "${var.firmware_qemu_x64}"]
+    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_x86_64.args", "init/common/qemu_lxc/vmrun_bhyve.args", "${var.firmware_qemu_x64}", "${var.nvram_qemu_x64}"]
     only                 = ["qemu.qemu_x86_64"]
-    output               = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}-${local.build_timestamp}.{{ .Provider }}.box"
+    output               = "output-vms/${var.variant}-x86_64-${var.vol_mgr}/${var.variant}-x86_64-${var.vol_mgr}-${local.build_timestamp}.{{.Provider}}.box"
     vagrantfile_template = "Vagrantfile.template"
   }
   post-processor "shell-local" {
@@ -292,13 +302,13 @@ build {
   post-processor "checksum" {
     checksum_types = ["sha256"]
     only           = ["qemu.qemu_aarch64"]
-    output         = "output-vms/${var.variant}-aarch64-${var.vol_mgr}/${var.variant}-aarch64-${var.vol_mgr}.{{ .BuilderType }}.{{ .ChecksumType }}"
+    output         = "output-vms/${var.variant}-aarch64-${var.vol_mgr}/${var.variant}-aarch64-${var.vol_mgr}.{{.BuilderType}}.{{.ChecksumType}}"
   }
   post-processor "vagrant" {
     keep_input_artifact  = true
-    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "${var.firmware_qemu_aa64}"]
+    include              = ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh", "init/common/qemu_lxc/vmrun_qemu_aarch64.args", "${var.firmware_qemu_aa64}", "${var.nvram_qemu_aa64}"]
     only                 = ["qemu.qemu_aarch64"]
-    output               = "output-vms/${var.variant}-aarch64-${var.vol_mgr}/${var.variant}-aarch64-${var.vol_mgr}-${local.build_timestamp}.{{ .Provider }}.box"
+    output               = "output-vms/${var.variant}-aarch64-${var.vol_mgr}/${var.variant}-aarch64-${var.vol_mgr}-${local.build_timestamp}.{{.Provider}}.box"
     vagrantfile_template = "Vagrantfile.template"
   }
   post-processor "shell-local" {

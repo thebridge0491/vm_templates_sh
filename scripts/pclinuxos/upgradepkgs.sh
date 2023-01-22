@@ -15,10 +15,10 @@ apt-get -y --option Retries=3 install sudo
 grep -e '^Hold' /etc/apt/apt.conf
 
 apt-get -y clean
-if command -v zpool > /dev/null ; then
-  ZPOOLNM=${ZPOOLNM:-ospool0} ;
-  zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
-else
-  fstrim -av ;
+fstrim -av
+if command -v btrfs > /dev/null ; then
+  btrfs subvolume list / ;
+elif command -v lvcreate > /dev/null ; then
+  lvs ;
 fi
-sync
+sleep 5 ; sync

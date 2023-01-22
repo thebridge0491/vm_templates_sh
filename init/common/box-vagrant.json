@@ -16,9 +16,9 @@
     "inline": [
       "cp -a init/common/metadata_libvirt.json output-vms/{{user `vm_name`}}/metadata.json",
       "if [ 'aarch64' = '{{user `machine`}}'] ; then",
-      "cp -a {{user `firmware_qemu_aa64`}} output-vms/{{user `vm_name`}}/",
+      "cp -a {{user `firmware_qemu_aa64`}} {{user `nvram_qemu_aa64`}} output-vms/{{user `vm_name`}}/",
       "else",
-      "cp -a {{user `firmware_qemu_x64`}} output-vms/{{user `vm_name`}}/",
+      "cp -a {{user `firmware_qemu_x64`}} {{user `nvram_qemu_x64`}} output-vms/{{user `vm_name`}}/",
       "fi",
       "cp -a init/common/info.json init/common/qemu_lxc/vmrun* output-vms/{{user `vm_name`}}/",
       "if command -v erb > /dev/null ; then",
@@ -33,7 +33,7 @@
       "fi",
       "cd output-vms/{{user `vm_name`}}",
       "qemu-img convert -f qcow2 -O qcow2 {{user `vm_name`}}.qcow2 box.img",
-      "tar -cvzf {{user `vm_name`}}-{{user `build_timestamp`}}.libvirt.box metadata.json info.json Vagrantfile `ls vmrun* *_CODE.fd` box.img"
+      "tar -cvzf {{user `vm_name`}}-{{user `build_timestamp`}}.libvirt.box metadata.json info.json Vagrantfile `ls vmrun* *.fd` box.img"
     ],
     "only": ["box-libvirt"]
   },
@@ -54,7 +54,7 @@
       "fi",
       "cd output-vms/{{user `vm_name`}}",
       "mv {{user `vm_name`}}.raw box.img",
-      "tar -cvzf {{user `vm_name`}}-{{user `build_timestamp`}}.bhyve.box metadata.json info.json Vagrantfile `ls vmrun* *_CODE.fd` box.img"
+      "tar -cvzf {{user `vm_name`}}-{{user `build_timestamp`}}.bhyve.box metadata.json info.json Vagrantfile `ls vmrun* *.fd` box.img"
     ],
     "only": ["box-bhyve"]
   }],
@@ -65,6 +65,8 @@
     "firmware_bhyve_x64": "/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd",
     "firmware_qemu_x64": "/usr/share/OVMF/OVMF_CODE.fd",
     "firmware_qemu_aa64": "/usr/share/AAVMF/AAVMF_CODE.fd",
+    "nvram_qemu_x64": "/usr/share/OVMF/OVMF_VARS.fd",
+    "nvram_qemu_aa64": "/usr/share/AAVMF/AAVMF_VARS.fd",
     "author": "thebridge0491",
     "build_timestamp": "{{isotime `2006.01`}}",
     "datestamp": "{{isotime `2006.01.02`}}"

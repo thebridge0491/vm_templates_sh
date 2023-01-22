@@ -14,10 +14,10 @@ dnf -y --setopt=install_weak_deps=False install sudo
 dnf versionlock list ; sleep 3
 
 dnf -y clean all
-if command -v zpool > /dev/null ; then
-  ZPOOLNM=${ZPOOLNM:-ospool0} ;
-  zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
-else
-  fstrim -av ;
+fstrim -av
+if command -v btrfs > /dev/null ; then
+  btrfs subvolume list / ;
+elif command -v lvcreate > /dev/null ; then
+  lvs ;
 fi
-sync
+sleep 5 ; sync
