@@ -100,8 +100,8 @@ EOF
 cat /etc/resolv.conf ; sleep 5
 
 sh -c 'cat > /etc/hosts' << EOF
-127.0.0.1	localhost
-::1			localhost
+127.0.0.1 localhost
+::1     localhost
 
 EOF
 sed -i '/127.0.1.1/d' /etc/hosts

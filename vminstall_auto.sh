@@ -29,9 +29,9 @@ NVRAM_QEMU_X64=${NVRAM_QEMU_X64:-/usr/share/OVMF/OVMF_VARS.fd}
 FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
 NVRAM_QEMU_AA64=${NVRAM_QEMU_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd}
 
-#mac_last3=$(hexdump -n3 -e '/1 ":%02x"' /dev/random | cut -c2-)
+#mac_last3=$(hexdump -n3 -e '3/1 ":%02x"' /dev/random | cut -c2-)
 #mac_last3=$(od -N3 -tx1 -An /dev/random | awk '$1=$1' | tr ' ' :)
-mac_last3=$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||')
+mac_last3=$(openssl rand -hex 3 | sed 's|\(..\)|:\1|g; s|^:||')
 
 
 _prep() {
@@ -89,7 +89,7 @@ _install_x86_64() {
 
     if [ -n "${EXTRA_ARGS}" ] || [ "${EXTRA_ARGS}" = " " ] ; then
       virt-install ${CONNECT_OPT} --arch x86_64 --cpu SandyBridge \
-        --memory 2048 --vcpus 2 \
+        --memory 4096 --vcpus 2 \
         --controller usb,model=ehci --controller virtio-serial \
         --console pty,target_type=virtio --graphics vnc,port=-1 \
         --network network=default,model=virtio-net,mac=RANDOM \
@@ -99,7 +99,7 @@ _install_x86_64() {
         --initrd-inject="/tmp/${cfg_file}" --extra-args="${EXTRA_ARGS}" &
     else
       virt-install ${CONNECT_OPT} --arch x86_64 --cpu SandyBridge \
-        --memory 2048 --vcpus 2 \
+        --memory 4096 --vcpus 2 \
         --controller usb,model=ehci --controller virtio-serial \
         --console pty,target_type=virtio --graphics vnc,port=-1 \
         --network network=default,model=virtio-net,mac=RANDOM \
@@ -129,22 +129,22 @@ _install_x86_64() {
 
       qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
         -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
-        -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+        -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
         -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
         -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
         -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
         -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-        -display default,show-cursor=on -vga none -device qxl-vga,vgamem_mb=64 \
+        -display default,show-cursor=on -vga virtio \
         ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot -kernel ${KERNEL_PATH} -append "${EXTRA_ARGS}" -initrd ${INITRD_PATH} &
     else
       qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
         -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
-        -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+        -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
         -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
         -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
         -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
         -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-        -display default,show-cursor=on -vga none -device qxl-vga,vgamem_mb=64 \
+        -display default,show-cursor=on -vga virtio \
         ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot &
     fi ;
     echo "### Once network connected, transfer needed file(s) ###" ;
@@ -167,7 +167,7 @@ _install_aarch64() {
     #  virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
 
     if [ -n "${EXTRA_ARGS}" ] || [ "${EXTRA_ARGS}" = " " ] ; then
-      virt-install ${CONNECT_OPT} --arch aarch64 --memory 2048 --vcpus 2 \
+      virt-install ${CONNECT_OPT} --arch aarch64 --memory 4096 --vcpus 2 \
         --controller usb,model=ehci --controller virtio-serial \
         --console pty,target_type=virtio --graphics vnc,port=-1 \
         --network network=default,model=virtio-net,mac=RANDOM \
@@ -176,7 +176,7 @@ _install_aarch64() {
         ${INST_SRC_OPTS} ${VUEFI_OPTS} -n ${GUEST} \
         --initrd-inject="/tmp/${cfg_file}" --extra-args="${EXTRA_ARGS}" &
     else
-      virt-install ${CONNECT_OPT} --arch aarch64 --memory 2048 --vcpus 2 \
+      virt-install ${CONNECT_OPT} --arch aarch64 --memory 4096 --vcpus 2 \
         --controller usb,model=ehci --controller virtio-serial \
         --console pty,target_type=virtio --graphics vnc,port=-1 \
         --network network=default,model=virtio-net,mac=RANDOM \
@@ -204,7 +204,7 @@ _install_aarch64() {
     if [ -n "${EXTRA_ARGS}" ] || [ "${EXTRA_ARGS}" = " " ] ; then
       #APPEND_OPTS="-kernel ${KERNEL_PATH} -append \'${EXTRA_ARGS}\' -initrd ${INITRD_PATH}" ;
       qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
-        -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+        -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
         -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
         -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
         -device virtio-blk-pci,drive=hd0 \
@@ -213,7 +213,7 @@ _install_aarch64() {
         ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot -kernel ${KERNEL_PATH} -append "${EXTRA_ARGS}" -initrd ${INITRD_PATH} &
     else
       qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
-        -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+        -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
         -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
         -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
         -device virtio-blk-pci,drive=hd0 \
@@ -338,7 +338,7 @@ _alpine() {
 
   #service sshd stop
   #export MIRROR=dl-cdn.alpinelinux.org/alpine
-  #APKREPOSOPTS=http://${MIRROR}/latest-stable/main BOOT_SIZE=200 USE_EFI=1 [BOOTFS=ext4 VARFS=ext4] setup-alpine -f init/alpine/[std | lvm]-answers
+  #APKREPOSOPTS=http://${MIRROR}/latest-stable/main BOOT_SIZE=512 USE_EFI=1 [BOOTFS=ext4 VARFS=ext4] setup-alpine -f init/alpine/[std | lvm]-answers
   # .. reboot
   # .. after reboot
   #[VOL_MGR=[std | lvm]] sh init/alpine/post_autoinstall.sh run_postinstall [passwd_crypted]
@@ -367,7 +367,9 @@ alpine_aarch64() {
 
 _suse() {
   cfg_file=autoinst.xml
-  repo_host=${repo_host:-download.opensuse.org} ; repo_directory=${repo_directory:-/distribution/openSUSE-current/repo/oss}
+  repo_host=${repo_host:-download.opensuse.org}
+  #repo_directory=${repo_directory:-/tumbleweed/repo/oss}
+  repo_directory=${repo_directory:-/distribution/openSUSE-current/repo/oss}
 
   #CFGHOST [http://<host>:<port> | file://]
   EXTRA_ARGS=${EXTRA_ARGS:- netsetup=dhcp lang=en_US install=http://${repo_host}${repo_directory} hostname=${init_hostname} domain= autoyast=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} textmode=1 text 3}
@@ -413,8 +415,8 @@ suse_aarch64() {
 
 _redhat() {
   cfg_file=ks.cfg
-  # [rocky/9|almalinux/9|centos/9-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
-  #repo_host=${repo_host:-mirror.centos.org/centos}
+  # [9|9-stream]/BaseOS/x86_64/os
+  #repo_host=${repo_host:-mirror.stream.centos.org}
   #repo_host=${repo_host:-repo.almalinux.org/almalinux}
   repo_host=${repo_host:-dl.rockylinux.org/pub/rocky}
 
@@ -442,7 +444,7 @@ redhat_x86_64() {
     (cd ${ISOS_PARDIR}/redhat ; sha256sum --ignore-missing -c CHECKSUM) ;
   fi
 
-  ##dnld: <mirror>/<version>/BaseOS/x86_64/kickstart/images/pxeboot/{vmlinuz,initrd.img}
+  ##dnld: <mirror>/<version>/BaseOS/x86_64/os/images/pxeboot/{vmlinuz,initrd.img}
   KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/redhat -name 'vmlinuz' | tail -n1)}
   INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/redhat -name 'initrd.img' | tail -n1)}
 
@@ -461,7 +463,7 @@ redhat_aarch64() {
     (cd ${ISOS_PARDIR}/redhat/aarch64 ; sha256sum --ignore-missing -c CHECKSUM) ;
   fi
 
-  ##dnld: <mirror>/<version>/BaseOS/aarch64/kickstart/images/pxeboot/{vmlinuz,initrd.img}
+  ##dnld: <mirror>/<version>/BaseOS/aarch64/os/images/pxeboot/{vmlinuz,initrd.img}
   KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name 'vmlinuz' | tail -n1)}
   INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name 'initrd.img' | tail -n1)}
 
@@ -474,16 +476,16 @@ mageia_x86_64() {
   cfg_file=auto_inst_cfg.pl
   repo_host=${repo_host:-mirrors.kernel.org/mageia}
 
+  init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-9}
+  repo_directory=${repo_directory:-/distrib/${RELEASE}/x86_64}
+  GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
+
   #CFGHOST [http://<host>:<port> | file://]
   EXTRA_ARGS=${EXTRA_ARGS:- automatic=method:http,server:${repo_host},directory:${repo_directory},network:dhcp auto_install=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} nomodeset text}
   # systemd.unit=multi-user.target
   cp -a init/mageia/${VOL_MGR}-auto_inst.cfg.pl /tmp/${cfg_file}
 
   ## NOTE, saved auto install config: /root/drakx/auto_inst_cfg.pl
-
-  init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-8}
-  repo_directory=${repo_directory:-/distrib/${RELEASE}/x86_64}
-  GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
 
   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia -maxdepth 1 -name "Mageia-*-x86_64*.iso" | tail -n1)}
   if [ "$ISO_PATH" ] ; then

@@ -22,10 +22,10 @@ fi
 
 export VOL_MGR=${VOL_MGR:-std}
 export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
-# [rocky/8|almalinux/8|centos/8-stream]/BaseOS/x86_64/os | centos/7/os/x86_64]
+# [9|9-stream]/BaseOS/x86_64/os
 # (rocky) mirror: dl.rockylinux.org/pub/rocky
 # (almalinux) mirror: repo.almalinux.org/almalinux
-# (centos[-stream]) mirror: mirror.centos.org/centos
+# (centos-stream) mirror: mirror.stream.centos.org
 export MIRROR=${MIRROR:-dl.rockylinux.org/pub/rocky}
 export RELEASE=${RELEASE:-9}
 export UNAME_M=$(uname -m)
@@ -247,6 +247,7 @@ if [ "7" = "\${VERSION_MAJOR}" ] ; then
 else
   ${DNFCMD} --enablerepo=epel --enablerepo=epel-modular install -y kernel kernel-devel ;
   ${DNFCMD} --enablerepo=epel install -y kernel kernel-devel ;
+  ${DNFCMD} install -y kernel kernel-devel ;
 fi
 
 ${DNFCMD} install -y linux-firmware shim-* grub2-* efibootmgr
@@ -282,6 +283,7 @@ if [ "zfs" = "$VOL_MGR" ] ; then
   #${DNFCMD} config-manager -y --set-disabled zfs ;
   ${DNFCMD} --enablerepo=epel --enablerepo=epel-modular --enablerepo=zfs install -y zfs zfs-dracut ;
   ${DNFCMD} --enablerepo=epel --enablerepo=zfs install -y zfs zfs-dracut ;
+  ${DNFCMD} --enablerepo=zfs install -y zfs zfs-dracut ;
   sleep 3 ;
 
   mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ;

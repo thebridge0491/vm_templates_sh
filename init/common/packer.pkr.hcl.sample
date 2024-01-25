@@ -1,5 +1,10 @@
 # usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
+variable "MIRROR" {
+  type    = string
+  default = ""
+}
+
 variable "RELEASE" {
   type    = string
   default = ""
@@ -40,29 +45,24 @@ variable "home" {
   default = "${env("HOME")}"
 }
 
-variable "init_hostname" {
-  type    = string
-  default = "freebsd-boxv0000"
-}
-
 variable "iso_base_x64" {
   type    = string
-  default = "FreeBSD-13.1-RELEASE-amd64"
+  default = "FreeBSD-13.2-RELEASE-amd64"
 }
 
 variable "iso_url_directory" {
   type    = string
-  default = "releases/ISO-IMAGES/13.1"
-}
-
-variable "iso_url_mirror" {
-  type    = string
-  default = "https://download.freebsd.org/ftp"
+  default = "/releases/ISO-IMAGES/13.2"
 }
 
 variable "isos_pardir" {
   type    = string
   default = "/mnt/Data0/distros"
+}
+
+variable "mirror_host" {
+  type    = string
+  default = "download.freebsd.org/ftp"
 }
 
 variable "nvram_qemu_x64" {
@@ -111,7 +111,7 @@ locals {
 }
 
 source "qemu" "qemu_x86_64" {
-  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "l<wait5>root<enter><wait10>", "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; geom -t ; sleep 3 ; sh -x /tmp/gpart_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/gpart_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} DISTARCHIVE_FETCH=${var.distarchive_fetch} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_crypted}'<enter><wait>"]
+  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "l<wait5>root<enter><wait10>", "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; geom -t ; sleep 3 ; sh -x /tmp/gpart_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/gpart_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} DISTARCHIVE_FETCH=${var.distarchive_fetch} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
   boot_wait          = "7s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -121,11 +121,11 @@ source "qemu" "qemu_x86_64" {
   http_directory     = "init"
   iso_checksum       = "file:file://${var.isos_pardir}/freebsd/CHECKSUM.SHA256-${var.iso_base_x64}"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/freebsd/${var.iso_base_x64}-disc1.iso","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_base_x64}-disc1.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/freebsd/${var.iso_base_x64}-disc1.iso","https://${var.mirror_host}${var.iso_url_directory}/${var.iso_base_x64}-disc1.iso"]
   machine_type       = "q35"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"]]
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "virtio"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"]]
   shutdown_command   = "shutdown -p +3 || poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"
@@ -134,7 +134,7 @@ source "qemu" "qemu_x86_64" {
 }
 
 source "virtualbox-iso" "virtualbox_x86_64" {
-  boot_command       = ["2<enter><wait10><wait10><enter><wait>", "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-installscript ; export PASSWD_CRYPTED='${var.passwd_crypted}' ; export INIT_HOSTNAME=${var.init_hostname} ; geom -t ; sleep 3 ; bsdinstall script /tmp/${var.vol_mgr}-installscript<enter>"]
+  boot_command       = ["2<enter><wait10><wait10><enter><wait>", "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-installscript ; export PASSWD_CRYPTED='${var.passwd_crypted}' ; export INIT_HOSTNAME=${var.variant}-boxv0000 ; geom -t ; sleep 3 ; bsdinstall script /tmp/${var.vol_mgr}-installscript<enter>"]
   boot_wait            = "7s"
   disk_size            = "${var.disk_size}"
   format               = "ova"
@@ -147,7 +147,7 @@ source "virtualbox-iso" "virtualbox_x86_64" {
   iso_checksum         = "file:file://${var.isos_pardir}/freebsd/CHECKSUM.SHA256-${var.iso_base_x64}"
   iso_interface        = "sata"
   iso_url              = ""
-  iso_urls             = ["file://${var.isos_pardir}/freebsd/${var.iso_base_x64}-disc1.iso","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_base_x64}-disc1.iso"]
+  iso_urls             = ["file://${var.isos_pardir}/freebsd/${var.iso_base_x64}-disc1.iso","https://${var.mirror_host}${var.iso_url_directory}/${var.iso_base_x64}-disc1.iso"]
   output_directory     = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
   shutdown_command     = "shutdown -p +3 || poweroff"
   ssh_password         = "${var.passwd_plain}"

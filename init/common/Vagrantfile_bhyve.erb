@@ -28,7 +28,7 @@ Vagrant.configure(2) do |config|
 
   config.vm.provider :bhyve do |p, override|
     p.cpus = 2
-    p.memory = 2048
+    p.memory = 4096
   end
 
   config.vm.define ENV.fetch('vm_name', File.basename(Dir.pwd))

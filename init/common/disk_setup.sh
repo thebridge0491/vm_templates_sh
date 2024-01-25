@@ -40,10 +40,10 @@ _sgdisk_part() {
   VOL_MGR=${1:-lvm} ; GRP_NM=${2:-vg0}
 
   sgdisk --zap --clear --mbrtogpt /dev/${DEVX} ; sync
-  # typecode: f/ BIOS 1M fat|ef02 (bios_boot) ; f/ EFI 200M efi|ef00 (ESP)
+  # typecode: f/ BIOS 1M fat|ef02 (bios_boot) ; f/ EFI 512M efi|ef00 (ESP)
   sgdisk --new 1:1M:+1M --typecode 1:ef02 --change-name 1:"bios_boot" \
     /dev/${DEVX}
-  sgdisk --new 2:0:+200M --typecode 2:ef00 --change-name 2:"ESP" /dev/${DEVX}
+  sgdisk --new 2:0:+512M --typecode 2:ef00 --change-name 2:"ESP" /dev/${DEVX}
 
   sgdisk --new 3:0:+1G --typecode 3:8300 --change-name 3:"${GRP_NM}-osBoot" /dev/${DEVX}
   sgdisk --new 4:0:+4G --typecode 4:8200 --change-name 4:"${GRP_NM}-osSwap" /dev/${DEVX}
@@ -81,7 +81,7 @@ _sfdisk_part() {
   #  Linux swap | 82 | 0657FD6D-A4AB-43C4-84E5-0933C84B4F4F
   #  L(inux) default | 83 | 0FC63DAF-8483-4772-8E79-3D69D8477DE4
   echo -n start=1MiB,size=1MiB,bootable,type=21686148-6449-6E6F-744E-656564454649,name=bios_boot | sfdisk -N 1 /dev/${DEVX}
-  echo -n size=200MiB,bootable,type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,name=ESP | sfdisk -N 2 \
+  echo -n size=512MiB,bootable,type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,name=ESP | sfdisk -N 2 \
     /dev/${DEVX}
 
   echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM}-osBoot" | sfdisk -N 3 /dev/${DEVX}
@@ -106,11 +106,11 @@ _parted_part() {
 
   parted --script /dev/${DEVX} mklabel gpt
   DIFF=1 ; END='-0'
-  # /dev/${DEVX}: f/ BIOS 1M none (bios_boot) ; f/ EFI 200M fat32 (ESP)
+  # /dev/${DEVX}: f/ BIOS 1M none (bios_boot) ; f/ EFI 512M fat32 (ESP)
   END=$(( 1 + $DIFF ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
     mkpart primary $DIFF $END name 1 bios_boot
-  DIFF=$END ; END=$(( 200 + $DIFF ))
+  DIFF=$END ; END=$(( 512 + $DIFF ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
     mkpart primary fat32 $DIFF $END name 2 ESP
 
@@ -207,7 +207,7 @@ zfspart_create() {
   zfs create -o atime=on $zpoolnm/var/mail
   zfs create $zpoolnm/opt
 
-  zfs set quota=7680M $zpoolnm/home
+  zfs set quota=7368M $zpoolnm/home
   zfs set quota=5G $zpoolnm/var
   zfs set quota=2G $zpoolnm/tmp
 
@@ -228,7 +228,7 @@ zfspart_create() {
 
 lvmpv_create() {
   GRP_NM=${1:-vg0} ; PV_NM=${2:-pvol0}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:12G osVar:5G osHome:7680M}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:12G osVar:5G osHome:7368M}
   modprobe dm-mod ; modprobe dm-crypt ; lvm version
   modinfo dm_mod dm_crypt | grep -e name -e version
   lsmod | grep -e dm_mod -e dm_crypt ; sleep 5
@@ -269,7 +269,7 @@ btrfspart_create() {
 
   btrfs subvolume list /mnt | cut -d' ' -f2 | xargs -I{} -n1 btrfs qgroup create 0/{} /mnt
   sleep 3 ; btrfs quota rescan /mnt
-  btrfs qgroup limit 7680M /mnt/@/home
+  btrfs qgroup limit 7368M /mnt/@/home
   btrfs qgroup limit 5G /mnt/@/var
   btrfs qgroup limit 2G /mnt/@/tmp
   btrfs qgroup show -re /mnt ; sleep 5
@@ -282,7 +282,7 @@ btrfspart_create() {
 format_partitions() {
   VOL_MGR=${1:-lvm} ; GRP_NM=${2:-vg0} ; PV_NM=${3:-pvol0}
   MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:12G osVar:5G osHome:7680M}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:12G osVar:5G osHome:7368M}
 
   echo "Formatting file systems" ; sleep 3
   if [ "${VOL_MGR}" = "zfs" ] ; then
@@ -321,7 +321,7 @@ format_partitions() {
 part_format() {
   TOOL=${1:-sgdisk} ; VOL_MGR=${2:-lvm} ; GRP_NM=${3:-vg0} ; PV_NM=${4:-pvol0}
   MKFS_CMD=${MKFS_CMD:-mkfs.ext4}
-  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:12G osVar:5G osHome:7680M}
+  PARTS_NM_SZ=${PARTS_NM_SZ:-osRoot:12G osVar:5G osHome:7368M}
 
   part_disk $TOOL $VOL_MGR $GRP_NM $PV_NM
   format_partitions $VOL_MGR $GRP_NM $PV_NM

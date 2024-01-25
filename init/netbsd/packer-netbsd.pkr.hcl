@@ -1,5 +1,10 @@
 # usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
+variable "MIRROR" {
+  type    = string
+  default = ""
+}
+
 variable "REL" {
   type    = string
   default = ""
@@ -45,34 +50,29 @@ variable "home" {
   default = "${env("HOME")}"
 }
 
-variable "init_hostname" {
-  type    = string
-  default = "netbsd-boxv0000"
-}
-
-variable "iso_name_aa64" {
+variable "iso_base_aa64" {
   type    = string
   default = "NetBSD-9.3-evbarm-aarch64"
 }
 
-variable "iso_name_x64" {
+variable "iso_base_x64" {
   type    = string
   default = "NetBSD-9.3-amd64"
 }
 
 variable "iso_url_directory" {
   type    = string
-  default = "NetBSD-9.3/images"
-}
-
-variable "iso_url_mirror" {
-  type    = string
-  default = "https://cdn.netbsd.org/pub/NetBSD"
+  default = "/NetBSD-9.3/images"
 }
 
 variable "isos_pardir" {
   type    = string
   default = "/mnt/Data0/distros"
+}
+
+variable "mirror_host" {
+  type    = string
+  default = "cdn.netbsd.org/pub/NetBSD"
 }
 
 variable "nvram_qemu_aa64" {
@@ -126,7 +126,7 @@ locals {
 }
 
 source "qemu" "qemu_aarch64" {
-  boot_command       = ["<spacebar><wait10>1<enter><wait10><wait10><wait10><wait10><wait10><wait10>a<enter><wait10>a<enter><wait10>e<enter><wait10>a<enter><wait10>", "ksh<enter><wait10><wait10><wait10>mount_mfs -s 100m md1 /tmp ; dhcpcd wm0 ; dhcpcd vioif0 ; cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/gpt_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; gpt show -l sd0 ; sleep 3 ; sh -x /tmp/gpt_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/gpt_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env REL=${var.REL} DISTARCHIVE_FETCH=${var.distarchive_fetch} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+  boot_command       = ["<spacebar><wait10>1<enter><wait10><wait10><wait10><wait10><wait10><wait10>a<enter><wait10>a<enter><wait10>e<enter><wait10>a<enter><wait10>", "ksh<enter><wait10><wait10><wait10>mount_mfs -s 100m md1 /tmp ; dhcpcd wm0 ; dhcpcd vioif0 ; cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/gpt_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; gpt show -l sd0 ; sleep 3 ; sh -x /tmp/gpt_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/gpt_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} REL=${var.REL} DISTARCHIVE_FETCH=${var.distarchive_fetch} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_plain}'<enter><wait>"]
   boot_wait          = "5s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -136,7 +136,7 @@ source "qemu" "qemu_aarch64" {
   http_directory     = "init"
   iso_checksum       = "file:file://${var.isos_pardir}/netbsd/SHA512"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/netbsd/${var.iso_name_aa64}.iso","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_aa64}.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/netbsd/${var.iso_base_aa64}.iso","https://${var.mirror_host}${var.iso_url_directory}/${var.iso_base_aa64}.iso"]
   machine_type       = "virt"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-aarch64-${var.vol_mgr}"
@@ -150,7 +150,7 @@ source "qemu" "qemu_aarch64" {
 }
 
 source "qemu" "qemu_x86_64" {
-  boot_command       = ["<spacebar><wait10>1<enter><wait10><wait10><wait10><wait10><wait10><wait10>a<enter><wait10>a<enter><wait10>e<enter><wait10>a<enter><wait10>", "ksh<enter><wait10><wait10><wait10>mount_mfs -s 100m md1 /tmp ; dhcpcd wm0 ; dhcpcd vioif0 ; cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/gpt_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; gpt show -l sd0 ; sleep 3 ; sh -x /tmp/gpt_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/gpt_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env REL=${var.REL} DISTARCHIVE_FETCH=${var.distarchive_fetch} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+  boot_command       = ["<spacebar><wait10>1<enter><wait10><wait10><wait10><wait10><wait10><wait10>a<enter><wait10>a<enter><wait10>e<enter><wait10>a<enter><wait10>", "ksh<enter><wait10><wait10><wait10>mount_mfs -s 100m md1 /tmp ; dhcpcd wm0 ; dhcpcd vioif0 ; cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/gpt_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; gpt show -l sd0 ; sleep 3 ; sh -x /tmp/gpt_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/gpt_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} REL=${var.REL} DISTARCHIVE_FETCH=${var.distarchive_fetch} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_plain}'<enter><wait>"]
   boot_wait          = "5s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -160,11 +160,11 @@ source "qemu" "qemu_x86_64" {
   http_directory     = "init"
   iso_checksum       = "file:file://${var.isos_pardir}/netbsd/SHA512"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/netbsd/${var.iso_name_x64}.iso","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_x64}.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/netbsd/${var.iso_base_x64}.iso","https://${var.mirror_host}${var.iso_url_directory}/${var.iso_base_x64}.iso"]
   machine_type       = "pc"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-global", "PIIX4_PM.disable_s3=1"], ["-global", "PIIX4_PM.disable_s4=1"], ["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"]]
+  qemuargs           = [["-global", "PIIX4_PM.disable_s3=1"], ["-global", "PIIX4_PM.disable_s4=1"], ["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "virtio"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"]]
   shutdown_command   = "/sbin/shutdown -p +3 || /sbin/poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"

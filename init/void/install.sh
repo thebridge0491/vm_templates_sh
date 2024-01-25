@@ -118,7 +118,7 @@ echo "${INIT_HOSTNAME}" > /etc/hostname
 #resolvconf -u   # generates /etc/resolv.conf
 cat /etc/resolv.conf ; sleep 5
 sed -i '/127.0.1.1/d' /etc/hosts
-echo "127.0.1.1		${INIT_HOSTNAME}.localdomain	${INIT_HOSTNAME}" >> /etc/hosts
+echo "127.0.1.1   ${INIT_HOSTNAME}.localdomain  ${INIT_HOSTNAME}" >> /etc/hosts
 
 ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 

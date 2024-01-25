@@ -100,7 +100,7 @@
           <label>ESP</label>
           <mount>/boot/efi</mount>
           <mountby t="symbol">label</mountby>
-          <size>200M</size>
+          <size>512M</size>
         </partition>
         <partition t="map">
           <partition_type>primary</partition_type>
@@ -208,8 +208,8 @@
   </services-manager>
   <software t="map">
     <install_recommended t="boolean">false</install_recommended>
-    <instsource>http://download.opensuse.org/distribution/openSUSE-current/repo/oss/</instsource>
-    <!--<instsource/>-->
+    <!--<instsource>http://download.opensuse.org/distribution/openSUSE-current/repo/oss/</instsource>-->
+    <instsource/>
     <do_online_update t="boolean">false</do_online_update>
     <kernel>kernel-default</kernel>
     <patterns t="list">
@@ -235,13 +235,15 @@
       <package>efibootmgr</package>
       <package>btrfsprogs</package>
       <package>firewalld</package>
+      <package>ntp</package>
       <package>openssl</package>
       <package>openssh-askpass</package>
+      <package>openssh</package>
       <!--<package>kernel-devel</package>-->
     </packages>
-    <!--<products t="list">
-      <product>Leap</product>
-    </products>-->
+    <products t="list">
+      <product>openSUSE</product>
+    </products>
     <remove-packages t="list">
 	  <package>desktop-translations</package>
       <package>kernel-firmware</package>
@@ -325,10 +327,19 @@ sed -i '/127.0.1.1/d' /etc/hosts
 echo "127.0.1.1    ${init_hostname}.localdomain    ${init_hostname}" >> /etc/hosts
 
 . /etc/os-release
-zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/oss/ repo-oss
-zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/non-oss/ repo-non-oss
-zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/oss/ update-oss
-zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/non-oss/ update-non-oss
+
+MIRROR=${MIRROR:-download.opensuse.org}
+if [ "opensuse-tumbleweed" = "\${ID}" ] ; then
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://\${MIRROR}/tumbleweed/repo/oss/ repo-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://\${MIRROR}/tumbleweed/repo/non-oss/ repo-non-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://\${MIRROR}/update/tumbleweed/ update-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://\${MIRROR}/update/tumbleweed-non-oss/ update-non-oss
+else # elif [ "opensuse-leap" = "\${ID}" ] ; then
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://\${MIRROR}/distribution/leap/\${VERSION_ID}/repo/oss/ repo-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://\${MIRROR}/distribution/leap/\${VERSION_ID}/repo/non-oss/ repo-non-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://\${MIRROR}/update/leap/\${VERSION_ID}/oss/ update-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://\${MIRROR}/update/leap/\${VERSION_ID}/non-oss/ update-non-oss
+fi
 
 groupadd --system wheel
 usermod -aG wheel packer

@@ -24,6 +24,7 @@ export VOL_MGR=${VOL_MGR:-std}
 export GRP_NM=${GRP_NM:-vg0} ; export ZPOOLNM=${ZPOOLNM:-ospool0}
 export MIRROR=${MIRROR:-download.opensuse.org}
 export UNAME_M=$(uname -m)
+# # RELEASE: tumbleweed | leap/15.5 | openSUSE-current
 export RELEASE=${RELEASE:-openSUSE-current}
 
 
@@ -47,9 +48,16 @@ bootstrap() {
   #wget -O /tmp/release.rpm http://${MIRROR}/distribution/${RELEASE}/repo/oss/${UNAME_M}/openSUSE-release-15.4-lp154.153.1.${UNAME_M}.rpm
   #rpm -v -qip /tmp/release.rpm ; sleep 5
   #rpm -v --root /mnt --nodeps -i /tmp/release.rpm
-  zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/${RELEASE}/repo/oss/ repo-oss
+  if [ "tumbleweed" = "${RELEASE}" ] ; then
+    zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/tumbleweed/repo/oss/ repo-oss
+  else
+    zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/${RELEASE}/repo/oss/ repo-oss
+  fi
   zypper --non-interactive --root /mnt --gpg-auto-import-keys refresh
-  zypper --non-interactive --root /mnt install --no-recommends patterns-base-base makedev system-group-wheel
+  for pkgX in patterns-base-base system-group-wheel makedev ; do
+    zypper --non-interactive --root /mnt install --no-recommends $pkgX ;
+  done ;
+  #zypper --non-interactive --root /mnt install --no-recommends patterns-base-base system-group-wheel makedev
   zypper --non-interactive --root /mnt repos ; sleep 5
 
   echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
@@ -94,10 +102,19 @@ systemctl stop sshd ; systemctl disable sshd
 
 echo "Config pkg repo mirror(s)" ; sleep 3
 . /etc/os-release
-zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/oss/ repo-oss
-zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/non-oss/ repo-non-oss
-zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/oss/ update-oss
-zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/non-oss/ update-non-oss
+
+if [ "tumbleweed" = "${RELEASE}" ] ; then
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/tumbleweed/repo/oss/ repo-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/tumbleweed/repo/non-oss/ repo-non-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/tumbleweed/ update-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/tumbleweed-non-oss/ update-non-oss
+else # elif [ "opensuse-leap" = "\${ID}" ] ; then
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/oss/ repo-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/non-oss/ repo-non-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/oss/ update-oss
+  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/non-oss/ update-non-oss
+fi
+
 zypper repos ; sleep 5
 
 
@@ -109,7 +126,10 @@ zypper --non-interactive install --no-recommends --type pattern base
 zypper --non-interactive install ca-certificates-cacert ca-certificates-mozilla
 zypper --gpg-auto-import-keys refresh
 update-ca-certificates
-zypper --non-interactive install makedev system-group-wheel sudo whois nano less dosfstools xfsprogs dhcp-client firewalld openssl openssh-askpass
+for pkgX in system-group-wheel sudo whois nano less dosfstools xfsprogs dhcp-client firewalld ntp openssl openssh makedev openssh-askpass ; do
+  zypper --non-interactive install \$pkgX ;
+done
+#zypper --non-interactive install system-group-wheel sudo whois nano less dosfstools xfsprogs dhcp-client firewalld ntp openssl openssh makedev openssh-askpass
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -196,8 +216,9 @@ set -x
 
 . /etc/os-release
 
-#zypper --non-interactive install --no-recommends patterns-base-bootloader patterns-yast-yast2_basis
-zypper --non-interactive install --no-recommends --type pattern bootloader yast2_basis
+##zypper --non-interactive remove busybox-sed busybox-grep # ???
+#zypper --non-interactive install --force-resolution --no-recommends patterns-base-bootloader patterns-yast-yast2_basis
+zypper --non-interactive install --force-resolution --no-recommends --type pattern bootloader yast2_basis
 zypper --non-interactive install kernel-default grub2 shim efibootmgr
 
 echo "Config dracut ; Linux kernel"
@@ -208,8 +229,12 @@ if [ "zfs" = "$VOL_MGR" ] ; then
   ## temp downgrade grub2[x86_64-efi|i386-pc] due to unknown filesystem error (ZFS)
   #zypper --non-interactive install --from repo-oss --from repo-non-oss --oldpackage grub2-i386-pc grub2-x86_64-efi shim grub2 ;
   #zypper addlock grub2-i386-pc grub2-x86_64-efi shim grub2 ;
-
-  zypper --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/\${VERSION_ID}/filesystems.repo ;
+  
+  if [ "tumbleweed" = "${RELEASE}" ] ; then
+    zypper --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/openSUSE_Tumbleweed/filesystems.repo ;
+  else
+    zypper --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/\${VERSION_ID}/filesystems.repo ;
+  fi ;
   zypper --gpg-auto-import-keys refresh ;
 
   zypper --non-interactive install kernel-default-devel dkms zfs ;

@@ -37,7 +37,7 @@ gpt_disk() {
   gpt destroy $DEVX
   gpt create -f $DEVX
   gpt add -b 40 -a 1M -s 512K -t bios -l bios_boot $DEVX
-  gpt add -a 1M -s 200M -t efi -l ESP $DEVX
+  gpt add -a 1M -s 512M -t efi -l ESP $DEVX
 
   if [ "zfs" = "$VOL_MGR" ] ; then
     gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" $DEVX ;

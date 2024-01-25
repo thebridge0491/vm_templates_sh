@@ -7,42 +7,40 @@
 # (mime msg) [cat /dev/null |] sh mime_data.sh mime_mixed \
 #   data.txt[.gpg][,dataN.txt[.gpg]] > data.mime
 
+# NOTE: possible errors/failures for ipv6 --- to disable
+# (FreeBSD) [sudo] sysctl net.inet6.ip6.v6only=0
+# (Linux)   [sudo] sysctl net.ipv6.conf.*.disable_ipv6=1
+
 # usage:
 #   [host=smtp.gmail.com] [port=465] \
-#     sh smtps_cli.sh [-f=a.sendr@email.com] \
+#     sh smtps_cli.sh [-f=a.sendr@gmail.com] \
 #     [-s="email subject"] [-i=[data.[txt|mime]|smime.p7m] recip [...recipN]
 
-## ensure GPG_TTY set to allow interactive agent usage from inside a pipe
-# [setenv | export] GPG_TTY[=]`tty`
-
-## ? (--keyring) alternate keyring ; ? (-v) verbose output ; ? (-a) armor
-GPG_CMD=${GPG_CMD:-gpg}
-
+SCRIPTPARENT=${SCRIPTPARENT:-$(dirname $0)}
 USE_CURL=${USE_CURL:-0} ; OPEN_AUTH=${OPEN_AUTH:-0}
 # [gmail.com | mail.yahoo.com | comcast.net]
 host=${host:-smtp.gmail.com} ; port=${port:-465}
+#read -p "Input password entry: " entry
 
-#infile="$(< /dev/stdin)"
-sender=a.sendr@email.com
+sender=a.sendr@gmail.com
 subj="email subject"
-infile=data.txt
+infile=/dev/stdin
+#outfile=/dev/stdout
 recips=""
 
 for opt in "$@" ; do
   case $opt in
+  -f=*) sender=`echo $opt | sed 's|-f=||'` ;;
   -s=*) subj=`echo $opt | sed 's|-s=||'` ;;
   -i=*) infile=`echo $opt | sed 's|-i=||'` ;;
-  -f=*) sender=`echo $opt | sed 's|-f=||'` ;;
+  #-o=*) outfile=`echo $opt | sed 's|-o=||'` ;;
   *) recips="${recips}${opt} " ;;
   esac
 done
 
-hdr_txt="From: ${sender}\nTo: `echo ${recips} | tr ' ' ,`\nSubject: ${subj}"
-
 if [ ! "0" = "${OPEN_AUTH:-0}" ] ; then
-  read -p "Token file(default: appmail.tokens) for user($sender): " tokenfile ; echo
-  tokenfile=${tokenfile:-appmail.tokens}
-  token=$(python $HOME/.config/mutt/oauth2.py ${tokenfile})
+  entry=${entry:-tokenmail}
+  token=$(sh ${SCRIPTPARENT}/get_secret.sh gettoken_entry ${entry} | tr '\n' '\0')
   
   # #Note: disable line-wrapping: use openssl base64 -A OR base64 -w 0
   auth_method=oauthbearer
@@ -52,61 +50,47 @@ if [ ! "0" = "${OPEN_AUTH:-0}" ] ; then
     sasl_str=$(printf "user=${sender}\1auth=Bearer ${token}\1\1" | openssl base64 -A)
   fi ;
 else
-  #stty -echo
-  #read -p "Host password for user($sender): " passw ; echo
-  #stty echo
-  
-  #read -p "Keepass database(default: $HOME/.keepass/store.kdbx) for user($sender): " keepassdb ; echo
-  #keepassdb=${keepassdb:-$HOME/.keepass/store.kdbx}
-  #read -p "Keepass entry(default: appmail) for user($sender): " entry ; echo
-  #entry=${entry:-appmail}
-  #passw=$(keepassxc-cli show -apassword ${keepassdb} ${entry})
-  
-  #read -p "Cert/key file(default: $HOME/.pki/encrypt.pem) for user($sender): " certkeyfile ; echo
-  #certkeyfile=${certkeyfile:-$HOME/.pki/encrypt.pem}
-  #read -p "Password entry(default: appmail) for user($sender): " entry ; echo
-  #entry=${entry:-appmail}
-  #passw=$(openssl pkeyutl -decrypt -inkey ${certkeyfile} -in $HOME/.pki/.${entry}.enc)
-  
-  read -p "Password entry(default: appmail) for user($sender): " entry ; echo
+  ##stty -echo ; read -p "Password for sender($sender): " passw ; stty echo
   entry=${entry:-appmail}
-  passw=$(${GPG_CMD} --no-tty -qd $HOME/.${entry}.gpg)
+  passw=$(sh ${SCRIPTPARENT}/get_secret.sh getpass_entry ${entry} | tr '\n' '\0')
   
   auth_method=plain
   sasl_str=$(printf "\0${sender}\0${passw}" | openssl base64)
 fi
 
+hdr_txt="From: ${sender}\nTo: `echo ${recips} | tr ' ' ,`\nSubject: ${subj}"
+
 if [ "0" = "${USE_CURL:-0}" ] ; then
   {
-  	echo "ehlo ${host}" ; sleep 2 ;
-  	echo "helo ${host}" ; sleep 2 ;
-  	echo "auth ${auth_method} ${sasl_str}" ; sleep 2 ;
-  	echo "mail from: <${sender}>" ; sleep 2 ;
-  	for recip in ${recips} ; do
-  	  echo "rcpt to: <${recip}>" ; sleep 2 ;
-  	done ;
-  	echo "data" ; sleep 2 ;
-  	echo -e ${hdr_txt} ; sleep 2 ;
-  	cat ${infile} ; sleep 2 ;
-  	echo "." ; sleep 2 ;
-  	} | openssl s_client -crlf -connect ${host}":"${port}
-	#} | gnutls-cli --crlf --insecure --no-ca-verification --port ${port} ${host}
-	
-	# (openssl s_client) ??? Linux: -CApath ...      ; macOS: -CAfile ...
-	# (gnutls-cli)       ??? Linux: --x509cafile ... ; macOS: --x509cafile ...
+    echo "ehlo ${host}" ; sleep 2 ;
+    echo "helo ${host}" ; sleep 2 ;
+    echo "auth ${auth_method} ${sasl_str}" ; sleep 2 ;
+    echo "mail from: <${sender}>" ; sleep 2 ;
+    for recip in ${recips} ; do
+      echo "rcpt to: <${recip}>" ; sleep 2 ;
+    done ;
+    echo "data" ; sleep 2 ;
+    echo -e ${hdr_txt} ; sleep 2 ;
+    cat ${infile} ; sleep 2 ;
+    echo "." ; sleep 2 ;
+    } | openssl s_client -crlf -connect ${host}":"${port} -4
+  #} | gnutls-cli --crlf --insecure --no-ca-verification --port ${port} ${host}
+  
+  # (openssl s_client) ??? Linux: -CApath ...      ; macOS: -CAfile ...
+  # (gnutls-cli)       ??? Linux: --x509cafile ... ; macOS: --x509cafile ...
 else
-	mail_rcpts=""
-	for recip in ${recips} ; do
-	  mail_rcpts="${mail_rcpts}--mail-rcpt ${recip} " ;
-	done ;
-	
-	if [ "0" = "${OPEN_AUTH:-0}" ] ; then
-	  cred_opts="--user ${sender}":"${passw}" ;
-	else
-	  cred_opts="--user ${sender} --oauth2-bearer ${token}" ;
-	fi ;
-	
-	(echo -e ${hdr_txt} ; cat ${infile}) | curl --insecure --crlf --ssl \
-	  ${cred_opts} --url smtps://${host}":"${port} \
-	  --mail-from ${sender} --upload-file - ${mail_rcpts} ;
+  mail_rcpts=""
+  for recip in ${recips} ; do
+    mail_rcpts="${mail_rcpts}--mail-rcpt ${recip} " ;
+  done ;
+  
+  if [ "0" = "${OPEN_AUTH:-0}" ] ; then
+    cred_opts="--user ${sender}":"${passw}" ;
+  else
+    cred_opts="--user ${sender} --oauth2-bearer ${token}" ;
+  fi ;
+  
+  (echo -e ${hdr_txt} ; cat ${infile}) | curl --insecure --crlf --ssl-reqd \
+    ${cred_opts} --url smtps://${host}":"${port} -4 \
+    --mail-from ${sender} --upload-file - ${mail_rcpts} ;
 fi

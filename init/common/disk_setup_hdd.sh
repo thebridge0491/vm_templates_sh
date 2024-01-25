@@ -41,10 +41,10 @@ _sgdisk_part() {
   PV_NM0=${4:-pvol0} ; PV_NM1=${5:-pvol1}
 
   sgdisk --zap --clear --mbrtogpt /dev/${DEVX} ; sync
-  # typecode: f/ BIOS 1M fat|ef02 (bios_boot) ; f/ EFI 200M efi|ef00 (ESP)
+  # typecode: f/ BIOS 1M fat|ef02 (bios_boot) ; f/ EFI 512M efi|ef00 (ESP)
   sgdisk --new 1:1M:+1M --typecode 1:ef02 --change-name 1:"bios_boot" \
     /dev/${DEVX}
-  sgdisk --new 2:0:+200M --typecode 2:ef00 --change-name 2:"ESP" /dev/${DEVX}
+  sgdisk --new 2:0:+512M --typecode 2:ef00 --change-name 2:"ESP" /dev/${DEVX}
 
   sgdisk --new 3:0:+1G --typecode 3:8300 --change-name 3:"${GRP_NM0}-osBoot" /dev/${DEVX}
   sgdisk --new 4:0:+4G --typecode 4:8200 --change-name 4:"${GRP_NM0}-osSwap" /dev/${DEVX}
@@ -127,7 +127,7 @@ _sfdisk_part() {
   #  Linux swap | 82 | 0657FD6D-A4AB-43C4-84E5-0933C84B4F4F
   #  L(inux) default | 83 | 0FC63DAF-8483-4772-8E79-3D69D8477DE4
   echo -n start=1MiB,size=1MiB,bootable,type=21686148-6449-6E6F-744E-656564454649,name=bios_boot | sfdisk -N 1 /dev/${DEVX}
-  echo -n size=200MiB,bootable,type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,name=ESP | sfdisk -N 2 \
+  echo -n size=512MiB,bootable,type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,name=ESP | sfdisk -N 2 \
     /dev/${DEVX}
 
   echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM0}-osBoot" | sfdisk -N 3 /dev/${DEVX}
@@ -176,11 +176,11 @@ _parted_part() {
 
   parted --script /dev/${DEVX} mklabel gpt
   DIFF=1 ; END='-0'
-  # /dev/${DEVX}: f/ BIOS 1M none (bios_boot) ; f/ EFI 200M fat32 (ESP)
+  # /dev/${DEVX}: f/ BIOS 1M none (bios_boot) ; f/ EFI 512M fat32 (ESP)
   END=$(( 1 + $DIFF ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
     mkpart primary $DIFF $END name 1 bios_boot
-  DIFF=$END ; END=$(( 200 + $DIFF ))
+  DIFF=$END ; END=$(( 512 + $DIFF ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
     mkpart primary fat32 $DIFF $END name 2 ESP
 

@@ -1,0 +1,34 @@
+[ req ]
+distinguished_name=req_distinguished_name
+prompt=no
+req_extensions=v3_req
+
+[ req_distinguished_name ]
+C=US
+ST=Texas
+L="San Antonio"
+O="Sandbox Org"
+# CA (OU=Root CA (certsign),CN=Sandbox Root CA)
+# user (OU=Email Tasks (sign),CN=I.M. Computer)
+OU="Email Tasks (sign)"
+CN="I.M. Computer"
+#0.emailAddress=im.computer@gmail.com
+
+[ v3_ca ]
+subjectKeyIdentifier=hash
+basicConstraints=critical,CA:true,pathlen:1
+keyUsage=critical,keyCertSign,cRLSign
+#subjectAltName=email:rootca@sandbox.org
+crlDistributionPoints=URI:file:///var/tmp/pki/publish_crls/demoCA/crl.crl
+authorityInfoAccess="caIssuers;URI:file:///var/tmp/pki/publish_crls/demoCA/chain.crt"
+
+[ v3_req ]
+subjectKeyIdentifier=hash
+basicConstraints=critical,CA:false
+keyUsage=critical,digitalSignature
+extendedKeyUsage=emailProtection
+subjectAltName=email:im.computer@gmail.com,email:im.computer-codelab@yahoo.com
+##subjectAltName=DNS:sandbox.org,IP:192.168.0.15
+#========================================
+# CSR template file for OpenSSL
+  

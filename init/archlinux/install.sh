@@ -71,25 +71,30 @@ bootstrap() {
     cp /etc/pacman.d/mirrorlist* /mnt/etc/pacman.d/ ;
   else
     mkdir -p /etc/pacman.d /mnt/etc/pacman.d /mnt/var/lib/pacman ;
-#  cat << EOF > /etc/pacman.conf ;
-#[options]
-#HoldPkg = pacman glibc
-#Architecture = auto
-#
-#CheckSpace
-#SigLevel = Required DatabaseOptional
-#LocalFileSigLevel = Optional
-#
-#[core]
-#Include = /etc/pacman.d/mirrorlist
-#[extra]
-#Include = /etc/pacman.d/mirrorlist
-#[community]
-#Include = /etc/pacman.d/mirrorlist
-#[multilib]
-#Include = /etc/pacman.d/mirrorlist
-#
-#EOF
+    cat << EOF > /etc/pacman.conf.try ;
+[options]
+HoldPkg = pacman glibc
+Architecture = auto
+
+CheckSpace
+SigLevel = Required DatabaseOptional
+#SigLevel = Never
+LocalFileSigLevel = Optional
+
+# (archlinux: core ; artix: system)
+[system]
+Include = /etc/pacman.d/mirrorlist
+# (archlinux: extra ; artix: world)
+[world]
+Include = /etc/pacman.d/mirrorlist
+# (archlinux: community ; artix: galaxy)
+[galaxy]
+Include = /etc/pacman.d/mirrorlist
+# (archlinux: multilib ; artix: lib32)
+[lib32]
+Include = /etc/pacman.d/mirrorlist
+
+EOF
     if [ "aarch64" = "${UNAME_M}" ] ; then
       #pacmanconf_ver=$(curl -Ls http://mirror.archlinuxarm.org/aarch64/core | sed -n 's|.*pacman-\(.*\)-aarch64.pkg.tar.xz.*|\1|p') ;
       #curl -LO http://mirror.archlinuxarm.org/aarch64/core/pacman-${pacmanconf_ver:-6.0.2-5}-aarch64.pkg.tar.xz ;
@@ -98,9 +103,10 @@ bootstrap() {
       tar -xf pacman*.pkg.tar.xz etc ;
       cat ./etc/pacman.conf | tee /etc/pacman.conf ;
     else
-      curl -s "https://gitea.artixlinux.org/packagesP/pacman/raw/branch/master/trunk/pacman.conf" | tee /etc/pacman.conf ;
+      #curl -s "https://gitea.artixlinux.org/packagesP/pacman/raw/branch/master/trunk/pacman.conf" | tee /etc/pacman.conf ;
+      curl -s "https://gitea.artixlinux.org/packages/pacman/raw/branch/master/pacman.conf" | tee /etc/pacman.conf ;
     fi ;
-    cp /etc/pacman.conf /mnt/etc/pacman.conf ;
+    cp /etc/pacman.conf /etc/pacman.conf.try /mnt/etc/ ;
   fi
   ## fetch cmd: [curl -s | wget -qO -]
   if [ "aarch64" = "${UNAME_M}" ] ; then
@@ -119,7 +125,8 @@ bootstrap() {
   else
     #reflector --verbose --country ${LOCALE_COUNTRY:-US} --sort rate --fastest 10 --save /etc/pacman.d/mirrorlist-arch
     curl -s "https://archlinux.org/mirrorlist/?country=${LOCALE_COUNTRY:-US}&use_mirror_status=on" | sed -e 's|^#Server|Server|' -e '/^#/d' | tee /etc/pacman.d/mirrorlist-arch
-    curl -s "https://gitea.artixlinux.org/packagesA/artix-mirrorlist/raw/branch/master/trunk/mirrorlist" | tee /etc/pacman.d/mirrorlist-artix
+    #curl -s "https://gitea.artixlinux.org/packagesA/artix-mirrorlist/raw/branch/master/trunk/mirrorlist" | tee /etc/pacman.d/mirrorlist-artix
+    curl -s "https://gitea.artixlinux.org/packages/artix-mirrorlist/raw/branch/master/mirrorlist" | tee /etc/pacman.d/mirrorlist-artix
 
     cp /etc/pacman.d/mirrorlist-artix /etc/pacman.d/mirrorlist
     #cp /etc/pacman.d/mirrorlist-arch /etc/pacman.d/mirrorlist-arch.bak
@@ -147,8 +154,9 @@ bootstrap() {
     sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf ;
   fi
   
-  #cat $(dirname $0)/repo_archzfs.cfg | tee -a /mnt/etc/pacman.conf
-  cat << EOF >> /mnt/etc/pacman.conf
+  if [ "zfs" = "${VOL_MGR}" ] ; then
+    #cat $(dirname $0)/repo_archzfs.cfg | tee -a /mnt/etc/pacman.conf
+    cat << EOF >> /mnt/etc/pacman.conf
 [archzfs]
 Server = http://archzfs.com/\$repo/\$arch
 Server = http://mirror.sum7.eu/archlinux/archzfs/\$repo/\$arch
@@ -157,8 +165,9 @@ Server = https://mirror.in.themindsmaze.com/archzfs/\$repo/\$arch
 Server = https://zxcvfdsa.com/archzfs/\$repo/\$arch
 
 EOF
-  curl -Lo /tmp/archzfs.gpg https://archzfs.com/archzfs.gpg
-  pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
+    curl -Lo /tmp/archzfs.gpg https://archzfs.com/archzfs.gpg
+    pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
+  fi
   pacman -Sy
 
   echo "Bootstrap base pkgs" ; sleep 3
@@ -369,7 +378,7 @@ pacman -Sy --noconfirm linux\${LINSUF} linux-firmware mkinitcpio amd-ucode grub 
 pacman -Sy --noconfirm --needed linux\${LINSUF} linux-firmware mkinitcpio amd-ucode grub efibootmgr
 
 echo "Customize initial ramdisk (hooks: ??)" ; sleep 3
-#sed -i '/^HOOK/ s|filesystems|encrypt filesystems|' /etc/mkinitcpio.conf	# encrypt hook only if crypted root partition
+#sed -i '/^HOOK/ s|filesystems|encrypt filesystems|' /etc/mkinitcpio.conf # encrypt hook only if crypted root partition
 
 if [ "artix" = "\${ID}" ] || [ "armtix" = "\${ID}" ] ; then
   if command -v rc-update > /dev/null ; then
@@ -401,7 +410,7 @@ EOF
   zgenhostid -f -o /etc/hostid ; sleep 5 ;
 
   sed -i '/^HOOK/ s| keyboard||' /etc/mkinitcpio.conf ;
-  #sed -i '/^HOOK/ s|filesystems|keyboard encrypt zfs usr filesystems|' /etc/mkinitcpio.conf	# encrypt hook only if crypted root partition
+  #sed -i '/^HOOK/ s|filesystems|keyboard encrypt zfs usr filesystems|' /etc/mkinitcpio.conf  # encrypt hook only if crypted root partition
   sed -i '/^HOOK/ s|filesystems|keyboard zfs usr filesystems|' \
     /etc/mkinitcpio.conf ;
 

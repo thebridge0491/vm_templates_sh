@@ -1,5 +1,10 @@
 # usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
+variable "MIRROR" {
+  type    = string
+  default = ""
+}
+
 variable "RELEASE" {
   type    = string
   default = ""
@@ -45,62 +50,57 @@ variable "home" {
   default = "${env("HOME")}"
 }
 
-variable "init_hostname" {
+variable "iso_base_aa64" {
   type    = string
-  default = "suse-boxv0000"
+  default = "openSUSE-Leap-15.5-NET-aarch64-Media"
 }
 
-variable "iso_name_aa64" {
+variable "iso_base_x64" {
   type    = string
-  default = "openSUSE-Leap-15.4-NET-aarch64-Media"
-}
-
-variable "iso_name_x64" {
-  type    = string
-  #default = "live/GeckoLinux_STATIC_BareBones.x86_64-154.220822.0"
-  default = "openSUSE-Leap-15.4-NET-x86_64-Media"
+  #default = "GeckoLinux_STATIC_BareBones.x86_64-154.220822.0"
+  default = "openSUSE-Leap-15.5-NET-x86_64-Media"
 }
 
 variable "iso_url_directory" {
   type    = string
-  default = "distribution/openSUSE-current/iso"
+  default = "/distribution/openSUSE-current/iso"
 }
 
-variable "iso_url_mirror" {
+variable "isolive_base_aa64" {
   type    = string
-  default = "https://download.opensuse.org"
+  default = "openSUSE-Leap-15.5-XFCE-Live-aarch64-Media"
+}
+
+variable "isolive_base_x64" {
+  type    = string
+  #default = "openSUSE-Leap-15.5-XFCE-Live-x86_64-Media"
+  default = "GeckoLinux_STATIC_BareBones.x86_64-154.220822.0"
 }
 
 variable "isolive_cdlabel_aa64" {
   type    = string
-  default = "openSUSE_Leap_15.4_XFCE_Live"
+  default = "openSUSE_Leap_15.5_XFCE_Live"
 }
 
 variable "isolive_cdlabel_x64" {
   type    = string
-  #default = "openSUSE_Leap_15.4_XFCE_Live"
+  #default = "openSUSE_Leap_15.5_XFCE_Live"
   default = "GeckoLinux_STATIC_BareBones"
-}
-
-variable "isolive_name_aa64" {
-  type    = string
-  default = "live/openSUSE-Leap-15.4-XFCE-Live-aarch64-Media"
-}
-
-variable "isolive_name_x64" {
-  type    = string
-  #default = "live/openSUSE-Leap-15.4-XFCE-Live-x86_64-Media"
-  default = "live/GeckoLinux_STATIC_BareBones.x86_64-154.220822.0"
 }
 
 variable "isolive_url_directory" {
   type    = string
-  default = "distribution/openSUSE-current/live"
+  default = "/distribution/openSUSE-current/live"
 }
 
 variable "isos_pardir" {
   type    = string
   default = "/mnt/Data0/distros"
+}
+
+variable "mirror_host" {
+  type    = string
+  default = "download.opensuse.org"
 }
 
 variable "mkfs_cmd" {
@@ -140,11 +140,6 @@ variable "repo_directory" {
   default = "/distribution/openSUSE-current/repo/oss"
 }
 
-variable "repo_host" {
-  type    = string
-  default = "download.opensuse.org"
-}
-
 variable "variant" {
   type    = string
   default = "suse"
@@ -174,7 +169,7 @@ locals {
 }
 
 source "qemu" "qemu_aarch64" {
-  boot_command       = ["<wait>c<wait>linux /boot/aarch64/loader/linux root=live:CDLABEL=${var.isolive_cdlabel_aa64} ro rd.live.image rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 ${var.boot_cmdln_options} textmode=1 text 3 systemd.unit=multi-user.target<enter>initrd /boot/aarch64/loader/initrd<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>linux<enter><wait10>sudo su<enter><wait10>systemctl stop sshd ; systemctl disable sshd ; . /etc/os-release ; zypper --non-interactive refresh ; zypper --non-interactive install ${var.foreign_pkgmgr} ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr lvm2 btrfsprogs ; update-ca-certificates ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then . /etc/os-release ; zypper --non-interactive install dkms kernel-devel ; zypper --gpg-auto-import-keys addrepo http://${var.repo_host}/repositories/filesystems/$${VERSION_ID}/filesystems.repo ; zypper --gpg-auto-import-keys refresh ; zypper --non-interactive install zfs zfs-kmp-default ; sleep 5 ; fi ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_crypted}'<enter><wait>"]
+  boot_command       = ["<wait>c<wait>linux /boot/aarch64/loader/linux root=live:CDLABEL=${var.isolive_cdlabel_aa64} ro rd.live.image rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 ${var.boot_cmdln_options} textmode=1 text 3 systemd.unit=multi-user.target<enter>initrd /boot/aarch64/loader/initrd<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>linux<enter><wait10>sudo su<enter><wait10>systemctl stop sshd ; systemctl disable sshd ; . /etc/os-release ; mount -o remount,size=1500M /run/overlay ; df -h ; sleep 5 ; zypper --non-interactive refresh ; zypper --non-interactive install ${var.foreign_pkgmgr} ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr lvm2 btrfsprogs ; update-ca-certificates ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then . /etc/os-release ; zypper --non-interactive install dkms kernel-devel ; zypper --gpg-auto-import-keys addrepo http://${var.mirror_host}/repositories/filesystems/$${VERSION_ID}/filesystems.repo ; zypper --gpg-auto-import-keys refresh ; zypper --non-interactive install zfs zfs-kmp-default ; sleep 5 ; fi ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -182,14 +177,14 @@ source "qemu" "qemu_aarch64" {
   disk_size          = "${var.disk_size}"
   headless           = "${var.headless}"
   http_directory     = "init"
-  iso_checksum       = "file:file://${var.isos_pardir}/suse/${var.isolive_name_aa64}.iso.sha256"
+  iso_checksum       = "file:file://${var.isos_pardir}/suse/live/${var.isolive_base_aa64}.iso.sha256"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/suse/${var.isolive_name_aa64}.iso","${var.iso_url_mirror}/${var.isolive_url_directory}/${var.isolive_cdlabel_aa64}-aarch64-Media.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/suse/live/${var.isolive_base_aa64}.iso","https://${var.mirror_host}${var.isolive_url_directory}/${var.isolive_base_aa64}.iso"]
   machine_type       = "virt"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-aarch64-${var.vol_mgr}"
   qemu_binary        = "qemu-system-aarch64"
-  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"
@@ -198,9 +193,9 @@ source "qemu" "qemu_aarch64" {
 }
 
 source "qemu" "qemu_x86_64" {
-  #boot_command         = ["<wait>c<wait>linuxefi /boot/x86_64/loader/linux ", "netsetup=dhcp lang=en_US install=http://${var.repo_host}${var.repo_directory} hostname=${var.init_hostname} domain= textmode=1 text 3 systemd.unit=multi-user.target autoyast=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-autoinst.xml<enter><wait10>", "initrdefi /boot/x86_64/loader/initrd<enter><wait10>boot<enter><wait10>"]
+  #boot_command         = ["<wait>c<wait>linuxefi /boot/x86_64/loader/linux ", "netsetup=dhcp lang=en_US install=http://${var.mirror_host}${var.repo_directory} hostname=${var.variant}-boxv0000 domain= textmode=1 text 3 systemd.unit=multi-user.target autoyast=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-autoinst.xml<enter><wait10>", "initrdefi /boot/x86_64/loader/initrd<enter><wait10>boot<enter><wait10>"]
 
-  boot_command       = ["<wait>c<wait>linuxefi /boot/x86_64/loader/linux root=live:CDLABEL=${var.isolive_cdlabel_x64} ro rd.live.image rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 ${var.boot_cmdln_options} textmode=1 text 3 systemd.unit=multi-user.target<enter>initrdefi /boot/x86_64/loader/initrd<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>linux<enter><wait10>sudo su<enter><wait10>systemctl stop sshd ; systemctl disable sshd ; . /etc/os-release ; zypper --non-interactive refresh ; zypper --non-interactive install ${var.foreign_pkgmgr} ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr lvm2 btrfsprogs ; update-ca-certificates ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then . /etc/os-release ; zypper --non-interactive install dkms kernel-devel ; zypper --gpg-auto-import-keys addrepo http://${var.repo_host}/repositories/filesystems/$${VERSION_ID}/filesystems.repo ; zypper --gpg-auto-import-keys refresh ; zypper --non-interactive install zfs zfs-kmp-default ; sleep 5 ; fi ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_crypted}'<enter><wait>"]
+  boot_command       = ["<wait>c<wait>linuxefi /boot/x86_64/loader/linux root=live:CDLABEL=${var.isolive_cdlabel_x64} ro rd.live.image rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 ${var.boot_cmdln_options} textmode=1 text 3 systemd.unit=multi-user.target<enter>initrdefi /boot/x86_64/loader/initrd<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>linux<enter><wait10>sudo su<enter><wait10>systemctl stop sshd ; systemctl disable sshd ; . /etc/os-release ; mount -o remount,size=1500M /run/overlay ; df -h ; sleep 5 ; zypper --non-interactive refresh ; zypper --non-interactive install ${var.foreign_pkgmgr} ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr lvm2 btrfsprogs ; update-ca-certificates ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then . /etc/os-release ; zypper --non-interactive install dkms kernel-devel ; zypper --gpg-auto-import-keys addrepo http://${var.mirror_host}/repositories/filesystems/$${VERSION_ID}/filesystems.repo ; zypper --gpg-auto-import-keys refresh ; zypper --non-interactive install zfs zfs-kmp-default ; sleep 5 ; fi ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
 
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
@@ -209,13 +204,13 @@ source "qemu" "qemu_x86_64" {
   disk_size          = "${var.disk_size}"
   headless           = "${var.headless}"
   http_directory     = "init"
-  iso_checksum       = "file:file://${var.isos_pardir}/suse/${var.isolive_name_x64}.iso.sha256"
+  iso_checksum       = "file:file://${var.isos_pardir}/suse/live/${var.isolive_base_x64}.iso.sha256"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/suse/${var.isolive_name_x64}.iso","${var.iso_url_mirror}/${var.isolive_url_directory}/${var.isolive_cdlabel_x64}-x86_64-Media.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/suse/live/${var.isolive_base_x64}.iso","https://${var.mirror_host}${var.isolive_url_directory}/${var.isolive_base_x64}.iso"]
   machine_type       = "q35"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "virtio"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"

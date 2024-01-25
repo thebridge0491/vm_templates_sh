@@ -6,17 +6,17 @@ echo '### Warning: FreeBSD bhyve currently requires root/sudo permission ###'
 printf "%40s\n\n" | tr ' ' '#' ; sleep 5
 
 if [ "1" = "${FREEBSDGUEST:-0}" ] ; then
-  #bhyveload -m 2048M -d ${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)} ${GUEST:-freebsd-x86_64-zfs} ;
+  #bhyveload -m 4096M -d ${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)} ${GUEST:-freebsd-x86_64-zfs} ;
   sleep 1 ;
 else
   cat << EOF > ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/device.map ;
 (hd0) ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/${GUEST:-freebsd-x86_64-zfs}.raw
 (cd0) ${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)}
 EOF
-  grub-bhyve -m ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/device.map -r cd0 -M 2048M ${GUEST:-freebsd-x86_64-zfs} ;
+  grub-bhyve -m ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/device.map -r cd0 -M 4096M ${GUEST:-freebsd-x86_64-zfs} ;
 fi
 
-bhyve -A -H -P -c 2 -m 2048M -s 0,hostbridge -s 1,lpc \
+bhyve -A -H -P -c 2 -m 4096M -s 0,hostbridge -s 1,lpc \
   -s 2,virtio-net,${NET_OPT:-tap0},mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
   -s 3,virtio-blk,${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/${GUEST:-freebsd-x86_64-zfs}.raw \
   -l com1,stdio \

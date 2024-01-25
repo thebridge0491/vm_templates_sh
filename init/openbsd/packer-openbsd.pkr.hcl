@@ -1,5 +1,10 @@
 # usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
+variable "MIRROR" {
+  type    = string
+  default = ""
+}
+
 variable "REL" {
   type    = string
   default = ""
@@ -45,34 +50,29 @@ variable "home" {
   default = "${env("HOME")}"
 }
 
-variable "init_hostname" {
+variable "iso_base_aa64" {
   type    = string
-  default = "openbsd-boxv0000"
+  default = "arm64/install74"
 }
 
-variable "iso_name_aa64" {
+variable "iso_base_x64" {
   type    = string
-  default = "arm64/install72"
-}
-
-variable "iso_name_x64" {
-  type    = string
-  default = "amd64/install72"
+  default = "amd64/install74"
 }
 
 variable "iso_url_directory" {
   type    = string
-  default = "7.2"
-}
-
-variable "iso_url_mirror" {
-  type    = string
-  default = "https://cdn.openbsd.org/pub/OpenBSD"
+  default = "/7.4"
 }
 
 variable "isos_pardir" {
   type    = string
   default = "/mnt/Data0/distros"
+}
+
+variable "mirror_host" {
+  type    = string
+  default = "cdn.openbsd.org/pub/OpenBSD"
 }
 
 variable "nvram_qemu_aa64" {
@@ -138,7 +138,7 @@ source "qemu" "qemu_aarch64" {
   #iso_checksum       = "file:file://${var.isos_pardir}/openbsd/arm64/SHA256"
   iso_checksum       = "none"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/openbsd/${var.iso_name_aa64}.img","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_aa64}.img"]
+  iso_urls           = ["file://${var.isos_pardir}/openbsd/${var.iso_base_aa64}.img","https://${var.mirror_host}${var.iso_url_directory}/${var.iso_base_aa64}.img"]
   machine_type       = "virt"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-aarch64-${var.vol_mgr}"
@@ -154,7 +154,7 @@ source "qemu" "qemu_aarch64" {
 source "qemu" "qemu_x86_64" {
   boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>dhclient vio0 ; ifconfig vio0 inet autoconf<enter><wait>", "cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.resp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/autoinstall.sh ; sync ; sleep 3 ; sh -x /tmp/autoinstall.sh<enter>"]
 
-  #boot_command         = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>", "mount_mfs -s 100m md1 /tmp ; mount_mfs -s 100m md2 /mnt ; mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; dhclient -L /tmp/dhclient.lease.em0 em0 ; dhclient -L /tmp/dhclient.lease.vio0 vio0 ; ifconfig em0 inet autoconf ; ifconfig vio0 inet autoconf ; cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/disklabel_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; (cd /dev ; sh MAKEDEV sd0) ; sh -x /tmp/disklabel_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/disklabel_setup.sh mount_filesystems<enter><wait10><wait10><wait10>REL=${var.REL} DISTARCHIVE_FETCH=${var.distarchive_fetch} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+  #boot_command         = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "S<enter><wait10>", "mount_mfs -s 100m md1 /tmp ; mount_mfs -s 100m md2 /mnt ; mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; dhclient -L /tmp/dhclient.lease.em0 em0 ; dhclient -L /tmp/dhclient.lease.vio0 vio0 ; ifconfig em0 inet autoconf ; ifconfig vio0 inet autoconf ; cd /tmp ; ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/disklabel_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; (cd /dev ; sh MAKEDEV sd0) ; sh -x /tmp/disklabel_setup.sh part_format ${var.vol_mgr} ; sh -x /tmp/disklabel_setup.sh mount_filesystems<enter><wait10><wait10><wait10>MIRROR=${var.MIRROR} REL=${var.REL} DISTARCHIVE_FETCH=${var.distarchive_fetch} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_plain}'<enter><wait>"]
 
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
@@ -167,7 +167,7 @@ source "qemu" "qemu_x86_64" {
   #iso_checksum       = "file:file://${var.isos_pardir}/openbsd/amd64/SHA256"
   iso_checksum       = "none"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/openbsd/${var.iso_name_x64}.img","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_x64}.img"]
+  iso_urls           = ["file://${var.isos_pardir}/openbsd/${var.iso_base_x64}.img","https://${var.mirror_host}${var.iso_url_directory}/${var.iso_base_x64}.img"]
   machine_type       = "pc"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"

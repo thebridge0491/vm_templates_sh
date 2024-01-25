@@ -166,15 +166,22 @@ sed -i '' "s|^[^#].*requiretty|# Defaults requiretty|" /usr/local/etc/sudoers
 echo "Config pkg repo nearby mirror(s)" ; sleep 3
 mkdir -p /usr/local/etc/pkg/repos
 sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
-FreeBSD: { enabled: false }
+FreeBSD: { 
+  #url: "pkg+http://pkg.freebsd.org/\$\{ABI}/quarterly",
+  url: "pkg+http://pkg.freebsd.org/\$(pkg config abi)/quarterly",
+  mirror_type: "srv",
+  signature_type: "fingerprints",
+  fingerprints: "/usr/share/keys/pkg",
+  enabled: false
+}
 
 FreeBSD-nearby: {
-	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$(pkg config abi)/quarterly",
-	mirror_type: "srv",
-	signature_type: "fingerprints",
-	fingerprints: "/usr/share/keys/pkg",
-	enabled: true
+  #url: "http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
+  url: "http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$(pkg config abi)/quarterly",
+  #mirror_type: "none",
+  signature_type: "fingerprints",
+  fingerprints: "/usr/share/keys/pkg",
+  enabled: true
 }
 
 EOF

@@ -1,5 +1,10 @@
 # usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
+variable "MIRROR" {
+  type    = string
+  default = ""
+}
+
 variable "RELEASE" {
   type    = string
   default = ""
@@ -35,29 +40,24 @@ variable "home" {
   default = "${env("HOME")}"
 }
 
-variable "init_hostname" {
+variable "iso_base_x64" {
   type    = string
-  default = "pclinuxos-boxv0000"
-}
-
-variable "iso_name_x64" {
-  type    = string
-  default = "pclinuxos64-xfce-2022.11.30"
+  default = "pclinuxos64-xfce-2022.12"
 }
 
 variable "iso_url_directory" {
   type    = string
-  default = "pclinuxos/live-cd/64bit"
-}
-
-variable "iso_url_mirror" {
-  type    = string
-  default = "https://spout.ussg.indiana.edu/linux/pclinuxos"
+  default = "/pclinuxos/iso"
 }
 
 variable "isos_pardir" {
   type    = string
   default = "/mnt/Data0/distros"
+}
+
+variable "mirror_host" {
+  type    = string
+  default = "spout.ussg.indiana.edu/linux/pclinuxos"
 }
 
 variable "mkfs_cmd" {
@@ -116,9 +116,9 @@ locals {
 }
 
 source "qemu" "qemu_x86_64" {
-  #boot_command       = ["<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 keyb=us textmode=1 text 3<enter>initrd /isolinux/initrd.gz<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10><enter>", "guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lib64hal1 lvm2 btrfs-progs ; apt-get -y --fix-broken install ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sfdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+  #boot_command       = ["<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 keyb=us textmode=1 text 3<enter>initrd /isolinux/initrd.gz<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10><enter>", "guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lib64hal1 lib64aio1 lvm2 btrfs-progs ; apt-get -y --fix-broken install ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sfdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_plain}'<enter><wait>"]
 
-  boot_command       = ["<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 keyb=us<enter>initrd /isolinux/initrd.gz<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10><enter>", "guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lib64hal1 lvm2 btrfs-progs ; apt-get -y --fix-broken install ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/post_drakliveinstall.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sfdisk ${var.vol_mgr} ; echo '' ; echo '(btrfs) USE Custom partitioning in draklive-install WITH Mount options advanced for / (root): subvol=@' ; echo '' ; sleep 30 ; draklive-install --expert --noauto ; env VOL_MGR=${var.vol_mgr} sh -x /tmp/post_drakliveinstall.sh run_postinstall ${var.init_hostname} '${var.passwd_plain}'<enter><wait>"]
+  boot_command       = ["<wait>c<wait>linux /isolinux/vmlinuz livecd=livecd root=/dev/rd/3 keyb=us<enter>initrd /isolinux/initrd.gz<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10><enter>", "guest<enter><enter><wait10>su<enter><wait10>apt-get update ; apt-get install -y netcat gdisk efibootmgr lib64hal1 lib64aio1 lvm2 btrfs-progs ; apt-get -y --fix-broken install ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/post_drakliveinstall.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sfdisk ${var.vol_mgr} ; echo '' ; echo '(btrfs) USE Custom partitioning in draklive-install WITH Mount options advanced for / (root): subvol=@' ; echo '' ; sleep 30 ; draklive-install --expert --noauto ; env VOL_MGR=${var.vol_mgr} sh -x /tmp/post_drakliveinstall.sh run_postinstall ${var.variant}-boxv0000 '${var.passwd_plain}'<enter><wait>"]
 
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
@@ -127,13 +127,13 @@ source "qemu" "qemu_x86_64" {
   disk_size          = "${var.disk_size}"
   headless           = "${var.headless}"
   http_directory     = "init"
-  iso_checksum       = "file:file://${var.isos_pardir}/pclinuxos/${var.iso_name_x64}.md5sum"
+  iso_checksum       = "file:file://${var.isos_pardir}/pclinuxos/${var.iso_base_x64}.md5sum"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/pclinuxos/${var.iso_name_x64}.iso","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_x64}.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/pclinuxos/${var.iso_base_x64}.iso","https://${var.mirror_host}${var.iso_url_directory}/${var.iso_base_x64}.iso"]
   machine_type       = "q35"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"

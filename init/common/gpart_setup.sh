@@ -46,7 +46,7 @@ gpart_disk() {
   gpart create -s gpt -f active $DEVX
   #gpart add -b 40 -a 1M -s 512K -t freebsd-boot -l bios_boot $DEVX
   gpart add -b 1M -a 1M -s 512K -t freebsd-boot -l bios_boot $DEVX
-  gpart add -a 1M -s 200M -t efi -l ESP $DEVX
+  gpart add -a 1M -s 512M -t efi -l ESP $DEVX
 
   if [ "zfs" = "$VOL_MGR" ] ; then
     gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 $DEVX ;

@@ -30,9 +30,9 @@ NVRAM_QEMU_X64=${NVRAM_QEMU_X64:-/usr/share/OVMF/OVMF_VARS.fd}
 FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
 NVRAM_QEMU_AA64=${NVRAM_QEMU_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd}
 
-#mac_last3=$(hexdump -n3 -e '/1 ":%02x"' /dev/random | cut -c2-)
+#mac_last3=$(hexdump -n3 -e '3/1 ":%02x"' /dev/random | cut -c2-)
 #mac_last3=$(od -N3 -tx1 -An /dev/random | awk '$1=$1' | tr ' ' :)
-mac_last3=$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||')
+mac_last3=$(openssl rand -hex 3 | sed 's|\(..\)|:\1|g; s|^:||')
 
 
 _prep() {
@@ -95,7 +95,7 @@ _install_x86_64() {
     #  virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
 
     virt-install ${CONNECT_OPT} --arch x86_64 --cpu SandyBridge \
-      --memory 2048 --vcpus 2 \
+      --memory 4096 --vcpus 2 \
       --controller usb,model=ehci --controller virtio-serial \
       --console pty,target_type=virtio --graphics vnc,port=-1 \
       --network network=default,model=virtio-net,mac=RANDOM \
@@ -115,17 +115,17 @@ _install_x86_64() {
       -l bootrom,${FIRMWARE_BHYVE_X64}}
 
     if [ "1" = "${FREEBSDGUEST:-0}" ] ; then
-      #bhyveload -m 2048M -d ${OUT_DIR}/${GUEST}.raw ${GUEST} ;
+      #bhyveload -m 4096M -d ${OUT_DIR}/${GUEST}.raw ${GUEST} ;
       sleep 1 ;
     else
       cat << EOF > ${OUT_DIR}/device.map ;
 (hd0) ${OUT_DIR}/${GUEST}.raw
 (cd0) ${ISO_PATH}
 EOF
-      grub-bhyve -m ${OUT_DIR}/device.map -r cd0 -M 2048M ${GUEST} ;
+      grub-bhyve -m ${OUT_DIR}/device.map -r cd0 -M 4096M ${GUEST} ;
     fi
 
-    bhyve -A -H -P -c 2 -m 2048M -s 0,hostbridge -s 1,lpc \
+    bhyve -A -H -P -c 2 -m 4096M -s 0,hostbridge -s 1,lpc \
       -s 2,virtio-net,${NET_OPT:-tap0},mac=52:54:00:${mac_last3} \
       -s 3,ahci-hd,${OUT_DIR}/${GUEST}.raw -l com1,stdio \
       ${BUEFI_OPTS} -s 31,ahci-cd,${ISO_PATH} ${GUEST} &
@@ -147,12 +147,12 @@ EOF
 
     qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
       -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
-      -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+      -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
       -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
       -drive file=${OUT_DIR}/${GUEST}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
-      -display default,show-cursor=on -vga none -device qxl-vga,vgamem_mb=64 \
+      -display default,show-cursor=on -vga virtio \
       ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot &
     echo "### Once network connected, transfer needed file(s) ###" ;
   fi
@@ -171,7 +171,7 @@ _install_aarch64() {
     #  eval "echo \"$(< vminstall_qemu.args)\"" > /tmp/install_qemu.args
     #  virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
 
-    virt-install ${CONNECT_OPT} --arch aarch64 --memory 2048 --vcpus 2 \
+    virt-install ${CONNECT_OPT} --arch aarch64 --memory 4096 --vcpus 2 \
       --controller usb,model=ehci --controller virtio-serial \
       --console pty,target_type=virtio --graphics vnc,port=-1 \
       --network network=default,model=virtio-net,mac=RANDOM \
@@ -196,7 +196,7 @@ _install_aarch64() {
     sleep 5 ;
 
     qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
-      -smp cpus=2 -m size=2048 -boot order=cdn,menu=on -name ${GUEST} \
+      -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
       -device virtio-blk-pci,drive=hd0 \
@@ -250,9 +250,10 @@ freebsd_aarch64() {
   ##!! login user/passwd: anon/voidlinux
 
   #ip link ; [dhcpcd {ifdev}]
-  #[bash;] sv down sshd ; export MIRRORHOST=repo-default.voidlinux.org
+  #[bash;] ; mount -o remount,size=1500M /run ; df -h ; sleep 5
+  #sv down sshd ; export MIRRORHOST=repo-default.voidlinux.org
   #yes | xbps-install -Sy -R http://${MIRRORHOST}/current -u xbps ; sleep 3
-  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current [debootstrap pacman apk-tools] netcat wget parted gptfdisk libffi gnupg2 curl [lvm2 btrfs-progs]
+  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current [debootstrap pacman apk-tools] netcat wget parted gptfdisk libffi libldap gnupg2 curl [lvm2 btrfs-progs]
 
   #------------ if using ZFS ---------------
   ## install zfs, if needed ##
@@ -283,10 +284,10 @@ void_x86_64() {
   # ip link ; [networkctl status ; networkctl up {ifdev}]
   #[dhcpcd {ifdev}]
   #sed -i 's|\(^SigLevel.*\)|#\1\nSigLevel = Never|' /etc/pacman.conf
-  #(arch) mount -o remount,size=1G /run/archiso/cowspace ; df -h ; sleep 5
+  #(arch) mount -o remount,size=1500M /run/archiso/cowspace ; df -h ; sleep 5
   #(arch) pacman-key --init ; pacman -Sy archlinux-keyring
   #(arch) pacman-key --populate archlinux
-  #(artix) mount -o remount,size=1G /run/artix/cowspace ; df -h ; sleep 5
+  #(artix) mount -o remount,size=1500M /run/artix/cowspace ; df -h ; sleep 5
   #(artix) pacman-key --init ; pacman -Sy artix-keyring
   #(artix) pacman-key --populate artix
   #(arch|artix) sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf
@@ -331,7 +332,7 @@ archlinux_x86_64() {
   #ip link ; [networkctl status ; networkctl up {ifdev}]
   #[dhcpcd {ifdev} ; dhclient {ifdev}]
   #systemctl stop ssh ; invoke-rc.d ssh stop
-  #mount -o remount,size=1G /run/live/overlay ; df -h ; sleep 5
+  #mount -o remount,size=1500M /run/live/overlay ; df -h ; sleep 5
   #sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
   #apt-get --yes update --allow-releaseinfo-change
   #apt-get --yes install [dnf zypper] gdisk [lvm2 btrfs-progs]
@@ -363,11 +364,12 @@ debian_x86_64() {
   #ifconfig ; ifconfig {ifdev} up ; udhcpc -i {ifdev} ; cd /tmp
 
   #service sshd stop ; date +%Y.%m.%d-%H:%M -s "YYYY.mm.dd-23:59"
-  #. /etc/os-release ; export MIRRORHOST=dl-cdn.alpinelinux.org/alpine
+  #. /etc/os-release ; mount -o remount,size=1500M /run ; df -h ; sleep 5
+  #export MIRRORHOST=dl-cdn.alpinelinux.org/alpine
   #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories
   #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories
   #apk update
-  #apk add [--repository=https://dl-cdn.alpinelinux.org/alpine/v3.13/main debootstrap=1.0.123-r0 pacman] e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl util-linux multipath-tools perl [lvm2 btrfs-progs]
+  #apk add [--repository=https://dl-cdn.alpinelinux.org/alpine/latest-stable/main debootstrap pacman] e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl util-linux multipath-tools perl [lvm2 btrfs-progs]
   #setup-devd udev
 
   #------------ if using ZFS ---------------
@@ -399,7 +401,9 @@ alpine_aarch64() {
 
   ##!! login user/passwd: linux/-
 
-  #sudo su ; . /etc/os-release ; export MIRRORHOST=download.opensuse.org
+  #sudo su ; . /etc/os-release
+  #mount -o remount,size=1500M /run/overlay ; df -h ; sleep 5
+  #export MIRRORHOST=download.opensuse.org
   #networkctl status ; networkctl up {ifdev}
   #nmcli device status ; nmcli connection up {ifdev}
   #wicked ifstatus all ; wicked ifup {ifdev}
@@ -443,7 +447,8 @@ suse_aarch64() {
 
   ##!! login user/passwd: liveuser/-
 
-  #. /etc/os-release ; export MIRRORHOST=dl.rockylinux.org/pub/rocky
+  #. /etc/os-release ; mount -o remount,size=1500M /run ; df -h ; sleep 5
+  #export MIRRORHOST=dl.rockylinux.org/pub/rocky
   #networkctl status ; networkctl up {ifdev}
   #nmcli device status ; nmcli connection up {ifdev}
   #[dnf | yum] -y check-update ; setenforce 0 ; sestatus ; sleep 5
@@ -487,7 +492,8 @@ redhat_aarch64() {
 
   ##!! login user/passwd: live/-
 
-  #su - ; export MIRRORHOST=mirrors.kernel.org/mageia
+  #su - [; mount -o remount,size=1500M /run ; df -h ; sleep 5]
+  #export MIRRORHOST=mirrors.kernel.org/mageia
   #networkctl status ; networkctl up {ifdev}
   #nmcli device status ; nmcli connection up {ifdev}
   #dnf -y check-update ; [dnf -y install lvm2 btrfs-progs ;] sleep 5
@@ -507,7 +513,8 @@ mageia_x86_64() {
   ##!! login user/passwd: guest/-
   ## NOTE, transfer [dir(s) | file(s)]: scripts_pclinuxos.tar (init/common, init/pclinuxos, scripts/pclinuxos)
 
-  #su - ; export MIRRORHOST=spout.ussg.indiana.edu/linux/pclinuxos
+  #su - [; mount -o remount,size=1500M /run ; df -h ; sleep 5]
+  #export MIRRORHOST=spout.ussg.indiana.edu/linux/pclinuxos
   #nmcli device status ; nmcli connection up {ifdev}
   #sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list
   #sed -i "/${MIRRORHOST}/ s|^.*rpm|rpm|" /etc/apt/sources.list
@@ -642,10 +649,10 @@ ${@:-freebsd_x86_64 freebsd-x86_64-std}
 #variant suse - distros(opensuse): ([x86_64,aarch64] MIRROR: download.opensuse.org)
   #  package(s): zypper, rpm, ? rinse
 
-#variant redhat - distros(rocky, almalinux, centos[-stream]):
+#variant redhat - distros(rocky, almalinux, centos-stream):
   # (rocky [x86_64|aarch64] MIRROR: dl.rockylinux.org/pub/rocky)
   # (almalinux [x86_64|aarch64] MIRROR: repo.almalinux.org/almalinux)
-  # (centos[-stream] [x86_64|aarch64] MIRROR: mirror.centos.org/centos)
+  # (centos-stream [x86_64|aarch64] MIRROR: mirror.stream.centos.org)
   #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm, ? rinse
 
 #variant mageia: ([x86_64,aarch64] MIRROR: mirrors.kernel.org/mageia)

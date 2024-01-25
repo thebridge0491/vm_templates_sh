@@ -1,0 +1,24 @@
+# CA (OU=Root CA (certsign),CN=Sandbox Root CA)
+# user (OU=Email Tasks (sign),CN=I.M. Computer)
+dn="C=US,ST=Texas,L=San Antonio,O=Sandbox Org,OU=Email Tasks (sign),CN=I.M. Computer"
+
+expiration_days=365
+# CA (email=rootca@sandbox.org) ; user (email=im.computer@gmail.com)
+email=im.computer@gmail.com
+email=im.computer-codelab@yahoo.com
+email0=im.computer@gmail.com
+email1=im.computer-codelab@yahoo.com
+##dns_name=sandbox.org
+##ip_address=192.168.0.15
+# -- (=true for ini file key=value) --
+signing_key=true
+email_protection_key=true
+# -- for CA --
+#ca=true
+#path_len=1
+#cert_signing_key=true
+#crl_signing_key=true
+#crl_dist_points=file:///var/tmp/pki/publish_crls/demoCA/crl.crl
+#ca_issuers_uri=file:///var/tmp/pki/publish_crls/demoCA/chain.crt
+#========================================
+# CSR template file for GnuTLS certtool

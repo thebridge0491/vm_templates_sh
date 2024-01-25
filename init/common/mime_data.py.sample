@@ -3,6 +3,8 @@
 import os, sys, base64, re
 
 import mimetypes
+# python-magic
+#import magic
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
@@ -22,6 +24,7 @@ usage_str = '''usage:
 
 def mime_attachmt(infile='data.txt'):
   ctype, encoding = mimetypes.guess_type(infile)
+  #ctype, encoding = magic.Magic().from_file(infile), None
   if ctype is None or encoding is not None:
     ctype = 'application/octet-stream'
   maintype, subtype = ctype.split('/', 1)
@@ -77,6 +80,7 @@ def mime_extract(mimefile='data.mime', outdir='.'):
     if not filenm:
       cnt += 1
       extN = mimetypes.guess_extension(partN.get_content_type()) or '.dat'
+      #extN = '.dat'
       filenm = 'part-{0:03d}{1}'.format(cnt, extN)
     with open(os.path.join(outdir, filenm), 'wb') as fOut:
       fOut.write(partN.get_payload(decode=True))

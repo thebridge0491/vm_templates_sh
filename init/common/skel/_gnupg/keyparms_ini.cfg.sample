@@ -1,0 +1,18 @@
+key_type=RSA
+key_length=4096
+key_usage=cert
+subkey_type=RSA
+subkey_length=3072
+#subkey_type=ECC
+#subkey_length=secp384r1
+subkey_usage=sign,auth
+# gpg --verbose --version
+#preferences="S9 S8 S13 S12 H10 H9 H8 Z3 Z2 Z1 Z0"
+preferences="AES256 AES192 CAMELLIA256 CAMELLIA192 SHA512 SHA384 SHA256 BZIP2 ZLIB ZIP Uncompressed"
+#passphrase="abcd0123"
+
+#creation_date=2011-10-01
+expire_date=13m
+name_real=im.computer
+name_email=im.computer@gmail.com
+#name_comment="Practice PGP Keyring"

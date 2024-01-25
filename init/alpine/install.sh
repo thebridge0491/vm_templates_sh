@@ -127,15 +127,15 @@ EOF
 
 echo "Update services" ; sleep 3
 for svc_runlvl in devfs:sysinit dmesg:sysinit mdev:sysinit hwdrivers:sysinit \
-		networking:boot urandom:boot hostname:boot hwclock:boot modules:boot \
-		sysctl:boot bootmisc:boot syslog:boot swap:boot loadkmap:boot \
-		mount-ro:shutdown killprocs:shutdown savecache:shutdown \
-		acpid:default sshd:default crond:default ; do
-		# udev:sysinit udev-postmount:default udev-trigger:sysinit ; do
-	svc=\$(echo \$svc_runlvl | cut -d: -f1) ;
-	runlvl=\$(echo \$svc_runlvl | cut -d: -f2) ;
+    networking:boot urandom:boot hostname:boot hwclock:boot modules:boot \
+    sysctl:boot bootmisc:boot syslog:boot swap:boot loadkmap:boot \
+    mount-ro:shutdown killprocs:shutdown savecache:shutdown \
+    acpid:default sshd:default crond:default ; do
+    # udev:sysinit udev-postmount:default udev-trigger:sysinit ; do
+  svc=\$(echo \$svc_runlvl | cut -d: -f1) ;
+  runlvl=\$(echo \$svc_runlvl | cut -d: -f2) ;
 
-	rc-update add \$svc \$runlvl ;
+  rc-update add \$svc \$runlvl ;
 done
 
 

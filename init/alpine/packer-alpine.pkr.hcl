@@ -1,5 +1,10 @@
 # usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
+variable "MIRROR" {
+  type    = string
+  default = ""
+}
+
 variable "RELEASE" {
   type    = string
   default = ""
@@ -32,7 +37,7 @@ variable "firmware_qemu_x64" {
 
 variable "foreign_pkgmgr" {
   type    = string
-  default = "--repository=https://dl-cdn.alpinelinux.org/alpine/v3.13/main debootstrap=1.0.123-r0 pacman"
+  default = "--repository=https://dl-cdn.alpinelinux.org/alpine/latest-stable/main debootstrap pacman"
 }
 
 variable "headless" {
@@ -45,34 +50,29 @@ variable "home" {
   default = "${env("HOME")}"
 }
 
-variable "init_hostname" {
+variable "iso_base_aa64" {
   type    = string
-  default = "alpine-boxv0000"
+  default = "alpine-standard-3.19.0-aarch64"
 }
 
-variable "iso_name_aa64" {
+variable "iso_base_x64" {
   type    = string
-  default = "alpine-standard-3.17.0-aarch64"
-}
-
-variable "iso_name_x64" {
-  type    = string
-  default = "alpine-extended-3.17.0-x86_64"
+  default = "alpine-extended-3.19.0-x86_64"
 }
 
 variable "iso_url_directory" {
   type    = string
-  default = "latest-stable/releases"
-}
-
-variable "iso_url_mirror" {
-  type    = string
-  default = "https://dl-cdn.alpinelinux.org/alpine"
+  default = "/latest-stable/releases"
 }
 
 variable "isos_pardir" {
   type    = string
   default = "/mnt/Data0/distros"
+}
+
+variable "mirror_host" {
+  type    = string
+  default = "dl-cdn.alpinelinux.org/alpine"
 }
 
 variable "mkfs_cmd" {
@@ -107,11 +107,6 @@ variable "qemunet_bridge" {
   default = "br0"
 }
 
-variable "repo_host" {
-  type    = string
-  default = "dl-cdn.alpinelinux.org/alpine"
-}
-
 variable "variant" {
   type    = string
   default = "alpine"
@@ -141,7 +136,7 @@ locals {
 }
 
 source "qemu" "qemu_aarch64" {
-  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10>root<enter><wait>ifconfig eth0 up ; udhcpc -i eth0<enter><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "date +%Y.%m.%d-%H:%M -s '${local.datestamp}-23:59' ; cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; . /etc/os-release ; echo http://${var.repo_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; echo http://${var.repo_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; apk update ; apk add ${var.foreign_pkgmgr} e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl lvm2 btrfs-progs util-linux multipath-tools perl ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then apk add zfs ; sleep 5 ; fi ; ", "setup-devd udev ; sleep 3 ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_crypted}'<enter><wait>"]
+  boot_command       = ["<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10>root<enter><wait>ifconfig eth0 up ; udhcpc -i eth0<enter><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "date +%Y.%m.%d-%H:%M -s '${local.datestamp}-23:59' ; cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; . /etc/os-release ; echo http://${var.mirror_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; echo http://${var.mirror_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; apk update ; apk add ${var.foreign_pkgmgr} e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl lvm2 btrfs-progs util-linux multipath-tools perl ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then apk add zfs ; sleep 5 ; fi ; ", "setup-devd udev ; sleep 3 ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -149,9 +144,9 @@ source "qemu" "qemu_aarch64" {
   disk_size          = "${var.disk_size}"
   headless           = "${var.headless}"
   http_directory     = "init"
-  iso_checksum       = "file:file://${var.isos_pardir}/alpine/${var.iso_name_aa64}.iso.sha256"
+  iso_checksum       = "file:file://${var.isos_pardir}/alpine/${var.iso_base_aa64}.iso.sha256"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/alpine/${var.iso_name_aa64}.iso","${var.iso_url_mirror}/${var.iso_url_directory}/aarch64/${var.iso_name_aa64}.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/alpine/${var.iso_base_aa64}.iso","https://${var.mirror_host}${var.iso_url_directory}/aarch64/${var.iso_base_aa64}.iso"]
   machine_type       = "virt"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-aarch64-${var.vol_mgr}"
@@ -165,9 +160,9 @@ source "qemu" "qemu_aarch64" {
 }
 
 source "qemu" "qemu_x86_64" {
-  #boot_command         = ["root<enter><wait>ifconfig eth0 up ; udhcpc -i eth0<enter><wait10>", "date +%Y.%m.%d-%H:%M -s '${local.datestamp}-23:59' ; cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-answers' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/post_autoinstall.sh' ; service sshd stop ; APKREPOSOPTS=http://${var.repo_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main BOOT_SIZE=200 USE_EFI=1 setup-alpine -f /tmp/answers<enter><wait5>${var.passwd_plain}<enter>${var.passwd_plain}<enter><wait10><wait10><wait10>y<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/post_autoinstall.sh run_postinstall '${var.passwd_crypted}'<enter>"]
+  #boot_command       = ["<wait10>root<enter><wait>ifconfig eth0 up ; udhcpc -i eth0<enter><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "date +%Y.%m.%d-%H:%M -s '${local.datestamp}-23:59' ; cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; . /etc/os-release ; mount -o remount,size=1500M /run ; df -h ; sleep 5 ; echo http://${var.mirror_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; echo http://${var.mirror_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; apk update ; apk add ${var.foreign_pkgmgr} e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl lvm2 btrfs-progs util-linux multipath-tools perl ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then apk add zfs ; sleep 5 ; fi ; ", "setup-devd udev ; sleep 3 ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
 
-  boot_command       = ["<wait10>root<enter><wait>ifconfig eth0 up ; udhcpc -i eth0<enter><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "date +%Y.%m.%d-%H:%M -s '${local.datestamp}-23:59' ; cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; . /etc/os-release ; echo http://${var.repo_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; echo http://${var.repo_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; apk update ; apk add ${var.foreign_pkgmgr} e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl lvm2 btrfs-progs util-linux multipath-tools perl ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then apk add zfs ; sleep 5 ; fi ; ", "setup-devd udev ; sleep 3 ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_crypted}'<enter><wait>"]
+  boot_command         = ["<wait10>root<enter><wait>ifconfig eth0 up ; udhcpc -i eth0<enter><wait10>", "date +%Y.%m.%d-%H:%M -s '${local.datestamp}-23:59' ; cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-answers' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/post_autoinstall.sh' ; service sshd stop ; env APKREPOSOPTS=http://${var.mirror_host}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main BOOT_SIZE=512 USE_EFI=1 setup-alpine -f /tmp/${var.vol_mgr}-answers<enter><wait5>${var.passwd_plain}<enter>${var.passwd_plain}<enter><wait10><wait10><wait10><enter><wait10>y<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "env mirror_host=${var.mirror_host} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/post_autoinstall.sh run_postinstall '${var.passwd_crypted}'<enter>"]
 
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
@@ -176,13 +171,13 @@ source "qemu" "qemu_x86_64" {
   disk_size          = "${var.disk_size}"
   headless           = "${var.headless}"
   http_directory     = "init"
-  iso_checksum       = "file:file://${var.isos_pardir}/alpine/${var.iso_name_x64}.iso.sha256"
+  iso_checksum       = "file:file://${var.isos_pardir}/alpine/${var.iso_base_x64}.iso.sha256"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/alpine/${var.iso_name_x64}.iso","${var.iso_url_mirror}/${var.iso_url_directory}/x86_64/${var.iso_name_x64}.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/alpine/${var.iso_base_x64}.iso","https://${var.mirror_host}${var.iso_url_directory}/x86_64/${var.iso_base_x64}.iso"]
   machine_type       = "q35"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "virtio"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"

@@ -92,7 +92,7 @@ $o = {
             'fs_type' => 'vfat',
             'mntpoint' => '/boot/EFI',
             'options' => 'umask=0,iocharset=utf8',
-            'size' => 200 * 2 << 10 # 200MB
+            'size' => 512 * 2 << 10 # 512MB
         },
         {
             'hd' => undef,

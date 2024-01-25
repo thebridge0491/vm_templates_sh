@@ -1,5 +1,10 @@
 # usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
+variable "MIRROR" {
+  type    = string
+  default = ""
+}
+
 variable "RELEASE" {
   type    = string
   default = ""
@@ -35,44 +40,39 @@ variable "home" {
   default = "${env("HOME")}"
 }
 
-variable "init_hostname" {
+variable "iso_base_x64" {
   type    = string
-  default = "mageia-boxv0000"
-}
-
-variable "iso_name_x64" {
-  type    = string
-  default = "Mageia-8-netinstall-x86_64"
+  default = "Mageia-9-netinstall-x86_64"
 }
 
 variable "iso_url_directory" {
   type    = string
-  default = "distrib/8/x86_64/install/images"
+  default = "/distrib/9/x86_64/install/images"
 }
 
-variable "iso_url_mirror" {
+variable "isolive_base_x64" {
   type    = string
-  default = "https://mirrors.kernel.org/mageia"
+  default = "Mageia-9-Live-Xfce-x86_64"
 }
 
 variable "isolive_cdlabel_x64" {
   type    = string
-  default = "Mageia-8-Live-Xfce-x86_64"
-}
-
-variable "isolive_name_x64" {
-  type    = string
-  default = "live/Mageia-8-Live-Xfce-x86_64"
+  default = "Mageia-9-Live-Xfce-x86_64"
 }
 
 variable "isolive_url_directory" {
   type    = string
-  default = "iso/8/Mageia-8-Live-Xfce-x86_64"
+  default = "/iso/9/Mageia-9-Live-Xfce-x86_64"
 }
 
 variable "isos_pardir" {
   type    = string
   default = "/mnt/Data0/distros"
+}
+
+variable "mirror_host" {
+  type    = string
+  default = "mirrors.kernel.org/mageia"
 }
 
 variable "mkfs_cmd" {
@@ -104,12 +104,7 @@ variable "qemunet_bridge" {
 
 variable "repo_directory" {
   type    = string
-  default = "/distrib/8/x86_64"
-}
-
-variable "repo_host" {
-  type    = string
-  default = "mirrors.kernel.org/mageia"
+  default = "/distrib/9/x86_64"
 }
 
 variable "variant" {
@@ -141,9 +136,9 @@ locals {
 }
 
 source "qemu" "qemu_x86_64" {
-  #boot_command         = ["<wait><wait5>c<wait>linux /isolinux/x86_64/vmlinuz ${var.boot_cmdln_options} textmode=1 text 3 systemd.unit=multi-user.target ", "automatic=method:http,server:${var.repo_host},directory:${var.repo_directory},network:dhcp auto_install=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-auto_inst.cfg.pl<enter>", "initrd /isolinux/x86_64/all.rdz<enter>boot<enter><wait>"]
+  #boot_command       = ["<wait><enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>live<enter><wait10>su<enter><wait10>dnf -y check-update ; dnf -y install lvm2 btrfs-progs ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
 
-  boot_command       = ["<wait><enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>live<enter><wait10>su<enter><wait10>dnf -y check-update ; dnf -y install lvm2 btrfs-progs ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_crypted}'<enter><wait>"]
+  boot_command         = ["<wait><wait5>c<wait>linux /isolinux/x86_64/vmlinuz ${var.boot_cmdln_options} textmode=1 text 3 systemd.unit=multi-user.target ", "automatic=method:http,server:${var.mirror_host},directory:${var.repo_directory},network:dhcp auto_install=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-auto_inst.cfg.pl<enter>", "initrd /isolinux/x86_64/all.rdz<enter>boot<enter><wait>"]
 
   boot_wait          = "5s"
   disk_detect_zeroes = "unmap"
@@ -152,13 +147,13 @@ source "qemu" "qemu_x86_64" {
   disk_size          = "${var.disk_size}"
   headless           = "${var.headless}"
   http_directory     = "init"
-  iso_checksum       = "file:file://${var.isos_pardir}/mageia/${var.isolive_name_x64}.iso.sha512"
+  iso_checksum       = "file:file://${var.isos_pardir}/mageia/${var.iso_base_x64}.iso.sha512"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/mageia/${var.isolive_name_x64}.iso","${var.iso_url_mirror}/${var.isolive_url_directory}/${var.isolive_cdlabel_x64}.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/mageia/${var.iso_base_x64}.iso","https://${var.mirror_host}${var.iso_url_directory}/${var.iso_base_x64}.iso"]
   machine_type       = "q35"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=2"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "virtio"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"

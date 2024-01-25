@@ -9,6 +9,6 @@ qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
   -usb \
   -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
   -drive file=${STORAGE_DIR:-$(dirname $0)}/${IMGFILE:-${GUEST:-freebsd-x86_64-zfs}${IMGEXT:-.qcow2}},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT:-qcow2} \
-  -display default,show-cursor=on -vga cirrus \
+  -display default,show-cursor=on -vga virtio \
   ${QUEFI_OPTS:--smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd} -drive if=pflash,unit=1,format=raw,file=${STORAGE_DIR:-$(dirname $0)}/nvram/${GUEST:-freebsd-x86_64-zfs}_VARS.fd} \
   ${VIRTFS_OPTS:--virtfs local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough}

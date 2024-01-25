@@ -1,5 +1,10 @@
 # usage example: (packer init <dir>[/template.pkr.hcl] ; [PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer build -only=qemu.qemu_x86_64 <dir>[/template.pkr.hcl])
 
+variable "MIRROR" {
+  type    = string
+  default = ""
+}
+
 variable "RELEASE" {
   type    = string
   default = ""
@@ -45,69 +50,64 @@ variable "home" {
   default = "${env("HOME")}"
 }
 
-variable "init_hostname" {
+variable "iso_base_aa64" {
   type    = string
-  default = "redhat-boxv0000"
+  #default = "aarch64/CentOS-Stream-9-20240115.0-aarch64-boot"
+  #default = "aarch64/AlmaLinux-9.3-aarch64-boot"
+  default = "aarch64/Rocky-9.3-aarch64-boot"
 }
 
-variable "iso_name_aa64" {
+variable "iso_base_x64" {
   type    = string
-  #default = "aarch64/CentOS-Stream-9-latest-aarch64-boot"
-  #default = "aarch64/AlmaLinux-9.1-aarch64-boot"
-  default = "aarch64/Rocky-9.1-aarch64-boot"
-}
-
-variable "iso_name_x64" {
-  type    = string
-  #default = "CentOS-Stream-9-latest-x86_64-boot"
-  #default = "AlmaLinux-9.1-x86_64-boot"
-  default = "Rocky-9.1-x86_64-boot"
+  #default = "CentOS-Stream-9-20240115.0-x86_64-boot"
+  #default = "AlmaLinux-9.3-x86_64-boot"
+  default = "Rocky-9.3-x86_64-boot"
 }
 
 variable "iso_url_directory" {
   type    = string
   #default = "/9-stream/BaseOS/x86_64/iso"
-  default = "9/isos"
+  default = "/9/isos"
 }
 
-variable "iso_url_mirror" {
+variable "isolive_base_aa64" {
   type    = string
-  #default = "https://mirror.stream.centos.org"
-  #default = "https://repo.almalinux.org/almalinux"
-  default = "https://dl.rockylinux.org/pub/rocky"
+  default = "Rocky-9.3-XFCE-aarch64-20231117.0"
+}
+
+variable "isolive_base_x64" {
+  type    = string
+  #default = "AlmaLinux-9.3-x86_64-Live-XFCE"
+  default = "Rocky-9.3-XFCE-x86_64-20231117.0"
 }
 
 variable "isolive_cdlabel_aa64" {
   type    = string
-  #default = "Rocky-9-1-aarch64-dvd"
-  default = "Rocky-9-1-XFCE-aarch64"
+  #default = "Rocky-9-3-aarch64-dvd"
+  default = "Rocky-9-3-XFCE-aarch64"
 }
 
 variable "isolive_cdlabel_x64" {
   type    = string
-  #default = "AlmaLinux-9.1-x86_64-Live-XFCE"
-  default = "Rocky-9-1-XFCE"
-}
-
-variable "isolive_name_aa64" {
-  type    = string
-  default = "live/Rocky-9.1-XFCE-aarch64-20221124.0"
-}
-
-variable "isolive_name_x64" {
-  type    = string
-  #default = "live/AlmaLinux-9.1-x86_64-Live-XFCE"
-  default = "live/Rocky-9.1-XFCE-x86_64-20221124.0"
+  #default = "AlmaLinux-9.3-x86_64-Live-XFCE"
+  default = "Rocky-9-3-XFCE"
 }
 
 variable "isolive_url_directory" {
   type    = string
-  default = "9/live"
+  default = "/9/live"
 }
 
 variable "isos_pardir" {
   type    = string
   default = "/mnt/Data0/distros"
+}
+
+variable "mirror_host" {
+  type    = string
+  #default = "mirror.stream.centos.org"
+  #default = "repo.almalinux.org/almalinux"
+  default = "dl.rockylinux.org/pub/rocky"
 }
 
 variable "mkfs_cmd" {
@@ -145,20 +145,13 @@ variable "qemunet_bridge" {
 variable "repo_directory" {
   type    = string
   #default = "/9-stream/BaseOS/x86_64/os"
-  #default = "/9/BaseOS/x86_64/os"
   default = "/9/BaseOS/x86_64/os"
 }
 
 variable "repo_directory_aa64" {
   type    = string
+  #default = "/9-stream/BaseOS/aarch64/os"
   default = "/9/BaseOS/aarch64/os"
-}
-
-variable "repo_host" {
-  type    = string
-  #default = "mirror.stream.centos.org"
-  #default = "repo.almalinux.org/almalinux"
-  default = "dl.rockylinux.org/pub/rocky"
 }
 
 variable "variant" {
@@ -190,7 +183,7 @@ locals {
 }
 
 source "qemu" "qemu_aarch64" {
-  boot_command       = ["<wait>c<wait>linux /images/pxeboot/vmlinuz* inst.stage2=hd:LABEL=${var.isolive_cdlabel_aa64} ro ${var.boot_cmdln_options} ", "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.repo_host}${var.repo_directory_aa64} ip=::::${var.init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrd /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
+  boot_command       = ["<wait>c<wait>linux /images/pxeboot/vmlinuz* inst.stage2=hd:LABEL=${var.isolive_cdlabel_aa64} ro ${var.boot_cmdln_options} ", "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.mirror_host}${var.repo_directory_aa64} ip=::::${var.variant}-boxv0000::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrd /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
   disk_discard       = "unmap"
@@ -200,12 +193,12 @@ source "qemu" "qemu_aarch64" {
   http_directory     = "init"
   iso_checksum       = "file:file://${var.isos_pardir}/redhat/aarch64/CHECKSUM"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/redhat/aarch64/${var.iso_name_aa64}.iso","${var.iso_url_mirror}/${var.iso_url_directory}/${var.iso_name_aa64}.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/redhat/aarch64/${var.iso_base_aa64}.iso","https://${var.mirror_host}${var.iso_url_directory}/${var.iso_base_aa64}.iso"]
   machine_type       = "virt"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-aarch64-${var.vol_mgr}"
   qemu_binary        = "qemu-system-aarch64"
-  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"], ["-smp", "cpus=2"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "qemu-xhci,id=usb"], ["-usb"], ["-device", "usb-kbd"], ["-device", "usb-tablet"], ["-vga", "none"], ["-device", "virtio-gpu-pci"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_aa64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"
@@ -214,11 +207,11 @@ source "qemu" "qemu_aarch64" {
 }
 
 source "qemu" "qemu_x86_64" {
-  #boot_command         = ["<wait>c<wait>linuxefi /images/pxeboot/vmlinuz* ${var.boot_cmdln_options} ", "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.repo_host}${var.repo_directory} ip=::::${var.init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrdefi /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
+  #boot_command       = ["<wait>c<wait>linuxefi /isolinux/vmlinuz* inst.stage2=hd:LABEL=${var.isolive_cdlabel_x64} ro ${var.boot_cmdln_options} ", "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.mirror_host}${var.repo_directory} ip=::::${var.variant}-boxv0000::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrdefi /isolinux/initrd*.img<enter><wait10>boot<enter><wait10>"]
 
-  #boot_command       = ["<wait>c<wait>linuxefi /isolinux/vmlinuz* inst.stage2=hd:LABEL=${var.isolive_cdlabel_x64} ro ${var.boot_cmdln_options} ", "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.repo_host}${var.repo_directory} ip=::::${var.init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrdefi /isolinux/initrd*.img<enter><wait10>boot<enter><wait10>"]
+  #boot_command       = ["<down><up><wait><wait><wait>c<wait>linuxefi /isolinux/vmlinuz* root=live:LABEL=${var.isolive_cdlabel_x64} ro rd.live.image rhgb text ${var.boot_cmdln_options} textmode=1 text 3 systemd.unit=multi-user.target<enter>initrdefi /isolinux/initrd*.img<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>liveuser<enter><wait10>sudo su<enter><wait10>dnf -y check-update ; setenforce 0 ; sestatus ; dnf -y install ${var.foreign_pkgmgr} nmap-ncat lvm2 ; sleep 5 ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then . /etc/os-release ; mount -o remount,size=1500M /run ; df -h ; sleep 5 ; dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(echo $${VERSION_ID} | cut -d. -f1).noarch.rpm ; dnf -y install kernel kernel-devel ; dnf -y install http://download.zfsonlinux.org/epel/zfs-release-2-2.el$${VERSION_ID/.*/}.noarch.rpm ; rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux ; dnf config-manager --disable zfs ; dnf config-manager --enable zfs-kmod ; dnf -y install zfs ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ; dkms status ; dnf config-manager --disable zfs-kmod ; dnf config-manager --enable zfs ; sleep 5 ; fi ; ", "env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
 
-  boot_command       = ["<down><up><wait><wait><wait>c<wait>linuxefi /isolinux/vmlinuz* root=live:LABEL=${var.isolive_cdlabel_x64} ro rd.live.image rhgb text ${var.boot_cmdln_options} textmode=1 text 3 systemd.unit=multi-user.target<enter>initrdefi /isolinux/initrd*.img<enter>boot<enter>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "<enter>liveuser<enter><wait10>sudo su<enter><wait10>dnf -y check-update ; setenforce 0 ; sestatus ; dnf -y install ${var.foreign_pkgmgr} nmap-ncat lvm2 ; sleep 5 ; ", "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; ", "if [ 'zfs' = '${var.vol_mgr}' ] ; then . /etc/os-release ; dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(echo $${VERSION_ID} | cut -d. -f1).noarch.rpm ; dnf -y install kernel kernel-devel ; dnf -y install http://download.zfsonlinux.org/epel/zfs-release-2-2.el$${VERSION_ID/.*/}.noarch.rpm ; rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux ; dnf config-manager --disable zfs ; dnf config-manager --enable zfs-kmod ; dnf -y install zfs ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ; dkms status ; dnf config-manager --disable zfs-kmod ; dnf config-manager --enable zfs ; sleep 5 ; fi ; ", "env MKFS_CMD=${var.mkfs_cmd} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait10><wait10><wait10>env RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.init_hostname} '${var.passwd_crypted}'<enter><wait>"]
+  boot_command         = ["<wait>c<wait>linuxefi /images/pxeboot/vmlinuz* ${var.boot_cmdln_options} ", "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.mirror_host}${var.repo_directory} ip=::::${var.variant}-boxv0000::dhcp inst.selinux=1 inst.enforcing=0 inst.text<enter><wait10>", "initrdefi /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
 
   boot_wait          = "10s"
   disk_detect_zeroes = "unmap"
@@ -229,11 +222,11 @@ source "qemu" "qemu_x86_64" {
   http_directory     = "init"
   iso_checksum       = "file:file://${var.isos_pardir}/redhat/CHECKSUM"
   iso_url            = ""
-  iso_urls           = ["file://${var.isos_pardir}/redhat/${var.isolive_name_x64}.iso","${var.iso_url_mirror}/${var.isolive_url_directory}/x86_64/${var.isolive_name_x64}.iso"]
+  iso_urls           = ["file://${var.isos_pardir}/redhat/${var.iso_base_x64}.iso","https://${var.mirror_host}${var.iso_url_directory}/x86_64/${var.iso_base_x64}.iso"]
   machine_type       = "q35"
   net_bridge         = "${var.qemunet_bridge}"
   output_directory   = "output-vms/${var.variant}-x86_64-${var.vol_mgr}"
-  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=4"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "none"], ["-device", "qxl-vga,vgamem_mb=64"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
+  qemuargs           = [["-cpu", "SandyBridge"], ["-smp", "cpus=4"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"], ["-name", "{{.Name}}"], ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${local.mac_last3}"], ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"], ["-usb"], ["-vga", "virtio"], ["-display", "gtk,show-cursor=on"], ["-smbios", "type=0,uefi=on"], ["-bios", "${var.firmware_qemu_x64}"], ["-virtfs", "${var.virtfs_opts}"]]
   shutdown_command   = "sudo shutdown -hP +3 || sudo poweroff"
   ssh_password       = "${var.passwd_plain}"
   ssh_timeout        = "4h45m"

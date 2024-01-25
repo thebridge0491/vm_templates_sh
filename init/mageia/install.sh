@@ -23,7 +23,7 @@ fi
 export VOL_MGR=${VOL_MGR:-std}
 export GRP_NM=${GRP_NM:-vg0}
 export MIRROR=${MIRROR:-mirrors.kernel.org/mageia}
-export RELEASE=${RELEASE:-8}
+export RELEASE=${RELEASE:-9}
 export UNAME_M=$(uname -m)
 
 export YUMCMD="yum --setopt=requires_policy=strong --setopt=group_package_types=mandatory --releasever=${RELEASE}"

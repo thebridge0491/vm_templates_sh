@@ -90,21 +90,21 @@ deb http://${MIRROR} stable-backports main
 deb-src http://${MIRROR} stable-backports main
 
 EOF
+
+echo "Config pkg repo components(main contrib non-free)" ; sleep 3
+sed -i 's|VERSION_CODENAME="\(.*\) .*"|VERSION_CODENAME="\1"|' /etc/os-release
+. /etc/os-release
+sed -i "s| stable| \${VERSION_CODENAME}|g" /etc/apt/sources.list
+sed -i '/main.*$/ s|main.*$|main contrib non-free|g' /etc/apt/sources.list
+sed -i '/^#[ ]*deb/ s|^#||g' /etc/apt/sources.list
+sed -i '/^[ ]*deb cdrom:/ s|^|#|g' /etc/apt/sources.list
+cat /etc/apt/sources.list ; sleep 5
 apt-get --yes update --allow-releaseinfo-change
 
 apt-get --yes install --no-install-recommends makedev
 #mount -t proc none /proc
 cd /dev ; MAKEDEV generic
 
-
-echo "Config pkg repo components(main contrib non-free)" ; sleep 3
-#sed -i 's|VERSION_CODENAME="\(.*\) .*"|VERSION_CODENAME="\1"|' /etc/os-release
-. /etc/os-release
-sed -i "s| stable| \${VERSION_CODENAME}|" /etc/apt/sources.list
-sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
-sed -i '/^#[ ]*deb/ s|^#||' /etc/apt/sources.list
-sed -i '/^[ ]*deb cdrom:/ s|^|#|' /etc/apt/sources.list
-cat /etc/apt/sources.list ; sleep 5
 
 echo "Add software package selection(s)" ; sleep 3
 apt-get --yes update --allow-releaseinfo-change

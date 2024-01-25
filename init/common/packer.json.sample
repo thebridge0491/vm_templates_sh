@@ -31,10 +31,10 @@
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-{{user `iso_base_x64`}}",
     "iso_url": "",
-    "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base_x64`}}-disc1.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_base_x64`}}-disc1.iso"],
+    "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base_x64`}}-disc1.iso","https://{{user `mirror_host`}}{{user `iso_url_directory`}}/{{user `iso_base_x64`}}-disc1.iso"],
     "boot_command": [
       "<wait10><wait10><wait10><wait10><wait10><wait10>", "<wait10><wait10><wait10><wait10><wait10><wait10>", "l<wait5>root<enter><wait10>",
-      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/install.sh ; geom -t ; sleep 3 ; sh -x /tmp/gpart_setup.sh part_format {{user `vol_mgr`}} ; sh -x /tmp/gpart_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env RELEASE={{user `RELEASE`}} DISTARCHIVE_FETCH={{user `distarchive_fetch`}} VOL_MGR={{user `vol_mgr`}} sh -x /tmp/install.sh run_install {{user `init_hostname`}} '{{user `passwd_crypted`}}'<enter><wait>"
+      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/install.sh ; geom -t ; sleep 3 ; sh -x /tmp/gpart_setup.sh part_format {{user `vol_mgr`}} ; sh -x /tmp/gpart_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait10><wait10><wait10>env MIRROR={{user `MIRROR`}} RELEASE={{user `RELEASE`}} DISTARCHIVE_FETCH={{user `distarchive_fetch`}} VOL_MGR={{user `vol_mgr`}} sh -x /tmp/install.sh run_install {{user `variant`}}-boxv0000 '{{user `passwd_crypted`}}'<enter><wait>"
     ]
   },
   {
@@ -69,10 +69,10 @@
 
     "iso_checksum": "file:file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-{{user `iso_base_x64`}}",
     "iso_url": "",
-    "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base_x64`}}-disc1.iso","{{user `iso_url_mirror`}}/{{user `iso_url_directory`}}/{{user `iso_base_x64`}}-disc1.iso"],
+    "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base_x64`}}-disc1.iso","https://{{user `mirror_host`}}{{user `iso_url_directory`}}/{{user `iso_base_x64`}}-disc1.iso"],
     "boot_command": [
       "2<enter><wait10><wait10><enter><wait>",
-      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installscript ; export PASSWD_CRYPTED='{{user `passwd_crypted`}}' ; export INIT_HOSTNAME={{user `init_hostname`}} ; geom -t ; sleep 3 ; bsdinstall script /tmp/{{user `vol_mgr`}}-installscript<enter>"
+      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installscript ; export PASSWD_CRYPTED='{{user `passwd_crypted`}}' ; export INIT_HOSTNAME={{user `variant`}}-boxv0000 ; geom -t ; sleep 3 ; bsdinstall script /tmp/{{user `vol_mgr`}}-installscript<enter>"
     ]
   }],
 
@@ -166,16 +166,16 @@
   "variables": {
     "variant": "freebsd",
     "vol_mgr": "std",
-    "init_hostname": "freebsd-boxv0000",
     "boot_cmdln_options": " ",
     "isos_pardir": "/mnt/Data0/distros",
+    "MIRROR": "",
     "RELEASE": "",
     "vboxguest_ostype": "FreeBSD_64",
     "qemunet_bridge": "virbr0",
 
-    "iso_url_mirror": "https://download.freebsd.org/ftp",
-    "iso_url_directory": "releases/ISO-IMAGES/13.1",
-    "iso_base_x64": "FreeBSD-13.1-RELEASE-amd64",
+    "mirror_host": "download.freebsd.org/ftp",
+    "iso_url_directory": "/releases/ISO-IMAGES/13.2",
+    "iso_base_x64": "FreeBSD-13.2-RELEASE-amd64",
 
     "firmware_qemu_x64": "/usr/share/OVMF/OVMF_CODE.fd",
     "nvram_qemu_x64": "/usr/share/OVMF/OVMF_VARS.fd",

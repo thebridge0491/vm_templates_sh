@@ -19,9 +19,9 @@ NVRAM_QEMU_X64=${NVRAM_QEMU_X64:-/usr/share/OVMF/OVMF_VARS.fd}
 FIRMWARE_QEMU_AA64=${FIRMWARE_QEMU_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
 NVRAM_QEMU_AA64=${NVRAM_QEMU_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd}
 
-#mac_last3=$(hexdump -n3 -e '/1 ":%02x"' /dev/random | cut -c2-)
+#mac_last3=$(hexdump -n3 -e '3/1 ":%02x"' /dev/random | cut -c2-)
 #mac_last3=$(od -N3 -tx1 -An /dev/random | awk '$1=$1' | tr ' ' :)
-mac_last3=$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||')
+mac_last3=$(openssl rand -hex 3 | sed 's|\(..\)|:\1|g; s|^:||')
 
 #-------- create Vagrant ; use box image --------
 box_vagrant() {
@@ -176,7 +176,7 @@ import_lxc() {
   CONNECT_OPT=${CONNECT_OPT:---connect lxc:///}
 
   virt-install ${CONNECT_OPT} --init /sbin/init --cpu SandyBridge \
-    --memory 768 --vcpus 1 \
+    --memory 2048 --vcpus 1 \
     --controller virtio-serial --console pty,target_type=virtio \
     --network network=default,model=virtio-net,mac=RANDOM --boot menu=on \
     ${VIRTFS_OPTS:---filesystem type=mount,mode=passthrough,source=/mnt/Data0,target=9p_Data0} \
@@ -274,7 +274,7 @@ run_qemu() {
       -device qemu-xhci,id=usb -usb -device usb-kbd -device usb-tablet \
       -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
       -drive file=${STORAGE_DIR}/${IMGFILE},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT} \
-      -display default,show-cursor=on -vga none -device qxl-vga,vgamem_mb=64 \
+      -display default,show-cursor=on -vga virtio \
       ${QUEFI_OPTS} ${VIRTFS_OPTS} &
   fi
 }

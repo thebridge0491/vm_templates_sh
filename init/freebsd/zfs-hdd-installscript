@@ -18,7 +18,7 @@ export GRP_NM=${GRP_NM:-bsd0} ; export UNAME_M=$(uname -m)
 export INIT_HOSTNAME=${INIT_HOSTNAME:-freebsd-boxp0000}
 
 export nonInteractive="YES"
-PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 1G linux, 4G linux,
+PARTITIONS="${DEVX} gpt { 512K freebsd-boot, 512M efi, 1G linux, 4G linux,
   80G linux, 1G linux, 80G linux, 4G freebsd-swap, 80G freebsd-ufs /,
   120G fat, auto fat }"
 DISTRIBUTIONS="kernel.txz base.txz "
@@ -40,25 +40,25 @@ export ZFSBOOT_SWAP_SIZE=4g
 #export ZFSBOOT_SWAP_ENCRYPTION=1
 
 ##export ZFSBOOT_DATASETS="
-### DATASET		OPTIONS
+### DATASET   OPTIONS
 ##
 ### Boot Environment[BE]
-##/$ZFSBOOT_BEROOT_NAME						mountpoint=none
-##/$ZFSBOOT_BEROOT_NAME/$ZFSBOOT_BOOTFS_NAME	mountpoint=/
+##/$ZFSBOOT_BEROOT_NAME           mountpoint=none
+##/$ZFSBOOT_BEROOT_NAME/$ZFSBOOT_BOOTFS_NAME  mountpoint=/
 ##
-##/tmp			mountpoint=/tmp,exec=on,setuid=off
+##/tmp      mountpoint=/tmp,exec=on,setuid=off
 ##
-##/usr			mountpoint=/usr,canmount=off
+##/usr      mountpoint=/usr,canmount=off
 ##/usr/home
-##/usr/ports		setuid=off
+##/usr/ports    setuid=off
 ##/usr/src
 ##
-##/var			mountpoint=/var,canmount=off
-##/var/audit		exec=off,setuid=off
-##/var/crash		exec=off,setuid=off
-##/var/log		exec=off,setuid=off
-##/var/mail		atime=on
-##/var/tmp		setuid=off
+##/var      mountpoint=/var,canmount=off
+##/var/audit    exec=off,setuid=off
+##/var/crash    exec=off,setuid=off
+##/var/log    exec=off,setuid=off
+##/var/mail   atime=on
+##/var/tmp    setuid=off
 ##
 ##"
 
@@ -85,7 +85,7 @@ sysctl kern.geom.label.gpt.enable=1
 #bsdinstall preamble
 #--------------------
 #export nonInteractive="YES"
-##PARTITIONS="${DEVX} gpt { 512k freebsd-boot, 200M efi, 1G linux, 4G linux,
+##PARTITIONS="${DEVX} gpt { 512K freebsd-boot, 512M efi, 1G linux, 4G linux,
 ##  80G linux, 1G linux, 80G linux, 4G freebsd-swap, 80G freebsd-ufs /,
 ##  120G fat, auto fat }"
 #DISTRIBUTIONS="kernel.txz base.txz "
@@ -107,25 +107,25 @@ sysctl kern.geom.label.gpt.enable=1
 ##export ZFSBOOT_SWAP_ENCRYPTION=1
 #
 ###export ZFSBOOT_DATASETS="
-#### DATASET		OPTIONS
+#### DATASET    OPTIONS
 ###
 #### Boot Environment[BE]
-###/$ZFSBOOT_BEROOT_NAME						mountpoint=none
-###/$ZFSBOOT_BEROOT_NAME/$ZFSBOOT_BOOTFS_NAME	mountpoint=/
+###/$ZFSBOOT_BEROOT_NAME            mountpoint=none
+###/$ZFSBOOT_BEROOT_NAME/$ZFSBOOT_BOOTFS_NAME mountpoint=/
 ###
-###/tmp			mountpoint=/tmp,exec=on,setuid=off
+###/tmp     mountpoint=/tmp,exec=on,setuid=off
 ###
-###/usr			mountpoint=/usr,canmount=off
+###/usr     mountpoint=/usr,canmount=off
 ###/usr/home
-###/usr/ports		setuid=off
+###/usr/ports   setuid=off
 ###/usr/src
 ###
-###/var			mountpoint=/var,canmount=off
-###/var/audit		exec=off,setuid=off
-###/var/crash		exec=off,setuid=off
-###/var/log		exec=off,setuid=off
-###/var/mail		atime=on
-###/var/tmp		setuid=off
+###/var     mountpoint=/var,canmount=off
+###/var/audit   exec=off,setuid=off
+###/var/crash   exec=off,setuid=off
+###/var/log   exec=off,setuid=off
+###/var/mail    atime=on
+###/var/tmp   setuid=off
 ###
 ###"
 
@@ -274,15 +274,22 @@ sed -i '' "s|^[^#].*requiretty|# Defaults requiretty|" /usr/local/etc/sudoers
 
 mkdir -p /usr/local/etc/pkg/repos
 sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
-FreeBSD: { enabled: false }
+FreeBSD: { 
+  #url: "pkg+http://pkg.freebsd.org/\$\{ABI}/quarterly",
+  url: "pkg+http://pkg.freebsd.org/\$(pkg config abi)/quarterly",
+  mirror_type: "srv",
+  signature_type: "fingerprints",
+  fingerprints: "/usr/share/keys/pkg",
+  enabled: false
+}
 
 FreeBSD-nearby: {
-	#url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
-	url: "pkg+http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/$(pkg config abi)/quarterly",
-	mirror_type: "srv",
-	signature_type: "fingerprints",
-	fingerprints: "/usr/share/keys/pkg",
-	enabled: true
+  #url: "http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$\{ABI}/quarterly",
+  url: "http://${MIRRORPKG:-pkg0.nyi.freebsd.org}/\$(pkg config abi)/quarterly",
+  #mirror_type: "none",
+  signature_type: "fingerprints",
+  fingerprints: "/usr/share/keys/pkg",
+  enabled: true
 }
 
 EOF

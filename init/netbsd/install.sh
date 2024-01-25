@@ -83,7 +83,7 @@ chmod 1777 /tmp ; chmod 1777 /var/tmp
 
 cat >> /etc/rc.conf << EOF
 #if [ -r /etc/defaults/rc.conf ] ; then
-#	. /etc/defaults/rc.conf ;
+# . /etc/defaults/rc.conf ;
 #fi
 rc_configured=YES
 #clear_tmp=YES
