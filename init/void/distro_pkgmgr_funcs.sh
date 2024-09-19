@@ -1,7 +1,7 @@
 # void/{distro_pkgs.ini,distro_pkgmgr_funcs.sh}
 # to use variables|functions, source these file(s):
 # source distro_pkgs.ini ; source distro_pkgmgr_funcs.sh
-# $pkgmgr_install $pkgs_cmdln_tools 2> /tmp/pkgsInstall_stderr.txt | tee /tmp/pkgsInstall_stdout.txt
+# ${pkgmgr_install} ${pkgs_cmdln_tools} 2> /tmp/pkgsInstall_stderr.txt | tee /tmp/pkgsInstall_stdout.txt
 
 pkgmgr_install='xbps-install'
 pkgmgr_search='xbps-query -Rs'
@@ -11,8 +11,8 @@ pkg_repos_sources() {
 	sep='#--------------------#'
 	argX='xbps-query -L'
 
-	#printf "${sep}\n$argX\n" | cat - $argX
-	printf "${sep}\n$argX\n" ; $argX
+	#printf "${sep}\n${argX}\n" | cat - ${argX}
+	printf "${sep}\n${argX}\n" ; ${argX}
 }
 
 pkgs_installed() {
@@ -20,12 +20,12 @@ pkgs_installed() {
 
 	sleep 3 ; xbps-install -S > /dev/null
 
-	if [ "leaf" = "$METHOD" ] ; then
+	if [ "leaf" = "${METHOD}" ] ; then
 		# -l for installed packages # -X for reverse depns
 		pkg_nms=$(xbps-query -l | cut -d' ' -f2) ;
-		(for pkg_nm in $pkg_nms ; do
-			if [ -z "$(xbps-query -X $pkg_nm | tr '\n' ' ')" ] ; then
-				echo $pkg_nm ;
+		(for pkg_nm in ${pkg_nms} ; do
+			if [ -z "$(xbps-query -X ${pkg_nm} | tr '\n' ' ')" ] ; then
+				echo ${pkg_nm} ;
 			fi
 		done) | sort | column ;
 	else

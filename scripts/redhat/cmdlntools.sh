@@ -8,7 +8,7 @@ dnf -y install epel-release ; dnf -y check-update ; dnf -y upgrade
 . /root/init/redhat/distro_pkgs.ini
 dnf --setopt=install_weak_deps=False config-manager --save
 dnf config-manager --dump | grep -we install_weak_deps
-dnf --setopt=install_weak_deps=False -y install $pkgs_cmdln_tools
+dnf --setopt=install_weak_deps=False -y install ${pkgs_cmdln_tools}
 dnf -y groups mark convert
 
 if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
@@ -69,7 +69,7 @@ systemctl unmask firewalld.service ; systemctl enable firewalld.service
 systemctl enable avahi-daemon ; systemctl enable nfs-utils
 systemctl enable cups ; systemctl enable cups-browsed
 
-#sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
+#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
 sh /root/init/common/misc_config.sh cfg_printer_pdf \
     /usr/share/cups/model/CUPS-PDF.ppd /etc/cups/cups-pdf.conf
 firewall-cmd --zone=public --permanent --add-service=mdns
@@ -84,7 +84,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 sh /root/init/common/misc_config.sh cfg_sshd
 #sh /root/init/common/misc_config.sh cfg_shell_keychain
-sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
 
 (cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
 cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
@@ -95,10 +95,10 @@ cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
 
 sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
 sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
-if [ -e $sshca_pubkey ] ; then
-	echo "@cert-authority 192.168.* $(cat $sshca_pubkey)" >> \
+if [ -e ${sshca_pubkey} ] ; then
+	echo "@cert-authority 192.168.* $(cat ${sshca_pubkey})" >> \
 		/etc/skel/.ssh/known_hosts ;
-	cp $sshca_krl $sshca_pubkey /etc/ssh/ ;
+	cp ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
 fi
 
 
@@ -108,6 +108,6 @@ distro="$(rpm -qf --queryformat '%{NAME}' /etc/redhat-release | cut -f 1 -d '-')
 # Remove development and kernel source packages
 #dnf -y remove gcc cpp kernel-devel kernel-headers perl
 
-if [ "$distro" != 'redhat' ] ; then
+if [ "${distro}" != 'redhat' ] ; then
   dnf -y clean all ;
 fi

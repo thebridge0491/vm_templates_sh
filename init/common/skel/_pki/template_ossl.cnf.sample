@@ -19,8 +19,8 @@ subjectKeyIdentifier=hash
 basicConstraints=critical,CA:true,pathlen:1
 keyUsage=critical,keyCertSign,cRLSign
 #subjectAltName=email:rootca@sandbox.org
-crlDistributionPoints=URI:file:///var/tmp/pki/publish_crls/demoCA/crl.crl
-authorityInfoAccess="caIssuers;URI:file:///var/tmp/pki/publish_crls/demoCA/chain.crt"
+crlDistributionPoints=URI:file:///var/tmp/pki/publish_crls/crl.crl
+authorityInfoAccess="caIssuers;URI:file:///var/tmp/pki/publish_crls/chain.crt"
 
 [ v3_req ]
 subjectKeyIdentifier=hash

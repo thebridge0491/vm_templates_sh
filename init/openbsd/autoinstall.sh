@@ -13,8 +13,8 @@ fi
 
 export PASSWD_PLAIN=${1:-packer}
 
-(cd /dev ; sh MAKEDEV $DEVX)
-fdisk -iy -g -b 960 $DEVX ; sync ; fdisk $DEVX ; sleep 3
+(cd /dev ; sh MAKEDEV ${DEVX})
+fdisk -iy -g -b 960 ${DEVX} ; sync ; fdisk ${DEVX} ; sleep 3
 
 # Always use the first line of ftplist.cgi for the default answer of "HTTP Server?".
 # This is a workaround for the change introduced in the following commit:
@@ -88,7 +88,7 @@ EOFchroot
 
 cp /tmp/install.resp /mnt/root/install.resp.orig
 for fileX in /tmp/*.disklabel /tmp/autoinstall.sh /tmp/i/install.resp ; do
-  cp $fileX /mnt/root/ ;
+  cp ${fileX} /mnt/root/ ;
 done
 sync
 
@@ -96,5 +96,5 @@ umount -a ; umount /mnt ; sleep 3
 
 installboot -v ${DEVX:-sd0}a ; installboot -v /dev/r${DEVX:-sd0}a
 
-##sync ; swapoff -a ; reboot #shutdown -p +3
-#sync ; reboot #shutdown -p +3
+#sync ; swapoff -a ; #reboot #shutdown -p +3
+sync ; #reboot #shutdown -p +3

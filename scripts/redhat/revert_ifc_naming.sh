@@ -3,7 +3,7 @@
 ## scripts/revert_ifc_naming.sh
 major_version="$(sed 's|^.\+ release \([.0-9]\+\).*|\1|' /etc/redhat-release | awk -F. '{print $1}')"
 
-if [ "$major_version" -ge 6 ] ; then
+if [ "${major_version}" -ge 6 ] ; then
     # Fix slow DNS:
     # Add 'single-request-reopen': to include upon /etc/resolv.conf generation
     # https://access.redhat.com/site/solutions/58625 (subscription required)
@@ -18,8 +18,8 @@ rm -rf /lib/udev/rules.d/75-persistent-net-generator.rules
 rm -rf /dev/.udev/
 
 for ndev in $(ls -1 /etc/sysconfig/network-scripts/ifcfg-*) ; do
-    if [ "$(basename $ndev)" != "ifcfg-lo" ] ; then
-        sed -i '/^HWADDR/d' "$ndev" ;
-        sed -i '/^UUID/d' "$ndev" ;
+    if [ "$(basename ${ndev})" != "ifcfg-lo" ] ; then
+        sed -i '/^HWADDR/d' "${ndev}" ;
+        sed -i '/^UUID/d' "${ndev}" ;
     fi
 done

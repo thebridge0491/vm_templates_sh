@@ -83,7 +83,7 @@ Misc config for user interface:
         cp -R /usr/pkg/share/examples/lxqt /usr/pkg/etc/xdg/ || true
 
         for dirX in dbus xdm ; do
-          cp -R /usr/pkg/share/examples/rc.d/$dirX /etc/rc.d/$dirX ;
+          cp -R /usr/pkg/share/examples/rc.d/${dirX} /etc/rc.d/${dirX} ;
         done
 
         ln -s /root/.xinitrc /root/.xsession

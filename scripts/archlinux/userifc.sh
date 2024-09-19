@@ -8,13 +8,13 @@ export CHOICE_DESKTOP=${1:-xfce}
 svc_enable() {
   svc=${1}
   if command -v systemctl > /dev/null ; then
-    systemctl enable $svc ;
+    systemctl enable ${svc} ;
   elif command -v s6-rc > /dev/null ; then
-    s6-rc-bundle-update add default $svc ;
+    s6-rc-bundle-update add default ${svc} ;
   elif command -v sv > /dev/null ; then
-    ln -s /etc/runit/sv/$svc /run/runit/service/ ;
+    ln -s /etc/runit/sv/${svc} /run/runit/service/ ;
   elif command -v rc-update > /dev/null ; then
-  	rc-update add $svc default ;
+  	rc-update add ${svc} default ;
   fi
 }
 
@@ -31,16 +31,16 @@ rm /var/lib/pacman/db.lck
 
 pacman --noconfirm -Syy ; pacman --noconfirm -Syu
 . /root/init/archlinux/distro_pkgs.ini
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-for pkgX in $pkgs_var ; do
-	pacman --noconfirm --needed -Sw $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	pacman --noconfirm --needed -Sw ${pkgX} ;
 done
-for pkgX in $pkgs_var ; do
-	pacman --noconfirm --needed -S $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	pacman --noconfirm --needed -S ${pkgX} ;
 done
 
 if [ -f /etc/os-release ] ; then
@@ -66,13 +66,13 @@ if command -v systemctl > /dev/null ; then
   systemctl set-default graphical.target ; sleep 3 ;
 elif command -v s6-rc > /dev/null ; then
   svc_enable xdm ;
-  sed -i "s|DISPLAYMANAGER=.*|DISPLAYMANAGER='$CHOICE_DESKTOP'|" etc/conf.d/xdm ;
+  sed -i "s|DISPLAYMANAGER=.*|DISPLAYMANAGER='${CHOICE_DESKTOP}'|" etc/conf.d/xdm ;
 elif command -v sv > /dev/null ; then
   svc_enable xdm ;
-  sed -i "s|DISPLAYMANAGER=.*|DISPLAYMANAGER='$CHOICE_DESKTOP'|" etc/conf.d/xdm ;
+  sed -i "s|DISPLAYMANAGER=.*|DISPLAYMANAGER='${CHOICE_DESKTOP}'|" etc/conf.d/xdm ;
 elif command -v rc-update > /dev/null ; then
   svc_enable xdm ;
-  sed -i "s|DISPLAYMANAGER=.*|DISPLAYMANAGER='$CHOICE_DESKTOP'|" etc/conf.d/xdm ;
+  sed -i "s|DISPLAYMANAGER=.*|DISPLAYMANAGER='${CHOICE_DESKTOP}'|" etc/conf.d/xdm ;
 fi
 chmod 1777 /tmp
 

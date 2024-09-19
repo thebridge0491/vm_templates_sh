@@ -10,17 +10,17 @@ dnf -y check-update ; dnf -y upgrade
 . /root/init/mageia/distro_pkgs.ini
 dnf --setopt=install_weak_deps=False config-manager --save
 dnf config-manager --dump | grep -we install_weak_deps
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-#urpmi --no-recommends --download-all $pkgs_var
-dnf --setopt=install_weak_deps=False -y install --downloadonly $pkgs_var
-for pkgX in $pkgs_var ; do
-	#urpmi --no-recommends $pkgX ;
-	#dnf --setopt=install_weak_deps=False -y install --cacheonly $pkgX ;
-	dnf --setopt=install_weak_deps=False -y install $pkgX ;
+#urpmi --no-recommends --download-all ${pkgs_var}
+dnf --setopt=install_weak_deps=False -y install --downloadonly ${pkgs_var}
+for pkgX in ${pkgs_var} ; do
+	#urpmi --no-recommends ${pkgX} ;
+	#dnf --setopt=install_weak_deps=False -y install --cacheonly ${pkgX} ;
+	dnf --setopt=install_weak_deps=False -y install ${pkgX} ;
 done
 sleep 3
 

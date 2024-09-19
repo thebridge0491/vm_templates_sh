@@ -7,16 +7,16 @@ export CHOICE_DESKTOP=${1:-xfce}
 
 apt-get -y update ; apt-get -y dist-upgrade
 . /root/init/pclinuxos/distro_pkgs.ini
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 chkconfig --add dm ; chkconfig dm on
 
-apt-get -y --option Retries=3 install drakconf acpi acpid $pkgs_var
+apt-get -y --option Retries=3 install drakconf acpi acpid ${pkgs_var}
 # fix AND re-attempt install for infrequent errors
 apt-get -y --fix-broken install
-apt-get -y --option Retries=3 install drakconf acpi acpid $pkgs_var
+apt-get -y --option Retries=3 install drakconf acpi acpid ${pkgs_var}
 sleep 3
 
 XFdrake --auto

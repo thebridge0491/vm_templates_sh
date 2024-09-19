@@ -5,13 +5,13 @@ export SHAREDNODE=${1:-localhost.local} ; export PRINTNAME=${2:-printer1}
 svc_enable() {
   svc=${1}
   if command -v systemctl > /dev/null ; then
-    systemctl enable $svc ;
+    systemctl enable ${svc} ;
   elif command -v s6-rc > /dev/null ; then
-    s6-rc-bundle-update add default $svc ;
+    s6-rc-bundle-update add default ${svc} ;
   elif command -v sv > /dev/null ; then
-    ln -s /etc/runit/sv/$svc /run/runit/service/ ;
+    ln -s /etc/runit/sv/${svc} /run/runit/service/ ;
   elif command -v rc-update > /dev/null ; then
-  	rc-update add $svc default ;
+  	rc-update add ${svc} default ;
   fi
 }
 
@@ -30,11 +30,11 @@ rm /var/lib/pacman/db.lck
 
 pacman --noconfirm -Syy ; pacman --noconfirm -Syu
 . /root/init/archlinux/distro_pkgs.ini
-for pkgX in $pkgs_cmdln_tools ; do
-	pacman --noconfirm --needed -Sw $pkgX ;
+for pkgX in ${pkgs_cmdln_tools} ; do
+	pacman --noconfirm --needed -Sw ${pkgX} ;
 done
-for pkgX in $pkgs_cmdln_tools ; do
-	pacman --noconfirm --needed -S $pkgX ;
+for pkgX in ${pkgs_cmdln_tools} ; do
+	pacman --noconfirm --needed -S ${pkgX} ;
 done
 
 if [ -f /etc/os-release ] ; then
@@ -112,16 +112,16 @@ sh /root/init/common/linux/firewall/nftables/config_nftables.sh cmds_nftables al
 #ipset destroy ; iptables -X ; ip6tables -X
 for unit in ipset iptables ip6tables ; do
   if command -v systemctl > /dev/null ; then
-    systemctl stop $unit ; systemctl disable $unit ;
+    systemctl stop ${unit} ; systemctl disable ${unit} ;
   elif command -v s6-rc > /dev/null ; then
-    s6-rc -d change $unit ; s6-rc-bundle-update delete default $unit ;
+    s6-rc -d change ${unit} ; s6-rc-bundle-update delete default ${unit} ;
   elif command -v sv > /dev/null ; then
-    sv stop $unit ; rm /run/runit/service/$unit ;
+    sv stop ${unit} ; rm /run/runit/service/${unit} ;
   elif command -v rc-update > /dev/null ; then
-    rc-service stop $unit ; rc-update del $unit default ;
+    rc-service stop ${unit} ; rc-update del ${unit} default ;
   fi ;
   if command -v systemctl > /dev/null ; then
-    systemctl mask $unit ;
+    systemctl mask ${unit} ;
   fi ;
 done
 if command -v systemctl > /dev/null ; then
@@ -140,11 +140,11 @@ set -e ; set -u
 sed -i '/hosts:/ s|files|files mdns_minimal \[NOTFOUND=return\]|' /etc/nsswitch.conf
 
 for svc in cupsd org.cups.cupsd cups-browsed avahi-daemon nfsclient ; do
-    svc_enable $svc ;
+  svc_enable ${svc} ;
 done
 
 set +e
-#sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
+#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
 sh /root/init/common/misc_config.sh cfg_printer_pdf \
     /usr/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
 #nft add rule inet filter in_allow udp port mdns accept
@@ -165,7 +165,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 sh /root/init/common/misc_config.sh cfg_sshd
 sh /root/init/common/misc_config.sh cfg_shell_keychain
-sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
 
 (cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
 cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
@@ -181,10 +181,10 @@ EOF
 
 sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
 sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
-if [ -e $sshca_pubkey ] ; then
-	echo "@cert-authority 192.168.* $(cat $sshca_pubkey)" >> \
+if [ -e ${sshca_pubkey} ] ; then
+	echo "@cert-authority 192.168.* $(cat ${sshca_pubkey})" >> \
 		/etc/skel/.ssh/known_hosts ;
-	cp $sshca_krl $sshca_pubkey /etc/ssh/ ;
+	cp ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
 fi
 
 

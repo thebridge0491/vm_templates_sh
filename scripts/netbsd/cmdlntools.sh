@@ -2,7 +2,7 @@
 
 #set path = (~/bin /bin /sbin /usr/{bin,sbin,X11R7/bin,pkg/{,s}bin,games} \
 #			/usr/local/{,s}bin)
-export PATH=$HOME/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11R7/bin:/usr/pkg/bin:/usr/pkg/sbin:/usr/pkg/games:/usr/local/bin:/usr/local/sbin
+export PATH=${HOME}/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11R7/bin:/usr/pkg/bin:/usr/pkg/sbin:/usr/pkg/games:/usr/local/bin:/usr/local/sbin
 
 set +x
 export sed_inplace="sed -i"
@@ -25,7 +25,7 @@ done
 
 pkgin update ; pkgin -y upgrade
 . /root/init/netbsd/distro_pkgs.ini
-pkgin -yd install $pkgs_cmdln_tools ; pkgin -y install $pkgs_cmdln_tools
+pkgin -yd install ${pkgs_cmdln_tools} ; pkgin -y install ${pkgs_cmdln_tools}
 
 if [ -z "$(grep '^export JAVA_HOME' /etc/csh.cshrc)" ] ; then
   echo "export JAVA_HOME=${default_java_home}" >> /etc/csh.cshrc ;
@@ -36,7 +36,7 @@ fi
 
 # clamd freshclamd
 for svc in dbus avahidaemon cupsd ; do
-	cp /usr/pkg/share/examples/rc.d/$svc /etc/rc.d/ ;
+	cp /usr/pkg/share/examples/rc.d/${svc} /etc/rc.d/ ;
 done
 mkdir -p /var/run/dbus
 
@@ -81,9 +81,9 @@ sed -i '/hosts:/ s|files|files mdns_minimal \[NOTFOUND=return\]|' /etc/nsswitch.
 
 #usermod -G cups root
 
-#sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
+#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
 sh /root/init/common/misc_config.sh cfg_printer_pdf \
-    /usr/pkg/share/cups/model/CUPS-PDF.ppd /usr/pkg/etc/cups/cups-pdf.conf
+  /usr/pkg/share/cups/model/CUPS-PDF.ppd /usr/pkg/etc/cups/cups-pdf.conf
 #echo 'pass in proto udp from any to any port { mdns } keep state' >> /etc/pf/outallow_in_allow.rules
 sed -i 's|domain|domain, mdns|g' /etc/pf/outallow_in_allow.rules
 set -e ; set -u
@@ -104,7 +104,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /usr/pkg/etc/sudoers
 
 sh /root/init/common/misc_config.sh cfg_sshd
 sh /root/init/common/misc_config.sh cfg_shell_keychain /etc/skel/.cshrc
-sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
 
 (cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
 cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
@@ -115,8 +115,8 @@ cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
 
 sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
 sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
-if [ -e $sshca_pubkey ] ; then
-	echo "@cert-authority 192.168.* $(cat $sshca_pubkey)" >> \
+if [ -e ${sshca_pubkey} ] ; then
+	echo "@cert-authority 192.168.* $(cat ${sshca_pubkey})" >> \
 		/etc/skel/.ssh/known_hosts ;
-	cp $sshca_krl $sshca_pubkey /etc/ssh/ ;
+	cp ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
 fi

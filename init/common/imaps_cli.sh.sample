@@ -14,7 +14,7 @@
 #     sh imaps_cli.sh [-u=im.computer@gmail.com] \
 #     [-m=INBOX] [-s=UNSEEN] [-n=0] [-b=0]
 
-SCRIPTPARENT=${SCRIPTPARENT:-$(dirname $0)}
+SCRIPTPARENT=${SCRIPTPARENT:-$(dirname ${0})}
 USE_CURL=${USE_CURL:-0} ; OPEN_AUTH=${OPEN_AUTH:-0}
 HDR_ITEMS=${HDR_ITEMS:-From To Subject Date}
 # [gmail.com | mail.yahoo.com | comcast.net]
@@ -29,22 +29,22 @@ brief=0
 #infile=/dev/stdin
 #outfile=/dev/stdout
 
-for opt in "$@" ; do
-  case $opt in
-  -u=*) user=`echo $opt | sed 's|-u=||'` ;;
-  -m=*) mailbox=`echo $opt | sed 's|-m=||'` ;;
-  -s=*) criterion=`echo $opt | sed 's|-s=||'` ;;
-  -n=*) idx_spec=`echo $opt | sed 's|-n=||'` ;;
-  -b=*) brief=`echo $opt | sed 's|-b=||'` ;;
-  #-i=*) infile=`echo $opt | sed 's|-i=||'` ;;
-  #-o=*) outfile=`echo $opt | sed 's|-o=||'` ;;
+for opt in "${@}" ; do
+  case ${opt} in
+  -u=*) user=`echo ${opt} | sed 's|-u=||'` ;;
+  -m=*) mailbox=`echo ${opt} | sed 's|-m=||'` ;;
+  -s=*) criterion=`echo ${opt} | sed 's|-s=||'` ;;
+  -n=*) idx_spec=`echo ${opt} | sed 's|-n=||'` ;;
+  -b=*) brief=`echo ${opt} | sed 's|-b=||'` ;;
+  #-i=*) infile=`echo ${opt} | sed 's|-i=||'` ;;
+  #-o=*) outfile=`echo ${opt} | sed 's|-o=||'` ;;
   esac
 done
 
 if [ ! "0" = "${OPEN_AUTH:-0}" ] ; then
   entry=${entry:-tokenmail}
   token=$(sh ${SCRIPTPARENT}/get_secret.sh gettoken_entry ${entry} | tr '\n' '\0')
-  
+
   # #Note: disable line-wrapping: use openssl base64 -A OR base64 -w 0
   auth_method=oauthbearer
   sasl_str=$(printf "n,a=${user},\1auth=Bearer ${token}\1\1" | openssl base64 -A)
@@ -53,10 +53,10 @@ if [ ! "0" = "${OPEN_AUTH:-0}" ] ; then
     sasl_str=$(printf "user=${user}\1auth=Bearer ${token}\1\1" | openssl base64 -A)
   fi ;
 else
-  ##stty -echo ; read -p "Password for user($user): " passw ; stty echo
+  ##stty -echo ; read -p "Password for user(${user}): " passw ; stty echo
   entry=${entry:-appmail}
   passw=$(sh ${SCRIPTPARENT}/get_secret.sh getpass_entry ${entry} | tr '\n' '\0')
-  
+
   auth_method=plain
   sasl_str=$(printf "\0${user}\0${passw}" | openssl base64)
 fi
@@ -82,7 +82,7 @@ if [ "0" = "${USE_CURL:-0}" ] ; then
     echo "z1 logout" ; sleep 2 ;
   } | openssl s_client -quiet -verify_quiet -crlf -connect ${host}":"${port} -4
   #} | gnutls-cli --crlf --insecure --no-ca-verification --port ${port} ${host}
-  
+
   # (openssl s_client) ??? Linux: -CApath ...      ; macOS: -CAfile ...
   # (gnutls-cli)       ??? Linux: --x509cafile ... ; macOS: --x509cafile ...
 else
@@ -90,13 +90,13 @@ else
   for recip in ${recips} ; do
     mail_rcpts="${mail_rcpts}--mail-rcpt ${recip} " ;
   done ;
-  
+
   if [ "0" = "${OPEN_AUTH:-0}" ] ; then
     cred_opts="--user ${user}":"${passw}" ;
   else
     cred_opts="--user ${user} --oauth2-bearer ${token}" ;
   fi ;
-  
+
   curl --insecure --crlf --ssl-reqd ${cred_opts} \
     --url imaps://${host}":"${port} -4 --request "examine ${mailbox}" ;
   if [ ! "0" = "${idx_spec}" ] ; then

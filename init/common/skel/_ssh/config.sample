@@ -4,6 +4,9 @@ AddKeysToAgent yes
 UpdateHostKeys yes
 HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
 PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+ServerAliveInterval 180
+# [FreeBSD|Linux: /usr[/local]/bin/xauth | macOS: /opt/X11/bin/xauth]
+XauthLocation /usr/bin/xauth
 
 Host github.com
   #IdentityFile ~/.ssh/id_<keytype>

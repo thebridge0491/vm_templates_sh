@@ -5,7 +5,7 @@
      grains['os_family'])|lower %}
 {% load_yaml as defaultdict %}
   default: # Debian
-    #pkgs_cmdln_tools = {{salt['cmd.shell']('. /root/init/'+variant+'/distro_pkgs.ini ; echo $pkgs_cmdln_tools', shell='/bin/sh')}}
+    #pkgs_cmdln_tools = {{salt['cmd.shell']('. /root/init/'+variant+'/distro_pkgs.ini ; echo ${pkgs_cmdln_tools}', shell='/bin/sh')}}
     distro_pkgs: {{salt['ini.get_ini']('/root/init/'+variant+'/distro_pkgs.ini')}}
     {% if salt['file.file_exists']('/var/lib/dbus/machine-id') %}
     {#hostname_last4: {{salt['cmd.shell']('cat /var/lib/dbus/machine-id | cut -b29-32')}}#}

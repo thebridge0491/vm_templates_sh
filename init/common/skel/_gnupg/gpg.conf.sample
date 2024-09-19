@@ -1,7 +1,7 @@
 #========================================
 # PGP Certificate configuration options for GnuPG
 
-default-key AC4F9EC1419CA793387A03B4E02B3B63D40B0F0B
+#default-key DA0F1D4A85DA7D713D502C60F4F23A5BDC7ED2BB
 #default-recipient im.computer@yahoo.com
 default-recipient-self
 #encrypt-to im.computer@yahoo.com
@@ -15,38 +15,28 @@ default-recipient-self
 #keyserver-options auto-key-retrieve
 keyserver-options no-honor-keyserver-url
 
-no-greeting
 no-emit-version
-no-comments
-openpgp
 keyid-format short
-charset utf-8
-#lock-once
+default-new-key-algo rsa4096/cert+nistp384/auth,sign
 
-fixed-list-mode
+no-comments
+no-greeting
+#lock-once
 list-options show-uid-validity show-unusable-uids
 verify-options show-uid-validity show-unusable-uids
 
-use-agent
-
-trust-model pgp
-passphrase-repeat 2
-
 # gpg --verbose --version
+#personal-cipher-preferences AES256 AES192 CAMELLIA256 CAMELLIA192
+#personal-digest-preferences SHA512 SHA384 SHA256
+#personal-compress-preferences BZIP2 ZLIB ZIP Uncompressed
+#default-preference-list S9 S8 S13 S12 H10 H9 H8 Z3 Z2 Z1 Z0
 default-preference-list AES256 AES192 CAMELLIA256 CAMELLIA192 SHA512 SHA384 SHA256 BZIP2 ZLIB ZIP Uncompressed
-personal-cipher-preferences AES256 AES192 CAMELLIA256 CAMELLIA192
-personal-digest-preferences SHA512 SHA384 SHA256
-personal-compress-preferences BZIP2 ZLIB ZIP Uncompressed
 
+passphrase-repeat 2
 default-sig-expire 13m
 default-cert-expire 13m
 min-cert-level 1
 #default-cert-level 1
 ask-cert-level
 
-require-cross-certification
-completes-needed 1
-marginals-needed 3
-cert-digest-algo SHA256
-ignore-time-conflict 
-allow-freeform-uid 
+ignore-time-conflict

@@ -1,5 +1,6 @@
 {
 	"key_sexp": "(rsa (nbits 4:4096))",
 	"subkey_sexp": "(rsa (nbits 4:3072))",
-	"subkey1_sexp": "(ecc (curve secp384r1))"
+	"subkey1_sexp": "(ecc (curve secp384r1) (flags ecdh))",
+	"subkey2_sexp": "(ecc (curve ed25519) (flags eddsa))"
 }

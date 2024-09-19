@@ -9,14 +9,14 @@ dnf -y check-update ; dnf -y upgrade
 . /root/init/redhat/distro_pkgs.ini
 dnf --setopt=install_weak_deps=False config-manager --save
 dnf config-manager --dump | grep -we install_weak_deps
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-dnf --setopt=install_weak_deps=False -y install --downloadonly $pkgs_var
-for pkgX in $pkgs_var ; do
-	dnf --setopt=install_weak_deps=False -y install --cacheonly $pkgX ;
+dnf --setopt=install_weak_deps=False -y install --downloadonly ${pkgs_var}
+for pkgX in ${pkgs_var} ; do
+	dnf --setopt=install_weak_deps=False -y install --cacheonly ${pkgX} ;
 done
 sleep 3
 

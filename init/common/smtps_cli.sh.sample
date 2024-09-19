@@ -16,7 +16,7 @@
 #     sh smtps_cli.sh [-f=a.sendr@gmail.com] \
 #     [-s="email subject"] [-i=[data.[txt|mime]|smime.p7m] recip [...recipN]
 
-SCRIPTPARENT=${SCRIPTPARENT:-$(dirname $0)}
+SCRIPTPARENT=${SCRIPTPARENT:-$(dirname ${0})}
 USE_CURL=${USE_CURL:-0} ; OPEN_AUTH=${OPEN_AUTH:-0}
 # [gmail.com | mail.yahoo.com | comcast.net]
 host=${host:-smtp.gmail.com} ; port=${port:-465}
@@ -28,12 +28,12 @@ infile=/dev/stdin
 #outfile=/dev/stdout
 recips=""
 
-for opt in "$@" ; do
-  case $opt in
-  -f=*) sender=`echo $opt | sed 's|-f=||'` ;;
-  -s=*) subj=`echo $opt | sed 's|-s=||'` ;;
-  -i=*) infile=`echo $opt | sed 's|-i=||'` ;;
-  #-o=*) outfile=`echo $opt | sed 's|-o=||'` ;;
+for opt in "${@}" ; do
+  case ${opt} in
+  -f=*) sender=`echo ${opt} | sed 's|-f=||'` ;;
+  -s=*) subj=`echo ${opt} | sed 's|-s=||'` ;;
+  -i=*) infile=`echo ${opt} | sed 's|-i=||'` ;;
+  #-o=*) outfile=`echo ${opt} | sed 's|-o=||'` ;;
   *) recips="${recips}${opt} " ;;
   esac
 done
@@ -41,7 +41,7 @@ done
 if [ ! "0" = "${OPEN_AUTH:-0}" ] ; then
   entry=${entry:-tokenmail}
   token=$(sh ${SCRIPTPARENT}/get_secret.sh gettoken_entry ${entry} | tr '\n' '\0')
-  
+
   # #Note: disable line-wrapping: use openssl base64 -A OR base64 -w 0
   auth_method=oauthbearer
   sasl_str=$(printf "n,a=${sender},\1auth=Bearer ${token}\1\1" | openssl base64 -A)
@@ -50,10 +50,10 @@ if [ ! "0" = "${OPEN_AUTH:-0}" ] ; then
     sasl_str=$(printf "user=${sender}\1auth=Bearer ${token}\1\1" | openssl base64 -A)
   fi ;
 else
-  ##stty -echo ; read -p "Password for sender($sender): " passw ; stty echo
+  ##stty -echo ; read -p "Password for sender(${sender}): " passw ; stty echo
   entry=${entry:-appmail}
   passw=$(sh ${SCRIPTPARENT}/get_secret.sh getpass_entry ${entry} | tr '\n' '\0')
-  
+
   auth_method=plain
   sasl_str=$(printf "\0${sender}\0${passw}" | openssl base64)
 fi
@@ -75,7 +75,7 @@ if [ "0" = "${USE_CURL:-0}" ] ; then
     echo "." ; sleep 2 ;
     } | openssl s_client -crlf -connect ${host}":"${port} -4
   #} | gnutls-cli --crlf --insecure --no-ca-verification --port ${port} ${host}
-  
+
   # (openssl s_client) ??? Linux: -CApath ...      ; macOS: -CAfile ...
   # (gnutls-cli)       ??? Linux: --x509cafile ... ; macOS: --x509cafile ...
 else
@@ -83,13 +83,13 @@ else
   for recip in ${recips} ; do
     mail_rcpts="${mail_rcpts}--mail-rcpt ${recip} " ;
   done ;
-  
+
   if [ "0" = "${OPEN_AUTH:-0}" ] ; then
     cred_opts="--user ${sender}":"${passw}" ;
   else
     cred_opts="--user ${sender} --oauth2-bearer ${token}" ;
   fi ;
-  
+
   (echo -e ${hdr_txt} ; cat ${infile}) | curl --insecure --crlf --ssl-reqd \
     ${cred_opts} --url smtps://${host}":"${port} -4 \
     --mail-from ${sender} --upload-file - ${mail_rcpts} ;

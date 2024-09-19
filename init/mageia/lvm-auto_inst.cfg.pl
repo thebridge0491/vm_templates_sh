@@ -136,6 +136,14 @@ $o = {
 			'VG_name' => 'vg0',
             'hd' => 'vg0',
             'fs_type' => 'ext4',
+            #'mntpoint' => '/snap',
+            'options' => 'noatime,acl',
+            'size' => 2100 * 2 << 10 # 2100MB
+        },
+        {
+			'VG_name' => 'vg0',
+            'hd' => 'vg0',
+            'fs_type' => 'ext4',
             'mntpoint' => '/home',
             'options' => 'noatime,acl',
             'size' => 2 << 20,

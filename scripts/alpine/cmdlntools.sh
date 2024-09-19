@@ -7,7 +7,7 @@ set +e
 
 apk update ; apk upgrade -U -a
 . /root/init/alpine/distro_pkgs.ini
-apk add $pkgs_cmdln_tools
+apk add ${pkgs_cmdln_tools}
 
 if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
   echo "export JAVA_HOME=${default_java_home}" >> /etc/bash.bashrc ;
@@ -46,8 +46,8 @@ sh /root/init/common/linux/firewall/nftables/config_nftables.sh cmds_nftables al
 #ipset flush ; iptables -F ; ip6tables -F
 #ipset destroy ; iptables -X ; ip6tables -X
 for unit in ipset iptables ip6tables ; do
-	service $unit stop ;
-	rc-update del $unit default ;
+	service ${unit} stop ;
+	rc-update del ${unit} default ;
 done
 service nftables save
 rc-update add nftables default
@@ -63,13 +63,13 @@ set -e ; set -u
 #sed -i '/hosts:/ s|files|files mdns_minimal \[NOTFOUND=return\]|' /etc/nsswitch.conf
 
 for svc in dbus cupsd avahi-daemon ; do
-    rc-update add $svc default
+  rc-update add ${svc} default
 done
 
 set +e
-#sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
+#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
 sh /root/init/common/misc_config.sh cfg_printer_pdf \
-    /usr/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
+  /usr/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
 #nft add rule inet filter in_allow udp port mdns accept
 sed -i 's|domain|domain, mdns|g' /etc/nftables.conf
 sed -i 's|domain|domain, mdns|g' /etc/nftables/*nftables.conf
@@ -89,7 +89,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 sh /root/init/common/misc_config.sh cfg_sshd
 sh /root/init/common/misc_config.sh cfg_shell_keychain
-sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
 
 (cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
 cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
@@ -100,10 +100,10 @@ cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
 
 sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
 sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
-if [ -e $sshca_pubkey ] ; then
-	echo "@cert-authority 192.168.* $(cat $sshca_pubkey)" >> \
+if [ -e ${sshca_pubkey} ] ; then
+	echo "@cert-authority 192.168.* $(cat ${sshca_pubkey})" >> \
 		/etc/skel/.ssh/known_hosts ;
-	cp $sshca_krl $sshca_pubkey /etc/ssh/ ;
+	cp ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
 fi
 
 

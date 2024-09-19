@@ -5,7 +5,7 @@ Fetch missing distribution sets (xbase*) & sysmerge updates:
     - shell: /bin/sh
     - name: |
         arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
-        setVer=$(echo $rel | tr '.' '\0')
+        setVer=$(echo ${rel} | tr '.' '\0')
         cd /tmp
         for setX in xbase ; do
           ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/${setX}${setVer}.tgz ;
@@ -39,10 +39,10 @@ Config misc services(ntp, firewall):
 
         #cd /usr/bin
         #for file1 in lp lpq lpr lprm ; do
-        #  if [ -e $file1 ] ; then
-        #    mv $file1 $file1.old ;
+        #  if [ -e ${file1} ] ; then
+        #    mv ${file1} ${file1}.old ;
         #  fi ;
-        #  ln -s /usr/local/bin/$file1 $file1 ;
+        #  ln -s /usr/local/bin/${file1} ${file1} ;
         #done
 
 #cups:

@@ -6,13 +6,13 @@ export SHAREDNODE=${1:-localhost.local} ; export PRINTNAME=${2:-printer1}
 svc_enable() {
   svc=${1}
   if command -v systemctl > /dev/null ; then
-    systemctl enable $svc ;
+    systemctl enable ${svc} ;
   elif command -v sv > /dev/null ; then
-    ln -s /etc/sv/$svc /var/service ;
+    ln -s /etc/sv/${svc} /var/service ;
   elif command -v rc-update > /dev/null ; then
-    rc-update add $svc default ;
+    rc-update add ${svc} default ;
   elif command -v update-rc.d > /dev/null ; then
-  	update-rc.d $svc defaults ;
+  	update-rc.d ${svc} defaults ;
   fi
 }
 
@@ -21,11 +21,11 @@ set +e
 . /root/init/debian/distro_pkgs.ini
 apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
   tee /etc/apt/apt.conf.d/999norecommends
-for pkgX in $pkgs_cmdln_tools ; do
-	apt-get -y --no-install-recommends install --download-only $pkgX ;
+for pkgX in ${pkgs_cmdln_tools} ; do
+	apt-get -y --no-install-recommends install --download-only ${pkgX} ;
 done
-for pkgX in $pkgs_cmdln_tools ; do
-	apt-get -y --no-install-recommends install $pkgX ;
+for pkgX in ${pkgs_cmdln_tools} ; do
+	apt-get -y --no-install-recommends install ${pkgX} ;
 done
 tasksel --list-tasks ; sleep 5
 
@@ -41,7 +41,7 @@ fi
 if [ "$(hostname | grep -e 'box.0000')" ] ; then
 	last4=$(cat /var/lib/dbus/machine-id | cut -b29-32) ; # cat /etc/machine-id
 	for fileX in /etc/hosts /etc/hostname ; do
-	  sed -i "/box.0000/ s|\(box.\)0000|\1${last4}|g" $fileX ;
+	  sed -i "/box.0000/ s|\(box.\)0000|\1${last4}|g" ${fileX} ;
 	done ;
 	hostname --file /etc/hostname ;
 fi
@@ -85,16 +85,16 @@ sh /root/init/common/linux/firewall/nftables/config_nftables.sh config_nftables 
 #ipset destroy ; iptables -X ; ip6tables -X
 for unit in ipset iptables ip6tables ; do
   if command -v systemctl > /dev/null ; then
-    systemctl stop $unit ; systemctl disable $unit ;
+    systemctl stop ${unit} ; systemctl disable ${unit} ;
   elif command -v sv > /dev/null ; then
-    sv stop $unit ; rm /var/service/$unit ;
+    sv stop ${unit} ; rm /var/service/${unit} ;
   elif command -v rc-update > /dev/null ; then
-    rc-service $unit stop ; rc-update del $unit default ;
+    rc-service ${unit} stop ; rc-update del ${unit} default ;
   elif command -v update-rc.d > /dev/null ; then
-    service $unit stop ; update-rc.d $unit remove ;
+    service ${unit} stop ; update-rc.d ${unit} remove ;
   fi ;
   if command -v systemctl > /dev/null ; then
-    systemctl mask $unit ;
+    systemctl mask ${unit} ;
   fi ;
 done
 if command -v systemctl > /dev/null ; then
@@ -150,13 +150,13 @@ sh /root/init/common/misc_config.sh cfg_shell_keychain /etc/skel/.bashrc
 
 
 svc_enable nfs-common
-sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
 
 
 #svc_enable cups ; svc_enable cups-browsed
 #sh /root/init/common/misc_config.sh cfg_printer_pdf /etc/cups \
 #    /usr/share/ppd/cups-pdf
-##sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
+##sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
 lpstat -t ; sleep 5
 set -e ; set -u
 

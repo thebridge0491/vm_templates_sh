@@ -7,10 +7,10 @@ _sgdisk_usbdrv() {
   sgdisk --zap-all /dev/${DEVX} ; sgdisk --clear --mbrtogpt /dev/${DEVX}
   sgdisk --new 1:1M:+1M --typecode 1:ef02 --change-name 1:"bios_boot" /dev/${DEVX}
   sgdisk --new 2:0:+200M --typecode 2:ef00 --change-name 2:"ESP" /dev/${DEVX}
-  sgdisk --new 3:0:+0G --typecode 3:8300 --change-name 3:"MULTI_ISOS" /dev/${DEVX}
+  sgdisk --new 3:0:0 --typecode 3:8300 --change-name 3:"MULTI_ISOS" /dev/${DEVX}
 
   sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
-  sleep 3 ; partprobe --summary
+  sleep 3 ; partprobe --summary || partprobe
 }
 _sfdisk_usbdrv() {
   sfdisk --delete --wipe always /dev/${DEVX}
@@ -31,35 +31,35 @@ _sfdisk_usbdrv() {
   sfdisk -N 3 --part-label MULTI_ISOS /dev/${DEVX}
 
   sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
-  sleep 3 ; partprobe --summary
+  sleep 3 ; partprobe --summary || partprobe
 }
 _parted_usbdrv() {
   parted --script /dev/${DEVX} mklabel gpt
   DIFF=1 ; END='-0'
   # /dev/${DEVX}: for BIOS 1M none (bios_boot) ; for EFI 200M fat32 (ESP)
-  END=$(( 1 + $DIFF ))
+  END=$(( 1 + ${DIFF} ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary $DIFF $END name 1 bios_boot
+    mkpart primary ${DIFF} ${END} name 1 bios_boot
 
-  DIFF=$END ; END=$(( 200 + $DIFF ))
+  DIFF=${END} ; END=$(( 200 + ${DIFF} ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary fat32 $DIFF $END name 2 ESP
+    mkpart primary fat32 ${DIFF} ${END} name 2 ESP
 
-  DIFF=$END ; END=100%
+  DIFF=${END} ; END=100%
   parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ext2 $DIFF $END name 3 MULTI_ISOS
+    mkpart primary ext2 ${DIFF} ${END} name 3 MULTI_ISOS
 
   parted -s /dev/${DEVX} set 1 bios_grub on
   parted -s /dev/${DEVX} set 2 esp on
 
   sync ; parted -s /dev/${DEVX} unit GiB print ; sleep 3
   parted -s /dev/${DEVX} align-check optimal 1 ; sleep 3
-  sleep 3 ; partprobe --summary
+  sleep 3 ; partprobe --summary || partprobe
 }
 
 part_usbdrv() {
   TOOL=${1:-sgdisk}
-  case $TOOL in
+  case ${TOOL} in
     'sfdisk') _sfdisk_usbdrv ;;
     'parted') _parted_usbdrv ;;
     *) _sgdisk_usbdrv ;;
@@ -67,7 +67,7 @@ part_usbdrv() {
 }
 
 mkfs_usbdrv_volumes() {
-  #gdisk $DEVX
+  #gdisk ${DEVX}
   #> Command (? for help): r
   #> Recovery/transformation: h
   #> Type from 1 to 3 GPT partition numbers: 1 2 3
@@ -122,4 +122,4 @@ grub_bios_efi_install() {
   umount /mnt/ISOS ; rm -r /mnt/ISOS
 }
 
-$@
+${@}

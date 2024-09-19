@@ -43,8 +43,8 @@ export ZFSBOOT_SWAP_SIZE=4g
 ### DATASET   OPTIONS
 ##
 ### Boot Environment[BE]
-##/$ZFSBOOT_BEROOT_NAME           mountpoint=none
-##/$ZFSBOOT_BEROOT_NAME/$ZFSBOOT_BOOTFS_NAME  mountpoint=/
+##/${ZFSBOOT_BEROOT_NAME}           mountpoint=none
+##/${ZFSBOOT_BEROOT_NAME}/${ZFSBOOT_BOOTFS_NAME}  mountpoint=/
 ##
 ##/tmp      mountpoint=/tmp,exec=on,setuid=off
 ##
@@ -110,8 +110,8 @@ sysctl kern.geom.label.gpt.enable=1
 #### DATASET    OPTIONS
 ###
 #### Boot Environment[BE]
-###/$ZFSBOOT_BEROOT_NAME            mountpoint=none
-###/$ZFSBOOT_BEROOT_NAME/$ZFSBOOT_BOOTFS_NAME mountpoint=/
+###/${ZFSBOOT_BEROOT_NAME}            mountpoint=none
+###/${ZFSBOOT_BEROOT_NAME}/${ZFSBOOT_BOOTFS_NAME} mountpoint=/
 ###
 ###/tmp     mountpoint=/tmp,exec=on,setuid=off
 ###
@@ -130,16 +130,16 @@ sysctl kern.geom.label.gpt.enable=1
 ###"
 
 
-#gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 2 $DEVX
-gpart bootcode -b /boot/pmbr $DEVX
+#gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 2 ${DEVX}
+gpart bootcode -b /boot/pmbr ${DEVX}
 
 PARTNM_LABELNMS="efiboot0:ESP swap0:${GRP_NM}-fsSwap zfs0:${GRP_NM}-fsPool" # partnm -> labelnm
 for partnm_labelnm in ${PARTNM_LABELNMS} ; do
-  partnm=$(echo $partnm_labelnm | cut -d: -f1) ;
-  labelnm=$(echo $partnm_labelnm | cut -d: -f2) ;
-  idx=$(gpart show -l | grep -e "$partnm" | cut -w -f4) ;
-  gpart modify -l "$labelnm" -i $idx $DEVX ;
-  glabel label "$labelnm" /dev/${DEVX}p${idx} ;
+  partnm=$(echo ${partnm_labelnm} | cut -d: -f1) ;
+  labelnm=$(echo ${partnm_labelnm} | cut -d: -f2) ;
+  idx=$(gpart show -l | grep -e "${partnm}" | cut -w -f4) ;
+  gpart modify -l "${labelnm}" -i ${idx} ${DEVX} ;
+  glabel label "${labelnm}" /dev/${DEVX}p${idx} ;
 done
 
 sync ; gpart show -p ; sleep 3 ; gpart show -l ; sleep 3
@@ -187,10 +187,10 @@ vfs.zfs.min_auto_ashift=12
 EOF
 sysrc zfs_enable="YES"
 
-zfs set dedup=off $ZFSBOOT_POOL_NAME
-zfs set quota=32G $ZFSBOOT_POOL_NAME/usr/home
-zfs set quota=8G $ZFSBOOT_POOL_NAME/var
-zfs set quota=2G $ZFSBOOT_POOL_NAME/tmp
+zfs set dedup=off ${ZFSBOOT_POOL_NAME}
+zfs set quota=32G ${ZFSBOOT_POOL_NAME}/usr/home
+zfs set quota=8G ${ZFSBOOT_POOL_NAME}/var
+zfs set quota=2G ${ZFSBOOT_POOL_NAME}/tmp
 
 
 chmod 1777 /tmp ; chmod 1777 /var/tmp
@@ -274,7 +274,7 @@ sed -i '' "s|^[^#].*requiretty|# Defaults requiretty|" /usr/local/etc/sudoers
 
 mkdir -p /usr/local/etc/pkg/repos
 sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
-FreeBSD: { 
+FreeBSD: {
   #url: "pkg+http://pkg.freebsd.org/\$\{ABI}/quarterly",
   url: "pkg+http://pkg.freebsd.org/\$(pkg config abi)/quarterly",
   mirror_type: "srv",
@@ -308,19 +308,19 @@ else
 fi
 efibootmgr -v ; sleep 3
 #read -p "Activate EFI BootOrder XXXX (or blank line to skip): " bootorder
-#if [ ! -z "$bootorder" ] ; then
-#  efibootmgr -a -b $bootorder ;
+#if [ ! -z "${bootorder}" ] ; then
+#  efibootmgr -a -b ${bootorder} ;
 #fi
 for bootorder in $(efibootmgr | sed -n 's|.*Boot\([0-9][0-9]*\).*|\1|p') ; do
-  efibootmgr -a -b $bootorder ;
+  efibootmgr -a -b ${bootorder} ;
 done
 
 
 cp /tmp/installscript /root/ ; sync
 
 read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
   umount /mnt/boot/efi ; rm -r /mnt/boot/efi ;
-  sync ; swapoff -a ; umount -a ; zfs umount -a ; zpool export $ZFSBOOT_POOL_NAME
+  sync ; swapoff -a ; umount -a ; zfs umount -a ; zpool export ${ZFSBOOT_POOL_NAME}
   reboot ; #poweroff ;
 fi

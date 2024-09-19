@@ -8,7 +8,7 @@ apt-get -y update
 apt-get -y --fix-broken install
 apt-get -y upgrade ; apt-get -y dist-upgrade
 . /root/init/pclinuxos/distro_pkgs.ini
-apt-get -y --option Retries=3 install $pkgs_cmdln_tools
+apt-get -y --option Retries=3 install ${pkgs_cmdln_tools}
 
 if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
   echo "export JAVA_HOME=${default_java_home}" >> /etc/bash.bashrc ;
@@ -46,7 +46,7 @@ drakfirewall ; sleep 600 ; cat /etc/shorewall/rules.drakx ; sleep 5
 ##ipset flush ; iptables -F ; ip6tables -F
 ##ipset destroy ; iptables -X ; ip6tables -X
 #for svc in ipset iptables ip6tables ; do
-#	service $svc stop ;
+#  service ${svc} stop ;
 #done
 
 
@@ -57,9 +57,9 @@ drakfirewall ; sleep 600 ; cat /etc/shorewall/rules.drakx ; sleep 5
 chkconfig --add avahi-daemon ; chkconfig --add nfs-common
 chkconfig --add cups ; chkconfig --add cups-browsed
 
-#sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
+#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
 sh /root/init/common/misc_config.sh cfg_printer_pdf \
-    /usr/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
+  /usr/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
 chkconfig --add cups ; chkconfig --add cups-browsed
 #iptables -A In_allow -p udp -m multiport --dports mdns -j ACCEPT
 #ip6tables -A In_allow -p udp -m multiport --dports mdns -j ACCEPT
@@ -78,7 +78,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 sh /root/init/common/misc_config.sh cfg_sshd
 sh /root/init/common/misc_config.sh cfg_shell_keychain
-sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
 
 (cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
 cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
@@ -89,10 +89,10 @@ cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
 
 sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
 sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
-if [ -e $sshca_pubkey ] ; then
-	echo "@cert-authority 192.168.* $(cat $sshca_pubkey)" >> \
+if [ -e ${sshca_pubkey} ] ; then
+	echo "@cert-authority 192.168.* $(cat ${sshca_pubkey})" >> \
 		/etc/skel/.ssh/known_hosts ;
-	cp $sshca_krl $sshca_pubkey /etc/ssh/ ;
+	cp ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
 fi
 
 

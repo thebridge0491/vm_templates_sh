@@ -1,0 +1,33 @@
+# X.509 Certificate configuration options for GnuTLS certtool
+
+# available digests: --hash [SHA256 | SHA384 | SHA512]
+default_md=SHA256
+default_bits=3072
+default_keyfile=${HOME}/demoCA/private/cakey.pem
+
+# available ciphers: --pkcs-cipher [aes-256 | aes-192 | aes-128 | 3des]
+cipher="--pkcs-cipher aes-256"
+encrypt_key=no
+
+#honor_crq_extensions=true
+# only honor subjectAltName extension
+honor_crq_ext=2.5.29.17
+
+expiration_days=365
+#activation_date="2010-10-01 01:34:00"
+#expiration_date="2011-10-01 01:34:00"
+#expiration_date="300 sec"
+crl_next_update=90
+#crl_revocation_date="2017-10-01 01:34:00"
+
+#serial=0ff
+#crl_number=101
+
+#========================================
+
+# -- (=true for ini file key=value) --
+# key usage
+signing_key=true
+
+# key purpose (extended key usage)
+email_protection_key=true

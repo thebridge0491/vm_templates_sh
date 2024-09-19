@@ -1,0 +1,279 @@
+{
+  "_usage_example": "[PACKER_LOG=1 PACKER_LOG_PATH=/tmp/packer.log] packer [validate | build -only=qemu_guestvm] -var-file osver.json template.json",
+
+  "variables": {
+    "qemu_binary": "qemu-system-x86_64",
+    "_qemu_binary_aa64": "qemu-system-aarch64",
+    "qemudisk_image": "",
+    "qemudisk_interface": "virtio-scsi",
+    "qemu_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
+    "qemu_nvram": "/usr/share/OVMF/OVMF_VARS.fd",
+    "_qemuargs_cpu_x64": "SandyBridge",
+    "_qemuargs_machine_x64": "q35,accel=kvm:hvf:tcg",
+    "_qemudisk_interface_aa64": "virtio",
+    "_qemu_firmware_aa64": "/usr/share/AAVMF/AAVMF_CODE.fd",
+    "_qemu_nvram_aa64": "/usr/share/AAVMF/AAVMF_VARS.fd",
+    "_qemuargs_cpu_aa64": "cortex-a57",
+    "_qemuargs_machine_aa64": "virt,gic-version=3,acpi=off",
+    "_qemuargs_global_PIIX4_disable": "-global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1",
+    "_qemuargs_qxlvga": "-vga none -device qxl-vga,vgamem_mb=64",
+    "_qemuargs_opts_virtfs": "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough",
+    "bhyve_firmware": "/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd",
+
+    "DISTARCHIVE_FETCH": "0",
+    "MIRROR": "",
+    "RELEASE": "",
+    "disk_size": "30720",
+    "headless": "",
+    "isos_pardir": "/mnt/Data0/distros",
+
+    "author": "imcomputer",
+    "home": "{{env `HOME`}}",
+
+    "build_timestamp": "{{isotime `2006.01`}}",
+    "datestamp": "{{isotime `2006.01.02`}}",
+
+    "MACHINE": "x86_64",
+    "passwd_plain": "packer",
+    "passwd_crypted": ""
+  },
+  "sensitive-variables": ["passwd_plain", "passwd_crypted"],
+
+  "builders": [{
+    "type": "qemu",
+    "name": "qemu_guestvm",
+    "disk_interface": "{{user `qemudisk_interface`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "disk_discard": "unmap",
+    "disk_detect_zeroes": "unmap",
+    "headless": "{{user `headless`}}",
+    "disk_image": "{{user `qemudisk_image`}}",
+    "machine_type": "q35",
+    "net_bridge": "virbr0",
+    "output_directory": "output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}",
+    "qemuargs": [
+      ["-cpu", "SandyBridge"], ["-machine", "q35,accel=kvm:hvf:tcg"],
+      ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
+      ["-name", "{{.Name}}"],
+      ["-device", "virtio-net,netdev=user.0,mac=52:54:00:{{isotime `15:04:05`}}"],
+      ["-device", "virtio-scsi"], ["-device", "scsi-hd,drive=drive0"],
+      ["-device", "usb-ehci,id=usb"], ["-usb"], ["-device", "usb-kbd"],
+      ["-device", "usb-tablet"], ["-display", "gtk,show-cursor=on"],
+      ["-vga", "virtio"],
+      ["-smbios", "type=0,uefi=on"], ["-bios", "{{user `qemu_firmware`}}"]
+    ],
+    "qemu_binary": "{{user `qemu_binary`}}",
+
+    "iso_checksum": "file:file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-{{user `iso_base`}}",
+    "iso_url": "",
+    "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base`}}-disc1.iso","https://{{user `mirror_host`}}{{user `iso_url_directory`}}/{{user `iso_base`}}-disc1.iso"],
+    "http_directory": "init",
+    "shutdown_command": "/sbin/shutdown -p +3 || (sleep 180 ; /sbin/poweroff)",
+    "shutdown_timeout": "10m",
+    "ssh_username": "root",
+    "ssh_password": "{{user `passwd_plain`}}",
+    "ssh_timeout": "4h45m",
+    "boot_wait": "10s",
+    "vm_name": "{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}.qcow2",
+
+    "boot_command": ["<wait2m>", "l<wait5>root<enter><wait10>",
+      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; ",
+      "mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5 ; ",
+      "dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; ",
+      "dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; ",
+      "cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh ",
+      "http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/install.sh ; geom -t ; ",
+      "sleep 3 ; sh -x /tmp/gpart_setup.sh part_format {{user `vol_mgr`}} ; ",
+      "sh -x /tmp/gpart_setup.sh mount_filesystems {{user `vol_mgr`}}<enter><wait30s>",
+      "env MIRROR={{user `MIRROR`}} RELEASE={{user `RELEASE`}} DISTARCHIVE_FETCH={{user `DISTARCHIVE_FETCH`}} VOL_MGR={{user `vol_mgr`}} ",
+      "sh -x /tmp/install.sh run_install {{user `variant`}}-boxv0000 '{{user `passwd_crypted`}}'<enter><wait>"]
+  },
+  {
+    "type": "virtualbox-iso",
+    "name": "virtualbox_guestvm",
+    "disk_size": "{{user `disk_size`}}",
+    "guest_os_type": "{{user `vboxguest_ostype`}}",
+    "hard_drive_discard": "1",
+    "hard_drive_interface": "sata",
+    "hard_drive_nonrotational": "1",
+    "iso_interface": "sata",
+    "guest_additions_mode": "disable",
+    "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+    "headless": "{{user `headless`}}",
+    "output_directory": "output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}",
+    "vboxmanage": [
+      ["storagectl", "{{.Name}}", "--name", "SCSI Controller", "--add",
+        "scsi", "--bootable", "on"],
+      ["modifyvm", "{{.Name}}", "--firmware", "efi", "--nictype1", "virtio",
+        "--memory", "2048", "--vram", "64", "--rtcuseutc", "on",
+        "--cpu-profile", "Intel Core i5-3570", "--cpus", "2",
+        "--clipboard", "bidirectional", "--draganddrop", "bidirectional",
+        "--accelerate3d", "on", "--groups", "/init_vm"]
+    ],
+
+    "iso_checksum": "file://{{user `isos_pardir`}}/freebsd/CHECKSUM.SHA256-{{user `iso_base`}}",
+    "iso_url": "",
+    "iso_urls": ["file://{{user `isos_pardir`}}/freebsd/{{user `iso_base`}}-disc1.iso","https://{{user `mirror_host`}}{{user `iso_url_directory`}}/{{user `iso_base`}}-disc1.iso"],
+    "http_directory": "init",
+    "shutdown_command": "/sbin/shutdown -p +3 || (sleep 180 ; /sbin/poweroff)",
+    "shutdown_timeout": "10m",
+    "ssh_username": "root",
+    "ssh_password": "{{user `passwd_plain`}}",
+    "ssh_timeout": "4h45m",
+    "boot_wait": "10s",
+    "vm_name": "{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}",
+
+    "boot_command": ["2<enter><wait20s><enter><wait5>",
+      "mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; ",
+      "dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.em0 em0 ; ",
+      "dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.vtnet0 vtnet0 ; ",
+      "cd /tmp ; fetch http://{{.HTTPIP}}:{{.HTTPPort}}/common/gpart_setup.sh ",
+      "http://{{.HTTPIP}}:{{.HTTPPort}}/{{user `variant`}}/{{user `vol_mgr`}}-installscript ; ",
+      "export PASSWD_CRYPTED='{{user `passwd_crypted`}}' ; ",
+      "export INIT_HOSTNAME={{user `variant`}}-boxv0000 ; geom -t ; sleep 3 ; ",
+      "<enter>bsdinstall script /tmp/{{user `vol_mgr`}}-installscript<enter>"]
+  },
+  {
+    "type": "null",
+    "name": "box-libvirt",
+    "communicator": "none"
+  },
+  {
+    "type": "null",
+    "name": "box-bhyve",
+    "communicator": "none"
+  }],
+
+  "provisioners": [{
+      "type": "shell-local",
+      "inline": ["mkdir -p {{user `home`}}/.ssh/publish_krls {{user `home`}}/.pki/publish_crls",
+        "cp -a {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
+        "cp -a {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
+        "tar -cf /tmp/scripts_{{user `variant`}}.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}"],
+      "except": ["box-libvirt", "box-bhyve"]
+    },
+    {
+      "type": "file",
+      "destination": "/tmp/scripts.tar",
+      "generated": true,
+      "source": "/tmp/scripts_{{user `variant`}}.tar",
+      "except": ["box-libvirt", "box-bhyve"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": ["HOME_DIR=/home/packer"],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "inline": ["tar -xf /tmp/scripts.tar -C /tmp ; ",
+        "mv /tmp/{{user `variant`}} /tmp/scripts",
+        "cp -a /tmp/init /tmp/scripts /root/"],
+      "except": ["box-libvirt", "box-bhyve"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": ["HOME_DIR=/home/packer"],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "scripts": ["init/{{user `variant`}}/vagrantuser.sh"],
+      "except": ["box-libvirt", "box-bhyve"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": ["HOME_DIR=/home/packer"],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "scripts": ["init/common/bsd/zerofill.sh"],
+      "except": ["qemu_guestvm", "virtualbox_guestvm", "box-libvirt",
+        "box-bhyve"]
+    },
+    {
+      "type": "shell-local",
+      "inline": ["if command -v erb > /dev/null ; then",
+        "erb author={{user `author`}} guest={{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}} datestamp={{user `build_timestamp`}} init/common/catalog.json.erb > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "elif command -v mustache > /dev/null ; then",
+        "echo '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' | mustache - init/common/catalog.json.mustache > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "elif command -v chevron > /dev/null ; then",
+        "echo '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' | chevron -d /dev/stdin init/common/catalog.json.mustache > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "elif command -v pystache > /dev/null ; then",
+        "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "fi", "cp -a init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/"],
+      "only": ["box-libvirt", "box-bhyve"]
+    },
+    {
+      "type": "shell-local",
+      "inline": ["cp -a init/common/metadata_libvirt.json output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/metadata.json",
+        "cp -a init/common/info.json init/common/qemu_lxc/vmrun.sh init/common/qemu_lxc/vmrun_qemu_{{user `MACHINE`}}.args init/common/qemu_lxc/vmrun_bhyve.args {{user `qemu_firmware`}} {{user `qemu_nvram`}} output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/",
+        "if command -v erb > /dev/null ; then",
+        "erb variant={{user `variant`}} init/common/Vagrantfile_libvirt.erb > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/Vagrantfile",
+        "elif command -v mustache > /dev/null ; then",
+        "echo '{\"variant\":\"{{user `variant`}}\"}' | mustache - init/common/Vagrantfile_libvirt.mustache > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/Vagrantfile",
+        "elif command -v chevron > /dev/null ; then",
+        "echo '{\"variant\":\"{{user `variant`}}\"}' | chevron -d /dev/stdin init/common/Vagrantfile_libvirt.mustache > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/Vagrantfile",
+        "elif command -v pystache > /dev/null ; then",
+        "pystache init/common/Vagrantfile_libvirt.mustache '{\"variant\":\"{{user `variant`}}\"}' > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/Vagrantfile",
+        "fi", "cd output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}",
+        "qemu-img convert -f qcow2 -O qcow2 {{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}.qcow2 box.img",
+        "tar -cvzf {{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}-{{user `build_timestamp`}}.libvirt.box metadata.json info.json Vagrantfile `ls vmrun* *.fd` box.img"],
+      "only": ["box-libvirt"]
+    },
+    {
+      "type": "shell-local",
+      "inline": ["cp -a init/common/metadata_bhyve.json output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/metadata.json",
+        "cp -a init/common/info.json init/common/qemu_lxc/vmrun.sh init/common/qemu_lxc/vmrun_qemu_{{user `MACHINE`}}.args init/common/qemu_lxc/vmrun_bhyve.args {{user `bhyve_firmware`}} output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/",
+        "if command -v erb > /dev/null ; then",
+        "erb variant={{user `variant`}} init/common/Vagrantfile_bhyve.erb > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/Vagrantfile",
+        "elif command -v mustache > /dev/null ; then",
+        "echo '{\"variant\":\"{{user `variant`}}\"}' | mustache - init/common/Vagrantfile_bhyve.mustache > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/Vagrantfile",
+        "elif command -v chevron > /dev/null ; then",
+        "echo '{\"variant\":\"{{user `variant`}}\"}' | chevron -d /dev/stdin init/common/Vagrantfile_bhyve.mustache > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/Vagrantfile",
+        "elif command -v pystache > /dev/null ; then",
+        "pystache init/common/Vagrantfile_bhyve.mustache '{\"variant\":\"{{user `variant`}}\"}' > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/Vagrantfile",
+        "fi", "cd output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}",
+        "mv {{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}.raw box.img",
+        "tar -cvzf {{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}-{{user `build_timestamp`}}.bhyve.box metadata.json info.json Vagrantfile `ls vmrun* *.fd` box.img"],
+      "only": ["box-bhyve"]
+    }],
+
+  "post-processors": [
+    {
+      "type": "checksum",
+      "checksum_types": ["sha256"],
+      "output": "output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}.qcow2.{{.ChecksumType}}",
+      "only": ["qemu_guestvm"]
+    },
+    {
+      "type": "checksum",
+      "checksum_types": ["sha256"],
+      "output": "output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}.ovf.{{.ChecksumType}}",
+      "only": ["virtualbox_guestvm"]
+    },
+    {
+      "type": "shell-local",
+      "inline": ["if command -v erb > /dev/null ; then",
+        "erb author={{user `author`}} guest={{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}} datestamp={{user `build_timestamp`}} init/common/catalog.json.erb > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "elif command -v mustache > /dev/null ; then",
+        "echo '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' | mustache - init/common/catalog.json.mustache > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "elif command -v chevron > /dev/null ; then",
+        "echo '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' | chevron -d /dev/stdin init/common/catalog.json.mustache > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "elif command -v pystache > /dev/null ; then",
+        "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' > output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "fi", "cp -a init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/"],
+      "only": ["qemu_guestvm", "virtualbox_guestvm"]
+    },
+    {
+      "type": "vagrant",
+      "keep_input_artifact": true,
+      "include": ["init/common/info.json", "init/common/qemu_lxc/vmrun.sh",
+        "init/common/qemu_lxc/vmrun_qemu_{{user `MACHINE`}}.args",
+        "init/common/qemu_lxc/vmrun_bhyve.args", "{{user `qemu_firmware`}}",
+        "{{user `qemu_nvram`}}"],
+      "only": ["qemu_guestvm"],
+      "output": "output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}-{{user `build_timestamp`}}.{{.Provider}}.box",
+      "vagrantfile_template": "Vagrantfile.template"
+    },
+    {
+      "type": "vagrant",
+      "keep_input_artifact": true,
+      "include": ["init/common/info.json"],
+      "only": ["virtualbox_guestvm"],
+      "output": "output-vms/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}-{{user `build_timestamp`}}.{{.Provider}}.box",
+      "vagrantfile_template": "Vagrantfile.template"
+    }]
+}

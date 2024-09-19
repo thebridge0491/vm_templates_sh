@@ -26,10 +26,10 @@ Config misc services(ntp, firewall):
 
         cd /usr/bin
         for file1 in lp lpq lpr lprm ; do
-          if [ -e $file1 ] ; then
-            mv $file1 $file1.old ;
+          if [ -e ${file1} ] ; then
+            mv ${file1} ${file1}.old ;
           fi ;
-          ln -s /usr/local/bin/$file1 $file1 ;
+          ln -s /usr/local/bin/${file1} ${file1} ;
         done
 
 config devfs:

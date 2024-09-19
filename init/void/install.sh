@@ -38,17 +38,17 @@ bootstrap() {
   pkg_list="libgcc ethtool base-voidstrap bash openssh sudo mkpasswd"
   if command -v xbps-install > /dev/null ; then
     if [ "aarch64" = "${UNAME_M}" ] ; then
-      yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list ;
+      yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current/aarch64 -r /mnt ${pkg_list} ;
     else
-      yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current -r /mnt $pkg_list ;
+      yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current -r /mnt ${pkg_list} ;
     fi ;
   else
     curl -LO http://${MIRROR}/static/xbps-static-latest.${UNAME_M}-musl.tar.xz ;
     tar -xf xbps-static-latest.${UNAME_M}-musl.tar.xz ;
     if [ "aarch64" = "${UNAME_M}" ] ; then
-      yes | XBPS_ARCH=${UNAME_M} ./usr/bin/xbps-install.static -Sy -R http://${MIRROR}/current/aarch64 -r /mnt $pkg_list ;
+      yes | XBPS_ARCH=${UNAME_M} ./usr/bin/xbps-install.static -Sy -R http://${MIRROR}/current/aarch64 -r /mnt ${pkg_list} ;
     else
-      yes | XBPS_ARCH=${UNAME_M} ./usr/bin/xbps-install.static -Sy -R http://${MIRROR}/current -r /mnt $pkg_list ;
+      yes | XBPS_ARCH=${UNAME_M} ./usr/bin/xbps-install.static -Sy -R http://${MIRROR}/current -r /mnt ${pkg_list} ;
     fi ;
   fi
 
@@ -94,7 +94,7 @@ xbps-install -S ; xbps-query -L ; sleep 5
 echo "Add software package selection(s)" ; sleep 3
 yes | xbps-install -Su xbps ; yes | xbps-install -u
 for pkgX in void-repo-nonfree python nano wget curl aria2 void-repo-multilib void-repo-multilib-nonfree ; do
-  yes | xbps-install -Sy \$pkgX
+  yes | xbps-install -Sy \${pkgX}
 done
 #yes | xbps-install -Sy xfce4
 xbps-query -Rs void-repo-nonfree ; sleep 10
@@ -180,13 +180,14 @@ if [ "aarch64" = "${UNAME_M}" ] ; then
 else
   yes | xbps-install -Sy linux-lts linux-lts-headers efibootmgr grub-x86_64-efi ;
 fi
+modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
 
 echo "Config dracut"
 echo 'hostonly="yes"' >> /etc/dracut.conf
 
-if [ "zfs" = "$VOL_MGR" ] ; then
-  yes | xbps-install -Sy zfs
+if [ "zfs" = "${VOL_MGR}" ] ; then
+  yes | xbps-install -Sy zfs-lts
   mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
   modprobe zfs ; zfs version ; sleep 5 ;
 
@@ -199,12 +200,12 @@ if [ "zfs" = "$VOL_MGR" ] ; then
 
   echo "Hold zfs & kernel package upgrades (require manual upgrade)" ;
   linuxver=\$(xbps-query -Rx linux-lts | sed -n '/linux[0-9.]/ s|\(linux[0-9.]*\).*|\1|p') ;
-  xbps-pkgdb -m hold zfs linux-lts linux-lts-headers \${linuxver} \${linuxver}-headers ;
+  xbps-pkgdb -m hold zfs-lts linux-lts linux-lts-headers \${linuxver} \${linuxver}-headers ;
   xbps-query --list-hold-pkgs ; sleep 3 ;
-elif [ "btrfs" = "$VOL_MGR" ] ; then
+elif [ "btrfs" = "${VOL_MGR}" ] ; then
   yes | xbps-install -Sy btrfs-progs ;
   modprobe btrfs ; sleep 5 ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   yes | xbps-install -Sy lvm2 ;
   # cryptsetup
   modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
@@ -214,8 +215,8 @@ echo "Config Linux kernel"
 #xbps-reconfigure -f linux-lts
 kernel=\$(xbps-query --regex -s '^linux-lts-[[:digit:]]\.[-0-9\._]*$' | cut -f2 -d' ' | sort -V | tail -n1)
 kver="\$(ls -A /lib/modules/ | tail -1)" # ?? or uname -r
-#mkinitrd /boot/initrd-\$kver \$kver
-dracut --kver \$kver --force
+#mkinitrd /boot/initrd-\${kver} \${kver}
+dracut --kver \${kver} --force
 xbps-reconfigure -f \${kernel}
 
 
@@ -228,7 +229,7 @@ if [ "aarch64" = "${UNAME_M}" ] ; then
   cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
   grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
-  grub-install --target=i386-pc --recheck /dev/$DEVX ;
+  grub-install --target=i386-pc --recheck /dev/${DEVX} ;
   cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
 fi
 
@@ -236,12 +237,12 @@ fi
 sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rd.auto=1 text xdriver=vesa nomodeset rootdelay=5"|' /etc/default/grub
 #sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+if [ "zfs" = "${VOL_MGR}" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|nomodeset rootdelay|nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay|' /etc/default/grub ;
   echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub ;
-elif [ "btrfs" = "$VOL_MGR" ] ; then
+elif [ "btrfs" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
@@ -251,11 +252,11 @@ fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
 fi
 efibootmgr -v ; sleep 3
 
@@ -266,21 +267,22 @@ exit
 EOFchroot
 
   . /mnt/etc/os-release
-  snapshot_name=${ID}_install-$(date "+%Y%m%d")
+  snapshot_name=${ID}_install-$(date -u "+%Y%m%d")
 
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs snapshot ${ZPOOLNM}/ROOT/default@${snapshot_name} ;
     # example remove: zfs destroy ospool0/ROOT/default@snap1
     zfs list -t snapshot ; sleep 5 ;
 
     zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
   else
-    if [ "btrfs" = "$VOL_MGR" ] ; then
+    if [ "btrfs" = "${VOL_MGR}" ] ; then
       btrfs subvolume snapshot /mnt /mnt/.snapshots/${snapshot_name} ;
       # example remove: btrfs subvolume delete /.snapshots/snap1
       btrfs subvolume list /mnt ;
-    elif [ "lvm" = "$VOL_MGR" ] ; then
+    elif [ "lvm" = "${VOL_MGR}" ] ; then
       lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+      # example remove: lvremove vg0/snap1
       lvs ;
     fi ;
     sleep 5 ; fstrim -av ;
@@ -290,11 +292,11 @@ EOFchroot
 
 unmount_reboot() {
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     sync ; swapoff -va ; umount -vR /mnt ;
-    if [ "zfs" = "$VOL_MGR" ] ; then
+    if [ "zfs" = "${VOL_MGR}" ] ; then
       #zfs umount -a ; zpool export -a ;
-      zfs umount -a ; zpool export $ZPOOLNM ;
+      zfs umount -a ; zpool export ${ZPOOLNM} ;
     fi ;
     reboot ; #poweroff ;
   fi
@@ -306,10 +308,10 @@ run_install() {
   export PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_CRYPTED
+  system_config ${INIT_HOSTNAME} ${PASSWD_CRYPTED}
   kernel_bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

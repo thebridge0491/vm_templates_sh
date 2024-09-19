@@ -109,7 +109,7 @@ cd /dev ; MAKEDEV generic
 echo "Add software package selection(s)" ; sleep 3
 apt-get --yes update --allow-releaseinfo-change
 for pkgX in sudo whois curl tasksel bsdextrautils ; do
-  apt-get --yes install --no-install-recommends \$pkgX ;
+  apt-get --yes install --no-install-recommends \${pkgX} ;
 done
 # xfce4
 tasksel install standard
@@ -239,8 +239,9 @@ apt-get --yes install --no-install-recommends linux-image-${MACHINE} linux-heade
 if [ "amd64" = "${MACHINE}" ] ; then
   apt-get --yes install --no-install-recommends grub-pc-bin ;
 fi
+modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+if [ "zfs" = "${VOL_MGR}" ] ; then
   apt-get --yes install --no-install-recommends dkms ;
   # spl-dkms dpkg-dev
   DEBIAN_FRONTEND=noninteractive apt-get --yes install \
@@ -257,10 +258,10 @@ if [ "zfs" = "$VOL_MGR" ] ; then
     zfs-dkms zfsutils-linux zfs-initramfs ;
   #dpkg -l | grep "^hi" ;
   apt-mark showhold ; sleep 3 ;
-elif [ "btrfs" = "$VOL_MGR" ] ; then
+elif [ "btrfs" = "${VOL_MGR}" ] ; then
   apt-get --yes install --no-install-recommends btrfs-progs ;
   modprobe btrfs ; sleep 5 ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   apt-get --yes install --no-install-recommends lvm2 ;
   # cryptsetup
   modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
@@ -291,7 +292,7 @@ if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
   #cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
   grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
-  grub-install --target=i386-pc --recheck /dev/$DEVX ;
+  grub-install --target=i386-pc --recheck /dev/${DEVX} ;
   cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
   cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak ;
   cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI ;
@@ -305,12 +306,12 @@ fi
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5"|'  \
   /etc/default/grub
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+if [ "zfs" = "${VOL_MGR}" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|nomodeset rootdelay|nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay|' /etc/default/grub ;
   echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub ;
-elif [ "btrfs" = "$VOL_MGR" ] ; then
+elif [ "btrfs" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
@@ -320,11 +321,11 @@ fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
 fi
 efibootmgr -v ; sleep 3
 
@@ -335,22 +336,24 @@ exit
 EOFchroot
 
   . /mnt/etc/os-release
-  #snapshot_name=${ID}_install-$(date "+%Y%m%d")
-  snapshot_name=${VERSION_CODENAME}_install-$(date "+%Y%m%d")
+  #snapshot_name=${ID}_${VERSION}-$(date -u "+%Y%m%d")
+  snapshot_name=${ID}-${VERSION_ID}_${VERSION_CODENAME}-$(date -u "+%Y%m%d")
 
-  if [ "zfs" = "$VOL_MGR" ] ; then
+
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs snapshot ${ZPOOLNM}/ROOT/default@${snapshot_name} ;
     # example remove: zfs destroy ospool0/ROOT/default@snap1
     zfs list -t snapshot ; sleep 5 ;
 
     zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
   else
-    if [ "btrfs" = "$VOL_MGR" ] ; then
+    if [ "btrfs" = "${VOL_MGR}" ] ; then
       btrfs subvolume snapshot /mnt /mnt/.snapshots/${snapshot_name} ;
       # example remove: btrfs subvolume delete /.snapshots/snap1
       btrfs subvolume list /mnt ;
-    elif [ "lvm" = "$VOL_MGR" ] ; then
+    elif [ "lvm" = "${VOL_MGR}" ] ; then
       lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+      # example remove: lvremove vg0/snap1
       lvs ;
     fi ;
     sleep 5 ; fstrim -av ;
@@ -360,11 +363,11 @@ EOFchroot
 
 unmount_reboot() {
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     sync ; swapoff -va ; umount -vR /mnt ;
-    if [ "zfs" = "$VOL_MGR" ] ; then
+    if [ "zfs" = "${VOL_MGR}" ] ; then
       #zfs umount -a ; zpool export -a ;
-      zfs umount -a ; zpool export $ZPOOLNM ;
+      zfs umount -a ; zpool export ${ZPOOLNM} ;
     fi ;
     reboot ; #poweroff ;
   fi
@@ -376,10 +379,10 @@ run_install() {
   PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_CRYPTED
+  system_config ${INIT_HOSTNAME} ${PASSWD_CRYPTED}
   kernel_bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

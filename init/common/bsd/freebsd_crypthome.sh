@@ -18,7 +18,7 @@ exists_zpool_cache() {
 
 backupunmount_home() {
   MNT=${1:-/}
-  exists_zpool_cache $MNT
+  exists_zpool_cache ${MNT}
   mkdir -p ${MNT}root/backups/usr_home ; cp -aR ${MNT}usr/home/* ${MNT}root/backups/usr_home/
   rm -rf ${MNT}usr/home/* ; umount -v ${MNT}usr/home
   swapoff /dev/gpt/fsSwap ; sync
@@ -41,12 +41,12 @@ crypt_open() {
 
 editcrypt_fstab() {
   MNT=${1:-/}
-  exists_zpool_cache $MNT
-  
+  exists_zpool_cache ${MNT}
+
   sysrc -f ${MNT}boot/loader.conf crypto_load="YES"
   sysrc -f ${MNT}boot/loader.conf aesni_load="YES"
   sysrc -f ${MNT}boot/loader.conf geom_eli_load="YES"
-  
+
   cr_swapopts=',ealgo=AES-CBC,keylen=128,sectorsize=4096'
   sed -i '' '/swap/ s|^\(.*\)$|#\1|' ${MNT}etc/fstab
   echo "/dev/gpt/fsSwap.eli  none        swap    sw${cr_swapopts} 0   0" \
@@ -56,7 +56,7 @@ editcrypt_fstab() {
 
 addkey_hdrbkup() {
   MNT=${1:-/}
-  exists_zpool_cache $MNT
+  exists_zpool_cache ${MNT}
   mkdir -p ${MNT}boot/obscure ${MNT}root/backups
   dd count=1 bs=4096 if=/dev/random of=${MNT}boot/obscure/puzzle_gpt_fsHome.dat
   geli dump gpt/fsHome ; sleep 5
@@ -68,7 +68,7 @@ addkey_hdrbkup() {
 
 mountrestore_home() {
   MNT=${1:-/}
-  exists_zpool_cache $MNT
+  exists_zpool_cache ${MNT}
   swapon /dev/gpt/fsSwap.eli
   mount -v /dev/gpt/fsHome.eli ${MNT}usr/home ; sync
   cp -aR ${MNT}root/backups/usr_home/* ${MNT}usr/home/ ; rm -rf ${MNT}root/backups/usr_home
@@ -76,7 +76,7 @@ mountrestore_home() {
 }
 
 #----------------------------------------
-$@
+${@}
 
 # encrypted(E) swap/home steps:
 #   during disk partitioning: [g]part_disk, mkfs_volumes, mount_volumes, (E) crypt_open, (E) editcrypt_fstab, (E) addkey_hdrbkup

@@ -21,11 +21,11 @@ mkdir -p ~/Downloads ; cd ~/Downloads
 # use pkgin to install dependencies binary pkgs, if available
 #(cd /usr/pkgsrc/misc/rpm ; make print-build-depends-list | sed -n 's|.*"\(.*\)".*|\1|p' | xargs pkgin -y install)
 pkgs_var=`cd /usr/pkgsrc/misc/rpm ; make print-build-depends-list | sed -n 's|.*"\(.*\)".*|\1|p'`
-for pkgX in $pkgs_var ; do
-	sudo pkgin -yd install $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	sudo pkgin -yd install ${pkgX} ;
 done
-for pkgX in $pkgs_var ; do
-	sudo pkgin -y install $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	sudo pkgin -y install ${pkgX} ;
 done
 
 (cd /usr/pkgsrc/misc/rpm ; sudo make install clean)     # install manually

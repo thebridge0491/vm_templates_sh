@@ -17,11 +17,11 @@ case "$?" in
 esac
 
 if [ "x${swapuuid}" != "x" ] ; then
-    swappart="$(readlink -f $swapdev)" ;
-    swapoff "$swappart" ;
-    dd bs=4M if=/dev/zero of="$swappart" || echo "dd exit code $? is suppressed" ;
-    mkswap -L "$swaplabel" -U "$swapuuid" "$swappart" ; 
-    partprobe --summary ; sync ; swapon -a ;
+    swappart="$(readlink -f ${swapdev})" ;
+    swapoff "${swappart}" ;
+    dd bs=4M if=/dev/zero of="${swappart}" || echo "dd exit code $? is suppressed" ;
+    mkswap -L "${swaplabel}" -U "${swapuuid}" "${swappart}" ;
+    partprobe --summary || partprobe ; sync ; swapon -a ;
 fi
 set -e
 

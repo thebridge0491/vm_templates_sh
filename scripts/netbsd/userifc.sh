@@ -20,14 +20,14 @@ done
 
 pkgin update
 . /root/init/netbsd/distro_pkgs.ini
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-pkgin -yd install $pkgs_var
-for pkgX in $pkgs_var ; do
-	pkgin -y install $pkgX ;
+pkgin -yd install ${pkgs_var}
+for pkgX in ${pkgs_var} ; do
+	pkgin -y install ${pkgX} ;
 done
 sleep 3
 
@@ -35,7 +35,7 @@ groupadd -g 81 dbus ; mkdir -p /var/db/dbus /var/lib/xdm /usr/pkg/etc/xdm
 useradd -c 'System message bus' -u 81 -g dbus -d '/' -s /usr/bin/false dbus
 
 for svc in dbus xdm ; do
-  cp /usr/pkg/share/examples/rc.d/$svc /etc/rc.d/ ;
+  cp /usr/pkg/share/examples/rc.d/${svc} /etc/rc.d/ ;
 done
 mkdir -p /var/run/dbus /var/run/xdm /var/lib/xdm
 
@@ -55,7 +55,7 @@ export XDG_CONFIG_DIRS=/usr/pkg/etc/xdg
 
 EOF
 
-case $CHOICE_DESKTOP in
+case ${CHOICE_DESKTOP} in
 	lxqt) cat >> /root/.xinitrc << EOF ;
 ck-launch-session dbus-launch --exit-with-session startlxqt
 

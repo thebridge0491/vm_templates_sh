@@ -8,13 +8,13 @@ export CHOICE_DESKTOP=${1:-xfce}
 svc_enable() {
   svc=${1}
   if command -v systemctl > /dev/null ; then
-    systemctl enable $svc ;
+    systemctl enable ${svc} ;
   elif command -v sv > /dev/null ; then
-    ln -s /etc/sv/$svc /var/service ;
+    ln -s /etc/sv/${svc} /var/service ;
   elif command -v rc-update > /dev/null ; then
-    rc-update add $svc default ;
+    rc-update add ${svc} default ;
   elif command -v update-rc.d > /dev/null ; then
-  	update-rc.d $svc defaults ;
+  	update-rc.d ${svc} defaults ;
   fi
 }
 
@@ -22,20 +22,20 @@ apt-get -y update --allow-releaseinfo-change ; apt-get -y upgrade
 . /root/init/debian/distro_pkgs.ini
 apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
   tee /etc/apt/apt.conf.d/999norecommends
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-for pkgX in $pkgs_var ; do
-	apt-get -y --no-install-recommends install --download-only $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	apt-get -y --no-install-recommends install --download-only ${pkgX} ;
 done
-for pkgX in $pkgs_var ; do
-	apt-get -y --no-install-recommends install $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	apt-get -y --no-install-recommends install ${pkgX} ;
 done
 sleep 3
 
-case $CHOICE_DESKTOP in
+case ${CHOICE_DESKTOP} in
 	lxqt) svc_enable sddm ;;
 	*) #mv /etc/lightdm /etc/lightdm.old ;
 	  svc_enable lightdm ;;

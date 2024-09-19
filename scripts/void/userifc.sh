@@ -5,22 +5,22 @@ set +e
 
 export CHOICE_DESKTOP=${1:-xfce}
 
-xbps-install -S ; xbps-install -y -u
+xbps-install -S ; xbps-install -uy xbps ; xbps-install -uy
 . /root/init/void/distro_pkgs.ini
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-for pkgX in $pkgs_var ; do
-	xbps-install -y -D $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	xbps-install -y -D ${pkgX} ;
 done
-for pkgX in $pkgs_var ; do
-	xbps-install -y $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	xbps-install -y ${pkgX} ;
 done
 sleep 3
 
-case $CHOICE_DESKTOP in
+case ${CHOICE_DESKTOP} in
 	lxqt) ln -s /etc/sv/sddm /etc/runit/runsvdir/default/ ;;
 	*) #mv /etc/lightdm /etc/lightdm.old ;
 	  ln -s /etc/sv/lightdm /etc/runit/runsvdir/default/ ;;

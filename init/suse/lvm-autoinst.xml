@@ -184,6 +184,20 @@
           <!--<stripesize t="integer">0</stripesize>-->
           <filesystem t="symbol">ext4</filesystem>
           <format t="boolean">false</format>
+          <lv_name>osSnap</lv_name>
+          <label>vg0-osSnap</label>
+          <!--<mount>/snap</mount>-->
+          <!--<mountby t="symbol">label</mountby>-->
+          <size>2100M</size>
+        </partition>
+        <partition t="map">
+          <!--<create t="boolean">true</create>-->
+          <!--<resize t="boolean">false</resize>-->
+          <!--<pool t="boolean">false</pool>-->
+          <!--<stripes t="integer">1</stripes>-->
+          <!--<stripesize t="integer">0</stripesize>-->
+          <filesystem t="symbol">ext4</filesystem>
+          <format t="boolean">false</format>
           <lv_name>osHome</lv_name>
           <label>vg0-osHome</label>
           <mount>/home</mount>

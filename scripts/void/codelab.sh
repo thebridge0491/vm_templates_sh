@@ -48,7 +48,7 @@ fi
 
 echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
 for pkgX in xauth xterm ; do
-  xbps-install -y $pkgX ;
+  xbps-install -y ${pkgX} ;
 done
 
 set -e ; set -u

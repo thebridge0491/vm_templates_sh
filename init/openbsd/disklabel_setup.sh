@@ -21,23 +21,23 @@ elif [ -n "`fdisk wd0`" ] ; then
 fi
 
 parttbl_bkup() {
-  echo "to backup partition table: disklabel -E $DEVX" ; sleep 3
+  echo "to backup partition table: disklabel -E ${DEVX}" ; sleep 3
   echo "            > s ${DEVX}.disklabel.bak" ; sleep 3
-  echo "to restore: disklabel -R $DEVX ${DEVX}.disklabel.bak"
-  disklabel -E $DEVX
+  echo "to restore: disklabel -R ${DEVX} ${DEVX}.disklabel.bak"
+  disklabel -E ${DEVX}
 }
 
 disklabel_disk() {
   echo "Partitioning disk" ; sleep 3
-  (cd /dev ; sh MAKEDEV $DEVX)
-  fdisk -iy -g -b 960 $DEVX ; sync
+  (cd /dev ; sh MAKEDEV ${DEVX})
+  fdisk -iy -g -b 960 ${DEVX} ; sync
   echo 'make OpenBSD partition bootable: > print ; flag X ; write ; quit'
-  sleep 5 ; fdisk -e $DEVX
-  disklabel -w -A -T /tmp/custom.disklabel $DEVX
+  sleep 5 ; fdisk -e ${DEVX}
+  disklabel -w -A -T /tmp/custom.disklabel ${DEVX}
 
   sync ; newfs_msdos -L ESP ${DEVX}i
 
-  fdisk $DEVX ; sleep 5 ; disklabel -h -p g -v $DEVX ; sleep 5
+  fdisk ${DEVX} ; sleep 5 ; disklabel -h -p g -v ${DEVX} ; sleep 5
 }
 
 format_partitions() {
@@ -45,10 +45,10 @@ format_partitions() {
 
   echo "Formatting file systems" ; sleep 3
   for partnm in ${BSD_PARTNMS} ; do
-    if [ ! "b" = "$partnm" ] ; then
-      ${MKFS_CMD} ${DEVX}$partnm ;
+    if [ ! "b" = "${partnm}" ] ; then
+      ${MKFS_CMD} ${DEVX}${partnm} ;
     fi ;
-    if [ "a" = "$partnm" ] ; then
+    if [ "a" = "${partnm}" ] ; then
       installboot -v ${DEVX}a ; installboot -v /dev/r${DEVX}a ;
     fi ;
   done
@@ -89,4 +89,4 @@ EOF
 }
 
 #----------------------------------------
-$@
+${@}

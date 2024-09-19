@@ -7,11 +7,11 @@ set +e
 #set -e
 
 . /root/init/void/distro_pkgs.ini
-for pkgX in $pkgs_cmdln_tools ; do
-	xbps-install -y -D $pkgX ;
+for pkgX in ${pkgs_cmdln_tools} ; do
+	xbps-install -y -D ${pkgX} ;
 done
-for pkgX in $pkgs_cmdln_tools ; do
-	xbps-install -y $pkgX ;
+for pkgX in ${pkgs_cmdln_tools} ; do
+	xbps-install -y ${pkgX} ;
 done
 
 if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
@@ -26,7 +26,7 @@ fi
 if [ "$(hostname | grep -e 'box.0000')" ] ; then
 	last4=$(cat /var/lib/dbus/machine-id | cut -b29-32) ; # cat /etc/machine-id
 	for fileX in /etc/hosts /etc/hostname ; do
-	  sed -i "/box.0000/ s|\(box.\)0000|\1${last4}|g" $fileX ;
+	  sed -i "/box.0000/ s|\(box.\)0000|\1${last4}|g" ${fileX} ;
 	done ;
 	hostname `cat /etc/hostname` ;
 fi
@@ -49,8 +49,8 @@ sh /root/init/common/linux/firewall/nftables/config_nftables.sh config_nftables 
 #ipset flush ; iptables -F ; ip6tables -F
 #ipset destroy ; iptables -X ; ip6tables -X
 for unit in ipset iptables ip6tables ; do
-	sv down $unit ;
-	rm /var/service/$unit ;
+	sv down ${unit} ;
+	rm /var/service/${unit} ;
 done
 
 #mkdir -p /var/lib/clamav ; touch /var/lib/clamav/clamd.sock
@@ -59,7 +59,7 @@ done
 
 
 for svc in dbus avahi-daemon ; do
-    ln -s /etc/sv/$svc /var/service/ ;
+    ln -s /etc/sv/${svc} /var/service/ ;
 done
 
 #sed -i '/hosts:/ s|files dns|files mdns_minimal \[NOTFOUND=return\] dns mdns|' /etc/nsswitch.conf
@@ -96,15 +96,15 @@ sh /root/init/common/misc_config.sh cfg_shell_keychain /etc/skel/.bashrc
 
 
 ln -s /etc/sv/rpcbind /var/service/
-sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
 
 
 for svc in cupsd ; do
-    ln -s /etc/sv/$svc /var/service/ ;
+    ln -s /etc/sv/${svc} /var/service/ ;
 done
 #sh /root/init/common/misc_config.sh cfg_printer_pdf /etc/cups \
 #    /usr/share/cups/model
-##sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
+##sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
 lpstat -t ; sleep 5
 set -e ; set -u
 

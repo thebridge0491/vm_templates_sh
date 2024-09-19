@@ -18,9 +18,9 @@ Artix buildiso
 
 # (initial) sudo modprobe loop ; sudo pacman -Sy artools iso-profiles
 # (initial) buildiso -p base -q
-# (initial) cp /etc/artools/artools-*.conf $HOME/.config/artools/
-#           echo INITSYS=\"runit\" >> $HOME/.config/artools/artools-iso.conf
-# (initial) cp -a /usr/share/artools/iso-profiles $HOME/artools-workspace/
+# (initial) cp /etc/artools/artools-*.conf ${HOME}/.config/artools/
+#           echo INITSYS=\"runit\" >> ${HOME}/.config/artools/artools-iso.conf
+# (initial) cp -a /usr/share/artools/iso-profiles ${HOME}/artools-workspace/
 #           // modify copied iso-profiles folder to customise iso
 # (initial) buildiso -p base -q // test the output
 
@@ -42,7 +42,7 @@ Artix buildiso
 # buildiso -p base -sc
 # buildiso -p base -bc
 # buildiso -p base -zc
-# // $HOME/artools-workspace/iso/base/artix-base-runit-YYYYMMDD-x86_64.iso
+# // ${HOME}/artools-workspace/iso/base/artix-base-runit-YYYYMMDD-x86_64.iso
 
 
 Alpine (aports) mkimage
@@ -64,7 +64,7 @@ Alpine (aports) mkimage
 #        kernel_cmdline="unionfs_size=512M console=tty0 console=ttyS0,115200"
 #        syslinux_serial="0 115200"
 #        kernel_addons="zfs"
-#        apks="$apks
+#        apks="${apks}
 #            iscsi-scst zfs-scripts zfs zfs-utils-py
 #            cciss_vol_status lvm2 mdadm mkinitfs mtools nfs-utils
 #            parted rsync sfdisk util-linux xfsprogs dosfstools ntfs-3g
@@ -72,13 +72,13 @@ Alpine (aports) mkimage
 #            # if x86_64, add syslinux
 #
 #        local _k _a
-#        for _k in $kernel_flavors; do
-#            apks="$apks linux-$_k"
-#            for _a in $kernel_addons; do
-#                apks="$apks $_a-$_k"
+#        for _k in ${kernel_flavors}; do
+#            apks="${apks} linux-${_k}"
+#            for _a in ${kernel_addons}; do
+#                apks="${apks} ${_a}-${_k}"
 #            done
 #        done
-#        apks="$apks linux-firmware linux-firmware-none"
+#        apks="${apks} linux-firmware linux-firmware-none"
 #    }
 #
 #   chmod +x aports/scripts/mkimg.rescue.sh

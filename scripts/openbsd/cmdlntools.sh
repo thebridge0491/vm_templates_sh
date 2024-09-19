@@ -11,7 +11,7 @@ set +e
 #tar -C / -xpzf xbase59.tgz ; sysmerge
 
 arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
-setVer=$(echo $rel | tr '.' '\0')
+setVer=$(echo ${rel} | tr '.' '\0')
 cd /tmp
 for setX in xbase ; do
   ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/${setX}${setVer}.tgz ;
@@ -22,7 +22,7 @@ sysmerge
 
 pkg_add -u #; pkg_add -ziU mupdf
 . /root/init/openbsd/distro_pkgs.ini
-pkg_add -ziU -n $pkgs_cmdln_tools ; pkg_add -ziU $pkgs_cmdln_tools
+pkg_add -ziU -n ${pkgs_cmdln_tools} ; pkg_add -ziU ${pkgs_cmdln_tools}
 
 if [ -z "$(grep '^export JAVA_HOME' /etc/ksh.kshrc)" ] ; then
   echo "export JAVA_HOME=${default_java_home}" >> /etc/ksh.kshrc ;
@@ -71,9 +71,9 @@ sed -i '/hosts:/ s|files|files mdns_minimal \[NOTFOUND=return\]|' /etc/nsswitch.
 
 #usermod -G cups root
 
-#sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
+#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
 sh /root/init/common/misc_config.sh cfg_printer_pdf \
-    /usr/local/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
+  /usr/local/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
 #echo 'pass in proto udp from any to any port { mdns } keep state' >> /etc/pf/outallow_in_allow.rules
 sed -i 's|domain|domain, mdns|g' /etc/pf/outallow_in_allow.rules
 set -e ; set -u
@@ -94,7 +94,7 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 sh /root/init/common/misc_config.sh cfg_sshd
 sh /root/init/common/misc_config.sh cfg_shell_keychain /etc/skel/.cshrc
-sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
 
 (cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
 cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
@@ -105,8 +105,8 @@ cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
 
 sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
 sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
-if [ -e $sshca_pubkey ] ; then
-	echo "@cert-authority 192.168.* $(cat $sshca_pubkey)" >> \
+if [ -e ${sshca_pubkey} ] ; then
+	echo "@cert-authority 192.168.* $(cat ${sshca_pubkey})" >> \
 		/etc/skel/.ssh/known_hosts ;
-	cp $sshca_krl $sshca_pubkey /etc/ssh/ ;
+	cp ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
 fi

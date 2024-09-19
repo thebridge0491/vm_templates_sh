@@ -166,7 +166,7 @@ sed -i '' "s|^[^#].*requiretty|# Defaults requiretty|" /usr/local/etc/sudoers
 echo "Config pkg repo nearby mirror(s)" ; sleep 3
 mkdir -p /usr/local/etc/pkg/repos
 sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
-FreeBSD: { 
+FreeBSD: {
   #url: "pkg+http://pkg.freebsd.org/\$\{ABI}/quarterly",
   url: "pkg+http://pkg.freebsd.org/\$(pkg config abi)/quarterly",
   mirror_type: "srv",
@@ -196,7 +196,7 @@ EOFchroot
 }
 
 bootloader() {
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     mkdir -p /mnt/boot /mnt/etc ;
     touch /mnt/boot/loader.conf ;
     touch /mnt/etc/sysctl.conf ; touch /mnt/etc/rc.conf ;
@@ -220,25 +220,28 @@ EOF
   fi
   efibootmgr -v ; sleep 3
   #read -p "Activate EFI BootOrder XXXX (or blank line to skip): " bootorder
-  #if [ ! -z "$bootorder" ] ; then
-  #  efibootmgr -a -b $bootorder ;
+  #if [ ! -z "${bootorder}" ] ; then
+  #  efibootmgr -a -b ${bootorder} ;
   #fi
   for bootorder in $(efibootmgr | sed -n 's|.*Boot\([0-9][0-9]*\).*|\1|p') ; do
-    efibootmgr -a -b $bootorder ;
+    efibootmgr -a -b ${bootorder} ;
   done
 
   cat << EOFchroot | chroot /mnt /bin/sh
 set -x
 
 mkpasswd -m help ; sleep 10
+/etc/rc.d/os-release start   # populate /etc/os-release
 
 exit
 
 EOFchroot
 
-  snapshot_name=freebsd_install-$(date "+%Y%m%d")
+  #snapshot_name=$(uname -s)_$(uname -r)-$(date -u "+%Y%m%d")
+  . /mnt/etc/os-release
+  snapshot_name=$(uname -s)_${VERSION}-$(date -u "+%Y%m%d")
 
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs snapshot ${ZPOOLNM}/ROOT/default@${snapshot_name} ;
     # example remove: zfs destroy fspool0/ROOT/default@snap1
     zfs list -t snapshot ; sleep 5 ;
@@ -259,11 +262,11 @@ EOFchroot
 
 unmount_reboot() {
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     umount /mnt/boot/efi ; rm -r /mnt/boot/efi ;
     sync ; swapoff -a ; umount -a ;
-    if [ "zfs" = "$VOL_MGR" ] ; then
-      zfs umount -a ; zpool export $ZPOOLNM ;
+    if [ "zfs" = "${VOL_MGR}" ] ; then
+      zfs umount -a ; zpool export ${ZPOOLNM} ;
     fi ;
     reboot ; #poweroff ;
   fi
@@ -275,10 +278,10 @@ run_install() {
   PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_CRYPTED
+  system_config ${INIT_HOSTNAME} ${PASSWD_CRYPTED}
   bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

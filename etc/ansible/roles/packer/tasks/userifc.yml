@@ -2,7 +2,7 @@
 
 - block:
   - name: "User interface packages (variant: {{variant}})"
-    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo $pkgs_displaysvr_xorg
+    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo ${pkgs_displaysvr_xorg}
     #ignore_errors: true
     debug: msg={{(distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}
 

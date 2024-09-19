@@ -11,7 +11,7 @@ export CHOICE_DESKTOP=${1:-xfce}
 #tar -C / -xpzf xbase59.tgz ; sysmerge
 
 arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
-setVer=$(echo $rel | tr '.' '\0')
+setVer=$(echo ${rel} | tr '.' '\0')
 cd /tmp
 for setX in xbase xserv xfont xshare ; do
   ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/${setX}${setVer}.tgz ;
@@ -22,14 +22,14 @@ sysmerge
 
 pkg_add -u
 . /root/init/openbsd/distro_pkgs.ini
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-pkg_add -ziU -n $pkgs_var
-for pkgX in $pkgs_var ; do
-	pkg_add -ziU $pkgX ;
+pkg_add -ziU -n ${pkgs_var}
+for pkgX in ${pkgs_var} ; do
+	pkg_add -ziU ${pkgX} ;
 done
 sleep 3
 

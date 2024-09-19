@@ -18,7 +18,7 @@ email_protection_key=true
 #path_len=1
 #cert_signing_key=true
 #crl_signing_key=true
-#crl_dist_points=file:///var/tmp/pki/publish_crls/demoCA/crl.crl
-#ca_issuers_uri=file:///var/tmp/pki/publish_crls/demoCA/chain.crt
+#crl_dist_points=file:///var/tmp/pki/publish_crls/crl.crl
+#ca_issuers_uri=file:///var/tmp/pki/publish_crls/chain.crt
 #========================================
 # CSR template file for GnuTLS certtool

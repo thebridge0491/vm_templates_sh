@@ -1,0 +1,44 @@
+# X509 Certificate extfile configuration for OpenSSL
+
+# pathlen: 0 -> self-sign or subord CA ; 1 -> CA ; > 1 -> CA w/ subord CAs
+PATHLEN=0
+# digitalSignature | keyEncipherment | keyAgreement | keyCertSign | cRLSign
+KEYUSAGE=critical,digitalSignature
+# emailProtection | codeSigning | serverAuth | clientAuth
+EXTKEYUSAGE=emailProtection
+SAN=email:im.computer@gmail.com
+
+[ crl_info ]
+#URI.0=file:///var/tmp/pki/publish_crls/crl.crl
+
+[ issuer_info ]
+#caIssuers;URI.0=file:///var/tmp/pki/publish_crls/chain.crt
+
+[ crl_ext ]
+authorityKeyIdentifier=keyid:always,issuer
+#issuerAltName=issuer:copy
+
+[ v3_ca ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer
+basicConstraints=critical,CA:true,pathlen:${ENV::PATHLEN}
+keyUsage=critical,keyCertSign,cRLSign
+## Note: (in /etc/ssl/openssl.cnf: copy_extensions=copy)
+##subjectAltName=email:move
+issuerAltName=issuer:copy
+#crlDistributionPoints=@crl_info
+crlDistributionPoints=URI:file:///var/tmp/pki/publish_crls/crl.crl
+#authorityInfoAccess=@issuer_info
+authorityInfoAccess="caIssuers;URI:file:///var/tmp/pki/publish_crls/chain.crt"
+
+[ usr_cert ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer
+basicConstraints=critical,CA:false
+keyUsage=${ENV::KEYUSAGE}
+extendedKeyUsage=${ENV::EXTKEYUSAGE}
+## Note: (in /etc/ssl/openssl.cnf: copy_extensions=copy)
+##subjectAltName=email:move
+## Note: use environment variable & uncomment for openssl x509 -req
+#subjectAltName=${ENV::SAN}
+issuerAltName=issuer:copy

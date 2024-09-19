@@ -27,11 +27,11 @@ sudo pkg_add portslist
 # use pkg_add to install dependencies binary pkgs, if available
 #(cd /usr/ports/misc/rpm ; make print-build-depends | sed -n 's|.*"\(.*\)".*|\1|p' | xargs pkg_add -ziU)
 pkgs_var=`cd /usr/ports/misc/rpm ; make print-build-depends | sed -n 's|.*"\(.*\)".*|\1|p'`
-for pkgX in $pkgs_var ; do
-	sudo pkg_add -ziU -n $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	sudo pkg_add -ziU -n ${pkgX} ;
 done
-for pkgX in $pkgs_var ; do
-	sudo pkg_add -ziU $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	sudo pkg_add -ziU ${pkgX} ;
 done
 
 (cd /usr/ports/misc/rpm ; sudo make install clean)     # install manually

@@ -82,12 +82,12 @@
 # #!/bin/sh                        #!/bin/sh
 # set -x                           set -x
 # switch=${switch:-br0}            switch=${switch:-br0}
-# if [ -n "$1" ] ; then            if [ -n "$1" ] ; then
-#   ip tuntap add dev $1 \           ip link set $1 nomaster
-#      mode tap group kvm            ip link set dev $1 down
-#   ip link set dev $1 up            ip tuntap del dev $1 mode tap
+# if [ -n "${1}" ] ; then            if [ -n "${1}" ] ; then
+#   ip tuntap add dev ${1} \           ip link set ${1} nomaster
+#      mode tap group kvm            ip link set dev ${1} down
+#   ip link set dev ${1} up            ip tuntap del dev ${1} mode tap
 #   sleep 3s                         exit 0
-#   ip link set $1 master $switch  else
+#   ip link set ${1} master ${switch}  else
 #   exit 0                           echo "Error: no interface \
 # else                                 (tapN) specified"
 #   echo "Error: no interface \      exit 1
@@ -101,11 +101,11 @@
 # #!/bin/sh                        #!/bin/sh
 # set -x                           set -x
 # switch=${switch:-br0}            switch=${switch:-br0}
-# if [ -n "$1" ] ; then            if [ -n "$1" ] ; then
-#   ifconfig $1 create               ifconfig $switch deletem $1
-#   ifconfig $1 up                   ifconfig $1 down
-#   sleep 3s                         ifconfig $1 destroy
-#   ifconfig $switch addm $1 up      exit 0
+# if [ -n "${1}" ] ; then            if [ -n "${1}" ] ; then
+#   ifconfig ${1} create               ifconfig ${switch} deletem ${1}
+#   ifconfig ${1} up                   ifconfig ${1} down
+#   sleep 3s                         ifconfig ${1} destroy
+#   ifconfig ${switch} addm ${1} up      exit 0
 #   exit 0                         else
 # else                               echo "Error: no interface \
 #   echo "Error: no interface \        (tapN) specified"
@@ -128,44 +128,44 @@
 # NOTE, Linux|BSD modify firewall rules|services for qemu network - nat br1
 # ### define nat_ifc = br1 ; define natip_cidr = 192.168.1.160/27 ###
 # (Linux - firewalld|iptables|nftables)
-# #?firewall-offline-cmd [--zone=external] --add-source=$natip_cidr \
+# #?firewall-offline-cmd [--zone=external] --add-source=${natip_cidr} \
 # #?  --add-masquerade
-# #iptables -t nat -I POSTROUTING -o $ext_ifc -j MASQUERADE
-# #nft insert rule ip nat postrouting oifname $ext_ifc counter masquerade
-# #iptables -t nat -I POSTROUTING -s $natip_cidr ! -d $natip_cidr -j MASQUERADE
-# nft insert rule ip nat postrouting ip saddr $natip_cidr ip daddr != \
-#   $natip_cidr counter masquerade
+# #iptables -t nat -I POSTROUTING -o ${ext_ifc} -j MASQUERADE
+# #nft insert rule ip nat postrouting oifname ${ext_ifc} counter masquerade
+# #iptables -t nat -I POSTROUTING -s ${natip_cidr} ! -d ${natip_cidr} -j MASQUERADE
+# nft insert rule ip nat postrouting ip saddr ${natip_cidr} ip daddr != \
+#   ${natip_cidr} counter masquerade
 #
 # #?firewall-offline-cmd [--zone=external] --add-rich-rule='rule family=ipv4 \
-# #?  source address=$natip_cidr accept'
-# #iptables -I FORWARD -i $nat_ifc -o $ext_ifc -j ACCEPT
-# #nft insert rule inet filter forward iifname $nat_ifc oifname $ext_ifc counter \
+# #?  source address=${natip_cidr} accept'
+# #iptables -I FORWARD -i ${nat_ifc} -o ${ext_ifc} -j ACCEPT
+# #nft insert rule inet filter forward iifname ${nat_ifc} oifname ${ext_ifc} counter \
 # #  accept
-# #iptables -I FORWARD -s $natip_cidr -i $nat_ifc -j ACCEPT
-# nft insert rule inet filter forward ip saddr $natip_cidr iifname $nat_ifc \
+# #iptables -I FORWARD -s ${natip_cidr} -i ${nat_ifc} -j ACCEPT
+# nft insert rule inet filter forward ip saddr ${natip_cidr} iifname ${nat_ifc} \
 #   counter accept
 #
 # #?firewall-offline-cmd [--zone=external] --add-rich-rule='rule family=ipv4 \
-# #?  destination address=$natip_cidr accept'
-# #iptables -I FORWARD -i $ext_ifc -o $nat_ifc -m conntrack --ctstate RELATED, \
+# #?  destination address=${natip_cidr} accept'
+# #iptables -I FORWARD -i ${ext_ifc} -o ${nat_ifc} -m conntrack --ctstate RELATED, \
 # #  ESTABLISHED -j ACCEPT
-# #nft insert rule inet filter forward iifname $ext_ifc oifname $nat_ifc \
+# #nft insert rule inet filter forward iifname ${ext_ifc} oifname ${nat_ifc} \
 # #  ct state related,established counter accept
-# #iptables -I FORWARD -d $natip_cidr -o $nat_ifc -m conntrack --ctstate \
+# #iptables -I FORWARD -d ${natip_cidr} -o ${nat_ifc} -m conntrack --ctstate \
 # #  RELATED,ESTABLISHED -j ACCEPT
-# nft insert rule inet filter forward ip daddr $natip_cidr oifname $nat_ifc \
+# nft insert rule inet filter forward ip daddr ${natip_cidr} oifname ${nat_ifc} \
 #   ct state related,established counter accept
 
 # ### ext_ifc = "alc0" ; nat_ifc = "br1" ###
 # (BSD - pf)
 # ..
 # scrub in all fragment reassemble no-df max-mss 1440
-# nat on \$ext_ifc inet from \$nat_ifc:network to any -> (\$ext_ifc)
+# nat on \${ext_ifc} inet from \${nat_ifc}:network to any -> (\${ext_ifc})
 # block all label 'policy deny incoming, deny outgoing'
 # ..
-# #pass from \$nat_ifc:network to any keep state
-# pass on \$nat_ifc from \$nat_ifc:network to any
-# pass on \$ext_ifc from \$nat_ifc:network to any keep state
+# #pass from \${nat_ifc}:network to any keep state
+# pass on \${nat_ifc} from \${nat_ifc}:network to any
+# pass on \${ext_ifc} from \${nat_ifc}:network to any keep state
 # ..
 
 # (Linux) $ sed -i 's|domain|domain, bootps, bootpc, mdns|g' /etc/nftables.conf

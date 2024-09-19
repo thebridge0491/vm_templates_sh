@@ -57,7 +57,7 @@ fi
 
 echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
 for pkgX in xorg-xauth xorg-xhost xterm ; do
-  pacman --noconfirm --needed -S $pkgX ;
+  pacman --noconfirm --needed -S ${pkgX} ;
 done
 
 set -e

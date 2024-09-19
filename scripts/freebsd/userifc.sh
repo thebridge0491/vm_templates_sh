@@ -11,20 +11,20 @@ fi
 
 pkg update ; pkg fetch -dy --available-updates ; pkg upgrade -y
 . /root/init/freebsd/distro_pkgs.ini
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-for pkgX in $pkgs_var ; do
-	pkg fetch -Udy $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	pkg fetch -Udy ${pkgX} ;
 done
-for pkgX in $pkgs_var ; do
-	pkg install -Uy $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	pkg install -Uy ${pkgX} ;
 done
 sleep 3
 
-case $CHOICE_DESKTOP in
+case ${CHOICE_DESKTOP} in
 	lxqt) sysrc sddm_enable="YES" ;;
 	*) #mv /usr/local/etc/lightdm /usr/local/etc/lightdm.old ;
 	  sysrc lightdm_enable="YES" ;;

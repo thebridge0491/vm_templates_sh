@@ -17,10 +17,15 @@ end_of_line = crlf
 [Makefile]
 indent_style = tab
 
-[*.{py,ini,yaml,yml,rst}]
+[*.{ini,yaml,yml,rst}]
 indent_style = space
 trim_trailing_whitespace = true
 indent_size = 4
+
+[*.{py,sh,hcl}]
+indent_style = space
+trim_trailing_whitespace = true
+indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false

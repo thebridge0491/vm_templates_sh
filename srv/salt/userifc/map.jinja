@@ -6,7 +6,7 @@
 {% set desktop = pillar.get(tpldot, {}).get('desktop', 'xfce') %}
 {% load_yaml as defaultdict %}
   default: # Debian
-    #pkgs_displaysvr_xorg = {{salt['cmd.shell']('. /root/init/'+variant+'/distro_pkgs.ini ; echo $pkgs_displaysvr_xorg', shell='/bin/sh')}}
+    #pkgs_displaysvr_xorg = {{salt['cmd.shell']('. /root/init/'+variant+'/distro_pkgs.ini ; echo ${pkgs_displaysvr_xorg}', shell='/bin/sh')}}
     distro_pkgs: {{salt['ini.get_ini']('/root/init/'+variant+'/distro_pkgs.ini')}}
     desktop: xfce
     xdguserdirs_file: /etc/xdg/user-dirs.defaults

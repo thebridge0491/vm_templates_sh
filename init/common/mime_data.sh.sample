@@ -1,21 +1,21 @@
 #!/bin/sh
 
-usage="usage: 
+usage="usage:
   ${0} mime_attachmt [data.txt]
   ${0} mime_mixed [data.txt[,..,dataN.txt] [/dev/stdin]]
   ${0} mime_extract [data.mime [.]]"
 
-SCRIPTPARENT=${SCRIPTPARENT:-$(dirname $0)}
+SCRIPTPARENT=${SCRIPTPARENT:-$(dirname ${0})}
 
 mime_attachmt() { # input: file ; output: MIME header w/ base64-encoded file
   infile=${1:-data.txt}
-  
-  cat << EOF
-Content-Type: $(file --brief --mime-type $infile); name="$(basename $infile)"
-Content-Transfer-Encoding: base64
-Content-Disposition: attachment; filename="$(basename $infile)"
 
-$(openssl base64 -in $infile)
+  cat << EOF
+Content-Type: $(file --brief --mime-type ${infile}); name="$(basename ${infile})"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="$(basename ${infile})"
+
+$(openssl base64 -in ${infile})
 EOF
 }
 
@@ -38,14 +38,14 @@ Content-Type: text/plain; charset=utf-8
 Content-Transfer-Encoding: 7bit
 Content-Disposition: inline
 
-$(echo "Enter body(file(s): $infile): " > /dev/stderr)
-$(echo '' ; cat $body)
+$(echo "Enter body(file(s): ${infile}): " > /dev/stderr)
+$(echo '' ; cat ${body})
 
 EOF
-  for infile in $(echo $infiles | tr ',' ' ') ; do
+  for infile in $(echo ${infiles} | tr ',' ' ') ; do
     cat << EOF
 --${boundary}
-$(mime_attachmt $infile)
+$(mime_attachmt ${infile})
 
 EOF
   done
@@ -55,14 +55,14 @@ EOF
 
 mime_extract() { # input: file & outdir ; output: extracted file(s) to dir
   mimefile=${1:-data.mime} ; outdir=${2:-.}
-  
-  #realmime=$(realpath $mimefile)
-  #(cd $outdir ; munpack -t $realmime)
-  ripmime -d $outdir -i $mimefile
+
+  #realmime=$(realpath ${mimefile})
+  #(cd ${outdir} ; munpack -t ${realmime})
+  ripmime -d ${outdir} -i ${mimefile}
 }
 
 is_function="0"
-func=$1 ; shift
+func=${1} ; shift
 
 case "${func}" in
   "mime_attachmt") is_function="1" ;;
@@ -72,4 +72,4 @@ esac
 if [ "0" = "${is_function}" ] ; then
   printf "${usage}\n" ; exit ;
 fi
-${func} $@
+${func} ${@}

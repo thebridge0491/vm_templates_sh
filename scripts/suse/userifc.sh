@@ -11,14 +11,14 @@ sed -i 's|.*solver.onlyRequires.*=.*|solver.onlyRequires = true|' \
   /etc/zypp/zypp.conf
 sed -i 's|.*installRecommends.*=.*|installRecommends = no|' \
   /etc/zypp/zypper.conf
-case $CHOICE_DESKTOP in
-	lxqt) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_lxqt" ;;
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-zypper --non-interactive install --download-only --no-recommends $pkgs_var
-for pkgX in $pkgs_var ; do
-	zypper --non-interactive install --no-recommends $pkgX ;
+zypper --non-interactive install --download-only --no-recommends ${pkgs_var}
+for pkgX in ${pkgs_var} ; do
+	zypper --non-interactive install --no-recommends ${pkgX} ;
 done
 sleep 3
 

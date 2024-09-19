@@ -2,7 +2,7 @@
 
 - block:
   - name: "Cmdline-tools packages (variant: {{variant}})"
-    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo $pkgs_cmdln_tools
+    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo ${pkgs_cmdln_tools}
     #ignore_errors: true
     debug: var=distro_pkgs.pkgs_cmdln_tools
 

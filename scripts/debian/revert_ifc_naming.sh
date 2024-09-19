@@ -11,5 +11,5 @@ rm -rf /dev/.udev/ /var/lib/dhcp/*
 # Adding a 2 sec delay to the interface up, to make the dhclient happy
 #echo "pre-up sleep 2" >> /etc/network/interfaces
 if [ ! "$(grep 'pre-up sleep 2' /etc/network/interfaces)" ] ; then
-    echo "pre-up sleep 2" >> /etc/network/interfaces ;
+  echo "pre-up sleep 2" >> /etc/network/interfaces ;
 fi

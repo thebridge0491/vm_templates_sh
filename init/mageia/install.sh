@@ -49,8 +49,9 @@ bootstrap() {
     rm -r /mnt/var/lib/rpm /mnt/var/cache/dnf ;
     mkdir -p /mnt/var/lib/rpm /mnt/var/cache/dnf ;
     rpm -v --root /mnt --initdb ;
+    #repos_ver=$(curl -Ls http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release | sed -n 's|.*mageia-repos-\(.*\).rpm.*|\1|p') ;
     # [wget -O file url | curl -Lo file url]
-    #wget -O /tmp/repos.rpm http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/mageia-repos-8-1.mga8.${UNAME_M}.rpm ;
+    #wget -O /tmp/repos.rpm http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/mageia-repos-${repos_ver:9-2.mga9.${UNAME_M}}.rpm ;
     #rpm -v -qip /tmp/repos.rpm ; sleep 5 ;
     #rpm -v --root /mnt --nodeps -i /tmp/repos.rpm ;
     yum-config-manager --releasever=${RELEASE} --nogpgcheck --installroot=/mnt -y --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
@@ -58,7 +59,7 @@ bootstrap() {
     ${YUMCMD} --nogpgcheck --installroot=/mnt install -y basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
     ${YUMCMD} --installroot=/mnt repolist -y ;
   elif command -v urpmi > /dev/null ; then
-    #urpmi.addmedia --urpmi-root /mnt --distrib --mirrorlist '$MIRRORLIST'
+    #urpmi.addmedia --urpmi-root /mnt --distrib --mirrorlist '${MIRRORLIST}'
     urpmi.addmedia --urpmi-root /mnt --distrib http://${MIRROR}/distrib/${RELEASE}/${UNAME_M} ;
     urpmi.update --urpmi-root /mnt -a ;
     urpmi --no-recommends --auto --urpmi-root /mnt basesystem-minimal-core urpmi dnf dnf-plugins-core makedev ;
@@ -76,7 +77,7 @@ bootstrap() {
   mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars/
 
   #mkdir -p /mnt/var/empty /mnt/var/lock/subsys /mnt/etc/sysconfig/network-scripts
-  #cp /etc/sysconfig/network-scripts/ifcfg-$ifdev /mnt/etc/sysconfig/network-scripts/ifcfg-${ifdev}.bak
+  #cp /etc/sysconfig/network-scripts/ifcfg-${ifdev} /mnt/etc/sysconfig/network-scripts/ifcfg-${ifdev}.bak
   cp /etc/resolv.conf /mnt/etc/resolv.conf
   sleep 5
 }
@@ -106,7 +107,7 @@ ls /proc ; sleep 5 ; ls /dev ; sleep 5
 echo "Config pkg repo mirror(s)" ; sleep 3
 . /etc/os-release
 #urpmi.update -a
-##urpmi.addmedia --distrib --mirrorlist '$MIRRORLIST'
+##urpmi.addmedia --distrib --mirrorlist '${MIRRORLIST}'
 #urpmi.addmedia --distrib http://${MIRROR}/distrib/\${VERSION_ID}/${UNAME_M}
 #urpmq --list-url ; sleep 5
 ${DNFCMD} config-manager --set-enabled \${ID}-${UNAME_M} updates-${UNAME_M}
@@ -119,9 +120,9 @@ echo "Add software package selection(s)" ; sleep 3
 pkgs_nms="basesystem-minimal locales-en sudo whois dhcp-client man-pages dosfstools xfsprogs openssh-server nano mandi-ifw shorewall shorewall-ipv6 urpmi dnf dnf-plugins-core harddrake-ui systemd" # task-xfce"
 #urpmi.update -a
 ${DNFCMD} check-update -y
-for pkgX in \$pkgs_nms ; do
-  #urpmi --no-recommends --auto \$pkgX ;
-  ${DNFCMD} install -y \$pkgX ;
+for pkgX in \${pkgs_nms} ; do
+  #urpmi --no-recommends --auto \${pkgX} ;
+  ${DNFCMD} install -y \${pkgX} ;
 done
 ${DNFCMD} check-update -y
 ${DNFCMD} install -y 'dnf-command(versionlock)'
@@ -162,7 +163,7 @@ echo "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hos
 
 ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
-#sh -c "cat >> /etc/sysconfig/network-scripts/ifcfg-\$ifdev" << EOF
+#sh -c "cat >> /etc/sysconfig/network-scripts/ifcfg-\${ifdev}" << EOF
 #BOOTPROTO=dhcp
 #STARTMODE=auto
 #ONBOOT=yes
@@ -225,16 +226,18 @@ set -x
 ${DNFCMD} check-update -y
 
 pkgs_nms="basesystem kernel-desktop-latest microcode_ctl grub grub2-efi efibootmgr"
-for pkgX in \$pkgs_nms ; do
-  #urpmi --no-recommends --auto \$pkgX ;
-  ${DNFCMD} install -y \$pkgX ;
+for pkgX in \${pkgs_nms} ; do
+  #urpmi --no-recommends --auto \${pkgX} ;
+  ${DNFCMD} install -y \${pkgX} ;
 done
 
-if [ "btrfs" = "$VOL_MGR" ] ; then
+modprobe vfat ; lsmod | grep -e fat ; sleep 5
+
+if [ "btrfs" = "${VOL_MGR}" ] ; then
   #urpmi --no-recommends --auto btrfs-progs ;
   ${DNFCMD} install -y btrfs-progs ;
   modprobe btrfs ; sleep 5 ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   #urpmi --no-recommends --auto lvm2 ;
   ${DNFCMD} install -y lvm2 ;
   # cryptsetup
@@ -245,8 +248,8 @@ echo "Config dracut"
 echo 'hostonly="yes"' >> /etc/dracut.conf
 mkdir -p /etc/dracut.conf.d
 kver="\$(ls -A /lib/modules/ | tail -1)" # or ? $(uname -r)
-#mkinitrd /boot/initrd-\$kver \$kver
-dracut --force --kver \$kver
+#mkinitrd /boot/initrd-\${kver} \${kver}
+dracut --force --kver \${kver}
 
 
 grub2-probe /boot
@@ -261,7 +264,7 @@ if [ "aarch64" = "${UNAME_M}" ] ; then
   #cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
   grub2-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
-  grub2-install --target=i386-pc --recheck /dev/$DEVX ;
+  grub2-install --target=i386-pc --recheck /dev/${DEVX} ;
   cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
   cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak ;
   cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI ;
@@ -275,9 +278,9 @@ fi
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5 resume=/dev/foo"|'  \
   /etc/default/grub
 
-if [ "btrfs" = "$VOL_MGR" ] ; then
+if [ "btrfs" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
@@ -289,11 +292,11 @@ grub2-mkconfig -o /boot/grub2/grub.cfg
 #cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg
 
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
 fi
 efibootmgr -v ; sleep 3
 
@@ -305,14 +308,15 @@ EOFchroot
 # end chroot commands
 
   . /mnt/etc/os-release
-  snapshot_name=${ID}_install-$(date "+%Y%m%d")
+  snapshot_name=${ID}_${VERSION}-$(date -u "+%Y%m%d")
 
-  if [ "btrfs" = "$VOL_MGR" ] ; then
+  if [ "btrfs" = "${VOL_MGR}" ] ; then
     btrfs subvolume snapshot /mnt /mnt/.snapshots/${snapshot_name} ;
     # example remove: btrfs subvolume delete /.snapshots/snap1
     btrfs subvolume list /mnt ;
-  elif [ "lvm" = "$VOL_MGR" ] ; then
+  elif [ "lvm" = "${VOL_MGR}" ] ; then
     lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+    # example remove: lvremove vg0/snap1
     lvs ;
   fi
   sleep 5 ; fstrim -av
@@ -321,7 +325,7 @@ EOFchroot
 
 unmount_reboot() {
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     sync ; swapoff -va ; umount -vR /mnt ;
     reboot ; #poweroff ;
   fi
@@ -333,10 +337,10 @@ run_install() {
   PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_CRYPTED
+  system_config ${INIT_HOSTNAME} ${PASSWD_CRYPTED}
   kernel_bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

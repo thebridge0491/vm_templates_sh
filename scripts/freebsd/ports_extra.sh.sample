@@ -6,7 +6,7 @@ if [ ! "root" = "${USER}" ] || [ -z "${SUDO_USER}" ] ; then
 fi
 
 if command -v aria2c > /dev/null ; then
-	FETCH_CMD=${FETCH_CMD:-aria2c} ;
+  FETCH_CMD=${FETCH_CMD:-aria2c} ;
 fi
 
 pkg update
@@ -20,14 +20,16 @@ portsnap cron update                    # (interactive: fetch, else cron)
 # use pkg to install dependencies binary pkgs, if available
 #(cd /usr/ports/sysutils/debootstrap ; make package-depends-list | cut -d' ' -f3 | xargs pkg install -y)
 pkgs_var=`cd /usr/ports/sysutils/debootstrap ; make run-depends-list build-depends-list | cut -c 12-`
-for pkgX in $pkgs_var ; do
-	pkg fetch -Udy $pkgX ;
+for pkgX in ${pkgs_var} ; do
+  pkg fetch -Udy ${pkgX} ;
 done
-for pkgX in $pkgs_var ; do
-	pkg install -Uy $pkgX ;
+for pkgX in ${pkgs_var} ; do
+  pkg install -Uy ${pkgX} ;
 done
 
-#portmaster sysutils/debootstrap                             # install using portmaster
-#portmaster -L ; sleep 5
+## install using portmaster
+#if command -v portmaster > /dev/null ; then
+#  portmaster sysutils/debootstrap ; portmaster -L ; sleep 5
+#fi
 (cd /usr/ports/sysutils/debootstrap ; make WITHOUT=X11 install clean)     # install manually
 pkg info debootstrap ; sleep 5

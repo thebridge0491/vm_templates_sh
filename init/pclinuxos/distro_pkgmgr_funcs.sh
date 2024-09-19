@@ -1,7 +1,7 @@
 # pclinuxos/{distro_pkgs.ini,distro_pkgmgr_funcs.sh}
 # to use variables|functions, source these file(s):
 # source distro_pkgs.ini ; source distro_pkgmgr_funcs.sh
-# $pkgmgr_install $pkgs_cmdln_tools 2> /tmp/pkgsInstall_stderr.txt | tee /tmp/pkgsInstall_stdout.txt
+# ${pkgmgr_install} ${pkgs_cmdln_tools} 2> /tmp/pkgsInstall_stderr.txt | tee /tmp/pkgsInstall_stdout.txt
 
 pkgmgr_install='apt-get -y --option Retries=3 install'
 pkgmgr_search='apt-cache search'
@@ -11,8 +11,8 @@ pkg_repos_sources() {
 	sep='#--------------------#'
 	argX='grep -ve "^#" /etc/apt/sources.list'
 
-	#printf "${sep}\n$argX\n" | cat - $argX
-	printf "${sep}\n$argX\n" ; $argX
+	#printf "${sep}\n${argX}\n" | cat - ${argX}
+	printf "${sep}\n${argX}\n" ; ${argX}
 }
 
 pkgs_installed() {
@@ -24,7 +24,7 @@ pkgs_installed() {
 	echo -e 'dpkg -l | grep -Ee "meta[-]*package" | sed -n "s|^\w*\s*\(\S*\)\s*.*|\1|p"\n----------'
 	dpkg -l | grep -Ee "meta[-]*package" | sed -n 's|^\w*\s*\(\S*\)\s*.*|\1|p' | column ; echo '' ; sleep 3
 
-	#if [ "leaf" = "$METHOD" ] ; then
+	#if [ "leaf" = "${METHOD}" ] ; then
 	#	;
 	#else
 	#	;
@@ -35,10 +35,10 @@ pkgs_installed() {
 	echo "=============================" ;
 
 	pkg_nms=$(rpm -qa --queryformat '%{name} \n')
-	(for pkg_nm in $pkg_nms ; do
-		no_rdepns=$(rpm -q --whatrequires $pkg_nm | grep -e 'no package requires') ;
-		if [ ! -z "$no_rdepns" ] ; then continue ; fi ;
+	(for pkg_nm in ${pkg_nms} ; do
+		no_rdepns=$(rpm -q --whatrequires ${pkg_nm} | grep -e 'no package requires') ;
+		if [ ! -z "${no_rdepns}" ] ; then continue ; fi ;
 
-		rpm -q --queryformat '%{group}/%{name} \n' $pkg_nm ;
+		rpm -q --queryformat '%{group}/%{name} \n' ${pkg_nm} ;
 	done) | sort | column
 }

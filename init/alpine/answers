@@ -1,0 +1,20 @@
+# ex: BOOT_SIZE=512 USE_EFI=1 [ROOTFS=ext4 VARFS=ext4] setup-alpine -f answers
+
+KEYMAPOPTS=${KEYMAPOPTS:-"us us"}
+HOSTNAMEOPTS=${HOSTNAMEOPTS:-"-n alpine-boxv0000"}
+INTERFACESOPTS="auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+#    hostname alpine-boxv0000
+"
+DNSOPTS=${DNSOPTS:-"-n 8.8.8.8"}
+TIMEZONEOPTS=${TIMEZONEOPTS:-"-z UTC"}
+PROXYOPTS=${PROXYOPTS:-"none"}
+#APKREPOSOPTS=${APKREPOSOPTS:-"-f"}
+APKREPOSOPTS=${APKREPOSOPTS:-"http://mirror.math.princeton.edu/pub/alpinelinux/latest-stable/main"}
+SSHDOPTS=${SSHDOPTS:-"-c none"} # "-c openssh"
+NTPOPTS=${NTPOPTS:-"-c chrony"}
+#DISKOPTS=${DISKOPTS:-"-v -L -s 4096 -m sys /dev/sda"}
+DISKOPTS=${DISKOPTS:-"-v -m sys /mnt"}

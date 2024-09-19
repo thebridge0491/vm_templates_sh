@@ -7,19 +7,19 @@ export CHOICE_DESKTOP=${1:-xfce}
 
 apk fix ; apk update ; apk upgrade -U -a
 . /root/init/alpine/distro_pkgs.ini
-case $CHOICE_DESKTOP in
-	*) pkgs_var="$pkgs_displaysvr_xorg $pkgs_deskenv_xfce" ;;
+case ${CHOICE_DESKTOP} in
+	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
 esac
 
-apk fetch $pkgs_var
+apk fetch ${pkgs_var}
 setup-xorg-base
-for pkgX in $pkgs_var ; do
-	apk add $pkgX ;
+for pkgX in ${pkgs_var} ; do
+	apk add ${pkgX} ;
 done
 sleep 3
 
 rc-update add polkit default
-case $CHOICE_DESKTOP in
+case ${CHOICE_DESKTOP} in
 	*) #mv /etc/lightdm /etc/lightdm.old ;
 	  rc-update add lightdm default ;;
 esac

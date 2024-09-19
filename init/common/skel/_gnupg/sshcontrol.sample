@@ -9,6 +9,12 @@
 # caching TTL in seconds, and another optional field for arbitrary
 # flags.   Prepend the keygrip with an '!' mark to disable it.
 
-!FF367534F40128D474AC3DDCB433A97824F45BD3 3600
+# RSA key added on: 2011-10-01 21:23:30
+# Fingerprints:  MD5:34:d1:6e:bb:3a:d4:e5:fd:30:64:96:50:1e:89:23:f7
+#                SHA256:JLZFngy42mWEViLHY+ohsCPUEu/i1nLqaqb0lbRNbmg
+!A3BB05D3768A6E3DE4E1A4B7744041C14179807C 3600
 
-19809419333A509B1D954A0E754F8D75E88D96E3 3600
+# RSA key added on: 2011-10-01 21:23:30
+# Fingerprints:  MD5:83:81:45:d3:c7:9d:4a:ad:a0:54:8e:a2:81:81:36:9c
+#                SHA256:IjlnRNguXnpZ3pvte25bMASuLuRsCsKE6XwpsrDzMQs
+!6DD8D52A1954D346AD2D235299F63E18AB5EE826 3600

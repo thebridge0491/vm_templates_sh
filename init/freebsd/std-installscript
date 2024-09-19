@@ -50,14 +50,14 @@ sysctl kern.geom.label.gpt.enable=1
 #DISTRIBUTIONS="kernel.txz base.txz "
 
 
-gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 $DEVX
-gpart bootcode -b /boot/pmbr $DEVX
+gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 ${DEVX}
+gpart bootcode -b /boot/pmbr ${DEVX}
 
-gpart modify -l gptboot0 -i 1 $DEVX ; gpart modify -l ESP -i 2 $DEVX
-gpart modify -l "${GRP_NM}-fsSwap" -i 3 $DEVX
-gpart modify -l "${GRP_NM}-fsRoot" -i 4 $DEVX
-gpart modify -l "${GRP_NM}-fsVar" -i 5 $DEVX
-gpart modify -l "${GRP_NM}-fsHome" -i 6 $DEVX
+gpart modify -l gptboot0 -i 1 ${DEVX} ; gpart modify -l ESP -i 2 ${DEVX}
+gpart modify -l "${GRP_NM}-fsSwap" -i 3 ${DEVX}
+gpart modify -l "${GRP_NM}-fsRoot" -i 4 ${DEVX}
+gpart modify -l "${GRP_NM}-fsVar" -i 5 ${DEVX}
+gpart modify -l "${GRP_NM}-fsHome" -i 6 ${DEVX}
 
 tunefs -n enable -t enable /dev/gpt/${GRP_NM}-fsRoot
 tunefs -n enable -t enable /dev/gpt/${GRP_NM}-fsVar
@@ -181,7 +181,7 @@ sed -i '' "s|^[^#].*requiretty|# Defaults requiretty|" /usr/local/etc/sudoers
 
 mkdir -p /usr/local/etc/pkg/repos
 sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
-FreeBSD: { 
+FreeBSD: {
   #url: "pkg+http://pkg.freebsd.org/\$\{ABI}/quarterly",
   url: "pkg+http://pkg.freebsd.org/\$(pkg config abi)/quarterly",
   mirror_type: "srv",
@@ -216,18 +216,18 @@ else
 fi
 efibootmgr -v ; sleep 3
 #read -p "Activate EFI BootOrder XXXX (or blank line to skip): " bootorder
-#if [ ! -z "$bootorder" ] ; then
-#  efibootmgr -a -b $bootorder ;
+#if [ ! -z "${bootorder}" ] ; then
+#  efibootmgr -a -b ${bootorder} ;
 #fi
 for bootorder in $(efibootmgr | sed -n 's|.*Boot\([0-9][0-9]*\).*|\1|p') ; do
-  efibootmgr -a -b $bootorder ;
+  efibootmgr -a -b ${bootorder} ;
 done
 
 
 cp /tmp/installscript /root/ ; sync
 
 read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
   umount /mnt/boot/efi ; rm -r /mnt/boot/efi ;
   sync ; swapoff -a ; umount -a ;
   reboot ; #poweroff ;

@@ -17,11 +17,11 @@ set +e
 
 . /root/init/freebsd/distro_pkgs.ini
 pkg update
-for pkgX in $pkgs_cmdln_tools ; do
-	pkg fetch -Udy $pkgX ;
+for pkgX in ${pkgs_cmdln_tools} ; do
+	pkg fetch -Udy ${pkgX} ;
 done
-for pkgX in $pkgs_cmdln_tools ; do
-	pkg install -Uy $pkgX ;
+for pkgX in ${pkgs_cmdln_tools} ; do
+	pkg install -Uy ${pkgX} ;
 done
 
 
@@ -36,7 +36,7 @@ fi
 if [ "$(hostname | grep -e 'box.0000')" ] ; then
 	last4=$(sysctl -n kern.hostuuid | cut -b33-36) ; # cat /etc/hostid
 	for fileX in /etc/hosts /etc/rc.conf ; do
-	  sed -i '' "/box.0000/ s|\(box.\)0000|\1${last4}|g" $fileX ;
+	  sed -i '' "/box.0000/ s|\(box.\)0000|\1${last4}|g" ${fileX} ;
 	done ;
 	hostname $(sysrc -n hostname) ;
 fi
@@ -102,7 +102,7 @@ sh /root/init/common/misc_config.sh cfg_shell_keychain /usr/share/skel/dot.cshrc
 #sysrc mountd_flags="-r"
 
 sysrc nfs_client_enable="YES"
-sh /root/init/common/misc_config.sh share_nfs_data0 $SHAREDNODE
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
 
 
 # Disable X11 because Vagrants VMs are (usually) headless
@@ -129,15 +129,15 @@ fi
 
 cd /usr/bin
 for file1 in lp lpq lpr lprm ; do
-    if [ -e $file ] ; then
-      mv $file1 $file1.old ;
+    if [ -e ${file1} ] ; then
+      mv ${file1} ${file1}.old ;
     fi ;
-    ln -s /usr/local/bin/$file1 $file1 ;
+    ln -s /usr/local/bin/${file1} ${file1} ;
 done
 
 #sh /root/init/common/misc_config.sh cfg_printer_pdf /usr/local/etc/cups \
 #    /usr/local/share/cups/model
-##sh /root/init/common/misc_config.sh cfg_printer_default $SHAREDNODE $PRINTNAME
+##sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
 lpstat -t ; sleep 5
 set -e ; set -u
 
@@ -145,7 +145,9 @@ set -e ; set -u
 set +e
 ## scripts/cleanup.sh
 pkg clean -y
-portmaster -n --clean-distfiles
+if command -v portmaster > /dev/null ; then
+  portmaster -n --clean-distfiles ;
+fi
 
 # Purge files we don't need any longer
 rm -rf /var/db/freebsd-update/files

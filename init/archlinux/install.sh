@@ -62,8 +62,8 @@ export CHROOT_CMD=chroot
 
 bootstrap() {
   echo "Config pkg repo mirror(s)" ; sleep 3
-  if [ "zfs" = "$VOL_MGR" ] ; then
-    zfs umount $ZPOOLNM/var/mail ; zfs destroy $ZPOOLNM/var/mail ;
+  if [ "zfs" = "${VOL_MGR}" ] ; then
+    zfs umount ${ZPOOLNM}/var/mail ; zfs destroy ${ZPOOLNM}/var/mail ;
   fi
   mkdir -p /mnt/etc/pacman.d /mnt/var/lib/pacman
   if [ -f /etc/pacman.conf ] && [ -d /etc/pacman.d ] ; then
@@ -97,9 +97,9 @@ Include = /etc/pacman.d/mirrorlist
 EOF
     if [ "aarch64" = "${UNAME_M}" ] ; then
       #pacmanconf_ver=$(curl -Ls http://mirror.archlinuxarm.org/aarch64/core | sed -n 's|.*pacman-\(.*\)-aarch64.pkg.tar.xz.*|\1|p') ;
-      #curl -LO http://mirror.archlinuxarm.org/aarch64/core/pacman-${pacmanconf_ver:-6.0.2-5}-aarch64.pkg.tar.xz ;
+      #curl -LO http://mirror.archlinuxarm.org/aarch64/core/pacman-${pacmanconf_ver:-6.1.0-3}-aarch64.pkg.tar.xz ;
       pacmanconf_ver=$(curl -Ls https://repo.armtixlinux.org/system/os/aarch64 | sed -n 's|.*pacman-\(.*\)-aarch64.pkg.tar.xz.*|\1|p') ;
-      curl -LO https://repo.armtixlinux.org/system/os/aarch64/pacman-${pacmanconf_ver:-6.0.2-5}-aarch64.pkg.tar.xz ;
+      curl -LO https://repo.armtixlinux.org/system/os/aarch64/pacman-${pacmanconf_ver:-6.1.0-3}-aarch64.pkg.tar.xz ;
       tar -xf pacman*.pkg.tar.xz etc ;
       cat ./etc/pacman.conf | tee /etc/pacman.conf ;
     else
@@ -111,11 +111,11 @@ EOF
   ## fetch cmd: [curl -s | wget -qO -]
   if [ "aarch64" = "${UNAME_M}" ] ; then
     #mirrorlist_ver=$(curl -Ls http://mirror.archlinuxarm.org/aarch64/core | sed -n 's|.*pacman-mirrorlist-\(.*\)-any.pkg.tar.xz.*|\1|p') ;
-    #curl -LO http://mirror.archlinuxarm.org/aarch64/core/pacman-mirrorlist-${mirrorlist_ver:-202202-1}-any.pkg.tar.xz ;
+    #curl -LO http://mirror.archlinuxarm.org/aarch64/core/pacman-mirrorlist-${mirrorlist_ver:-20230206-1}-any.pkg.tar.xz ;
     #tar -xf pacman-mirrorlist*.pkg.tar.xz ;
     #cat ./etc/pacman.d/mirrorlist | tee /etc/pacman.d/mirrorlist-archlinuxarm ;
     mirrorlist_ver=$(curl -Ls https://repo.armtixlinux.org/system/os/aarch64 | sed -n 's|.*artix-mirrorlist-\(.*\)-any.pkg.tar.xz.*|\1|p') ;
-    curl -LO https://repo.armtixlinux.org/system/os/aarch64/artix-mirrorlist-${mirrorlist_ver:-20220301-1}-any.pkg.tar.xz ;
+    curl -LO https://repo.armtixlinux.org/system/os/aarch64/artix-mirrorlist-${mirrorlist_ver:-20230501-1}-any.pkg.tar.xz ;
     tar -xf artix-mirrorlist*.pkg.tar.xz ;
     cat ./etc/pacman.d/mirrorlist | tee /etc/pacman.d/mirrorlist-armtix ;
 
@@ -136,10 +136,10 @@ EOF
   sleep 5 ; cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.old
   cp `ls /etc/pacman.d/mirrorlist*` /mnt/etc/pacman.d/
   for libname in multilib lib32 ; do
-    MULTILIB_LINENO=$(grep -n "\[$libname\]" /mnt/etc/pacman.conf | cut -f1 -d:) ;
+    MULTILIB_LINENO=$(grep -n "\[${libname}\]" /mnt/etc/pacman.conf | cut -f1 -d:) ;
     if [ "" = "${MULTILIB_LINENO}" ] ; then continue ; fi ;
     sed -i "${MULTILIB_LINENO}s|^#||" /mnt/etc/pacman.conf ;
-    MULTILIB_LINENO=$(( $MULTILIB_LINENO + 1 )) ;
+    MULTILIB_LINENO=$(( ${MULTILIB_LINENO} + 1 )) ;
     sed -i "${MULTILIB_LINENO}s|^#||" /mnt/etc/pacman.conf ;
   done
 
@@ -148,27 +148,27 @@ EOF
   pacman-key --init ; pacman -Sy --noconfirm artix-keyring
   pacman -U --noconfirm `ls /var/cache/pacman/pkg/artix-keyring*`
   pacman-key --populate artix
-  #pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
-  #pacman-key --lsign-key 53C01BC2 ; pacman-key --lsign-key F165BBAC
+  pacman-key --recv-keys 'arch@eworm.de' ; pacman-key --lsign-key 498E9CEE
+  pacman-key --lsign-key 53C01BC2 ; pacman-key --lsign-key F165BBAC
   if [ "x86_64" = "${UNAME_M}" ] ; then
     sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf ;
   fi
-  
-  if [ "zfs" = "${VOL_MGR}" ] ; then
-    #cat $(dirname $0)/repo_archzfs.cfg | tee -a /mnt/etc/pacman.conf
-    cat << EOF >> /mnt/etc/pacman.conf
-[archzfs]
-Server = http://archzfs.com/\$repo/\$arch
-Server = http://mirror.sum7.eu/archlinux/archzfs/\$repo/\$arch
-Server = https://mirror.biocrafting.net/archlinux/archzfs/\$repo/\$arch
-Server = https://mirror.in.themindsmaze.com/archzfs/\$repo/\$arch
-Server = https://zxcvfdsa.com/archzfs/\$repo/\$arch
 
-EOF
-    curl -Lo /tmp/archzfs.gpg https://archzfs.com/archzfs.gpg
-    pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
-  fi
-  pacman -Sy
+  #if [ "zfs" = "${VOL_MGR}" ] ; then
+  #  #cat $(dirname ${0})/repo_archzfs.cfg | tee -a /mnt/etc/pacman.conf
+  #  cat << EOF >> /mnt/etc/pacman.conf
+#[archzfs]
+#Server = http://archzfs.com/\$repo/\$arch
+#Server = http://mirror.sum7.eu/archlinux/archzfs/\$repo/\$arch
+#Server = https://mirror.biocrafting.net/archlinux/archzfs/\$repo/\$arch
+#Server = https://mirror.in.themindsmaze.com/archzfs/\$repo/\$arch
+#Server = https://zxcvfdsa.com/archzfs/\$repo/\$arch
+#
+#EOF
+  #  curl -Lo /tmp/archzfs.gpg https://archzfs.com/archzfs.gpg
+  #  pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
+  #fi
+  #pacman -Sy
 
   echo "Bootstrap base pkgs" ; sleep 3
   pkg_list="base base-devel dosfstools e2fsprogs xfsprogs reiserfsprogs jfsutils sysfsutils usbutils inetutils logrotate which dialog man-db man-pages less perl s-nail texinfo diffutils vi nano sudo whois elogind-${service_mgr}"
@@ -176,12 +176,12 @@ EOF
   ##pacman -Sg base | cut -d' ' -f2 | sed "s|^linux$|linux-lts|g" | pacstrap /mnt -
   #pacman -Sg base | cut -d' ' -f2 | sed "s|^linux$||g" | pacstrap /mnt -
   if command -v pacstrap > /dev/null ; then
-    #pacstrap /mnt --noconfirm $(pacman -Sqg base | sed "s|^linux$|&${SUF}|g") $pkg_list ;
-    pacstrap /mnt --noconfirm $(pacman -Sqg base | sed "s|^linux$||g") $pkg_list ;
+    #pacstrap /mnt --noconfirm $(pacman -Sqg base | sed "s|^linux$|&${SUF}|g") ${pkg_list} ;
+    pacstrap /mnt --noconfirm $(pacman -Sqg base | sed "s|^linux$||g") ${pkg_list} ;
   elif command -v basestrap > /dev/null ; then
-    basestrap /mnt --noconfirm $(pacman -Sqg base | sed "s|^linux$||g") $pkg_list ;
+    basestrap /mnt --noconfirm $(pacman -Sqg base | sed "s|^linux$||g") ${pkg_list} ;
   else
-    pacman --root /mnt -Sy --noconfirm $(pacman -Sqg base | sed "s|^linux$||g") $pkg_list ;
+    pacman --root /mnt -Sy --noconfirm $(pacman -Sqg base | sed "s|^linux$||g") ${pkg_list} ;
   fi
 
   echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
@@ -204,7 +204,7 @@ system_config() {
   export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
   # LANG=[C|en_US].UTF-8
-  cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en $CHROOT_CMD /mnt /bin/sh
+  cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en ${CHROOT_CMD} /mnt /bin/sh
 set -x
 
 chmod 1777 /tmp ; chmod 1777 /var/tmp
@@ -359,7 +359,7 @@ EOFchroot
 
 kernel_bootloader() {
   # LANG=[C|en_US].UTF-8
-  cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en $CHROOT_CMD /mnt /bin/sh
+  cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en ${CHROOT_CMD} /mnt /bin/sh
 set -x
 
 if [ -f /etc/os-release ] ; then
@@ -371,7 +371,7 @@ fi
 if [ "aarch64" = "${UNAME_M}" ] ; then
   LINSUF=-aarch64-lts ;
 else
-  LINSUF=-lts ;
+  LINSUF=-lts515 ; # older kernel for ZFS compatibility
 fi
 
 pacman -Sy --noconfirm linux\${LINSUF} linux-firmware mkinitcpio amd-ucode grub efibootmgr
@@ -389,10 +389,13 @@ if [ "artix" = "\${ID}" ] || [ "armtix" = "\${ID}" ] ; then
     service_mgr=s6 ;
   fi ;
 fi
+modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+if [ "zfs" = "${VOL_MGR}" ] ; then
   curl -Lo /tmp/archzfs.gpg https://archzfs.com/archzfs.gpg ;
-  #cat /tmp/repo_archzfs.cfg >> /etc/pacman.conf ;
+  if [ ! "`grep archzfs /etc/pacman.conf`" ] ; then
+    cat /tmp/repo_archzfs.cfg >> /etc/pacman.conf ;
+  fi ;
   pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76 ;
   pacman -Syu ;
 
@@ -420,10 +423,10 @@ EOF
     sed -i "/^IgnorePkg/ s|\$| \${pkgX}|" /etc/pacman.conf
   done ;
   grep -e '^IgnorePkg' /etc/pacman.conf ; sleep 3 ;
-elif [ "btrfs" = "$VOL_MGR" ] ; then
+elif [ "btrfs" = "${VOL_MGR}" ] ; then
   pacman -Sy --noconfirm --needed btrfs-progs ;
   modprobe btrfs ; sleep 5 ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   if [ "arch" = "\${ID}" ] || [ "archarm" = "\${ID}" ] ; then
     pacman -Sy --noconfirm --needed device-mapper lvm2 ;
     # cryptsetup mdadm
@@ -437,7 +440,7 @@ elif [ "lvm" = "$VOL_MGR" ] ; then
   sed -i '/^HOOK/ s|filesystems|lvm2 filesystems|' /etc/mkinitcpio.conf ;
 fi
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+if [ "zfs" = "${VOL_MGR}" ] ; then
   if command -v systemctl > /dev/null ; then
     systemctl enable zfs-import-cache ; systemctl enable zfs-import.target ;
     systemctl enable zfs-mount ; systemctl enable zfs.target ;
@@ -448,7 +451,7 @@ if [ "zfs" = "$VOL_MGR" ] ; then
     cat << EOF >> /etc/runit/sv/zfs-mount/run ;
 #!/bin/sh
 
-zfs mount $ZPOOLNM/ROOT/default ; zfs mount -a
+zfs mount ${ZPOOLNM}/ROOT/default ; zfs mount -a
 
 EOF
 
@@ -459,7 +462,7 @@ EOF
     cat << EOF >> /etc/init.d/zfs-mount ;
 #!/sbin/openrc-run
 
-command="zfs mount $ZPOOLNM/ROOT/default ; zfs mount -a"
+command="zfs mount ${ZPOOLNM}/ROOT/default ; zfs mount -a"
 
 EOF
 
@@ -480,7 +483,7 @@ if [ "aarch64" = "${UNAME_M}" ] ; then
   cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
   grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
-  grub-install --target=i386-pc --recheck /dev/$DEVX ;
+  grub-install --target=i386-pc --recheck /dev/${DEVX} ;
   cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
 fi
 
@@ -490,12 +493,12 @@ fi
 sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5 resume=/dev/foo"|' /etc/default/grub
 #sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+if [ "zfs" = "${VOL_MGR}" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|nomodeset rootdelay|nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay|' /etc/default/grub ;
   echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub ;
-elif [ "btrfs" = "$VOL_MGR" ] ; then
+elif [ "btrfs" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
@@ -521,11 +524,11 @@ fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
 fi
 efibootmgr -v ; sleep 3
 
@@ -540,21 +543,22 @@ EOFchroot
   elif [ -f /mnt/usr/lib/os-release ] ; then
     . /mnt/usr/lib/os-release ;
   fi
-  snapshot_name=${ID}_install-$(date "+%Y%m%d")
+  snapshot_name=${ID}_install-$(date -u "+%Y%m%d")
 
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs snapshot ${ZPOOLNM}/ROOT/default@${snapshot_name} ;
     # example remove: zfs destroy ospool0/ROOT/default@snap1
     zfs list -t snapshot ; sleep 5 ;
 
     zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
   else
-    if [ "btrfs" = "$VOL_MGR" ] ; then
+    if [ "btrfs" = "${VOL_MGR}" ] ; then
       btrfs subvolume snapshot /mnt /mnt/.snapshots/${snapshot_name} ;
       # example remove: btrfs subvolume delete /.snapshots/snap1
       btrfs subvolume list /mnt ;
-    elif [ "lvm" = "$VOL_MGR" ] ; then
+    elif [ "lvm" = "${VOL_MGR}" ] ; then
       lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+      # example remove: lvremove vg0/snap1
       lvs ;
     fi ;
     sleep 5 ; fstrim -av ;
@@ -564,11 +568,11 @@ EOFchroot
 
 unmount_reboot() {
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     sync ; swapoff -va ; umount -vR /mnt ;
-    if [ "zfs" = "$VOL_MGR" ] ; then
+    if [ "zfs" = "${VOL_MGR}" ] ; then
       #zfs umount -a ; zpool export -a ;
-      zfs umount -a ; zpool export $ZPOOLNM ;
+      zfs umount -a ; zpool export ${ZPOOLNM} ;
     fi ;
     reboot ; #poweroff ;
   fi
@@ -580,10 +584,10 @@ run_install() {
   PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_CRYPTED
+  system_config ${INIT_HOSTNAME} ${PASSWD_CRYPTED}
   kernel_bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

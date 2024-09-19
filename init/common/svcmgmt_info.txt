@@ -33,7 +33,7 @@ start svc       rc-service networking start       sv up dhcpcd
                 ------------------------------    ------------------------------
 list services   s6-rc -a list                     66-intree -go contents default
             or  for i in /var/run/service/* ; do \
-                  echo -n "$i: " ; s6-svstat $i ; \
+                  echo -n "${i}: " ; s6-svstat ${i} ; \
                 done
 enable svc      s6-rc-bundle-update add \         66-enable -t default sshd
                   default sshd

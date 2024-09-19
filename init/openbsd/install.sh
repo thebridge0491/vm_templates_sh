@@ -26,7 +26,7 @@ export GRP_NM=${GRP_NM:-bsd0}
 export MIRROR=${MIRROR:-ftp.openbsd.org/pub/OpenBSD}
 export ARCH_S=${ARCH_S:-$(arch -s)}
 export REL=${REL:-$(sysctl -n kern.osrelease)}
-export DISTARCHIVE_FETCH=${DISTARCHIVE_FETCH:-1}
+export DISTARCHIVE_FETCH=${DISTARCHIVE_FETCH:-0}
 
 
 # ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
@@ -50,11 +50,11 @@ bootstrap() {
     cp /mnt2/${REL}/${ARCH_S}/bsd* ${DESTDIR:-/mnt} ;
   else
     for file in man${SUF} comp${SUF} base${SUF} ; do
-      (ftp -o - http://${MIRROR}/${REL}/${ARCH_S}/${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
+      (ftp -vo - http://${MIRROR}/${REL}/${ARCH_S}/${file}.tgz | tar -xpzf - -C ${DESTDIR:-/mnt}) ;
     done ;
-    ftp -o ${DESTDIR:-/mnt}/bsd http://${MIRROR}/${REL}/${ARCH_S}/bsd ;
-    ftp -o ${DESTDIR:-/mnt}/bsd.rd http://${MIRROR}/${REL}/${ARCH_S}/bsd.rd ;
-    ftp -o ${DESTDIR:-/mnt}/bsd.mp http://${MIRROR}/${REL}/${ARCH_S}/bsd.mp ;
+    ftp -vo ${DESTDIR:-/mnt}/bsd http://${MIRROR}/${REL}/${ARCH_S}/bsd ;
+    ftp -vo ${DESTDIR:-/mnt}/bsd.rd http://${MIRROR}/${REL}/${ARCH_S}/bsd.rd ;
+    ftp -vo ${DESTDIR:-/mnt}/bsd.mp http://${MIRROR}/${REL}/${ARCH_S}/bsd.mp ;
   fi
 }
 
@@ -180,11 +180,11 @@ bootloader() {
   mkdir -p /mnt/efi ; mount -t msdos /dev/${DEVX}i /mnt/efi
   (cd /mnt/efi ; mkdir -p EFI/openbsd EFI/BOOT)
   if [ "arm64" = "${ARCH_S}" ] || [ "aarch64" = "${ARCH_S}" ] ; then
-    ftp -o /mnt/usr/mdec/BOOTAA64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTAA64.EFI ;
+    ftp -vo /mnt/usr/mdec/BOOTAA64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTAA64.EFI ;
     cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
     cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
   else
-    ftp -o /mnt/usr/mdec/BOOTX64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTX64.EFI ;
+    ftp -vo /mnt/usr/mdec/BOOTX64.EFI http://${MIRROR}/${REL}/${ARCH_S}/BOOTX64.EFI ;
     cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/openbsd/ ;
     cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
   fi
@@ -202,7 +202,7 @@ bootloader() {
 
 unmount_reboot() {
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     umount /mnt/efi ; rm -r /mnt/efi ;
     sync ; swapctl -d /dev/${DEVX}b ; umount -a ;
     reboot ; #shutdown -p +3 ;
@@ -215,10 +215,10 @@ run_install() {
   #PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_PLAIN
+  system_config ${INIT_HOSTNAME} ${PASSWD_PLAIN}
   bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

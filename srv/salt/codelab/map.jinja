@@ -5,7 +5,7 @@
      grains['os_family'])|lower %}
 {% load_yaml as defaultdict %}
   default: # Debian
-    #pkgs_lang_py = {{salt['cmd.shell']('. /root/init/'+variant+'/distro_pkgs.ini ; echo $pkgs_lang_py', shell='/bin/sh')}}
+    #pkgs_lang_py = {{salt['cmd.shell']('. /root/init/'+variant+'/distro_pkgs.ini ; echo ${pkgs_lang_py}', shell='/bin/sh')}}
     distro_pkgs: {{salt['ini.get_ini']('/root/init/'+variant+'/distro_pkgs.ini')}}
     langs: py c java
 {% endload %}

@@ -49,7 +49,7 @@ fi
 
 echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
 for pkgX in xauth xterm ; do
-  pkg install -Uy $pkgX ;
+  pkg install -Uy ${pkgX} ;
 done
 
 echo "Fix .NET access problem SSL CA cert path" >> /dev/stderr ; sleep 3
@@ -60,7 +60,9 @@ ln -s /usr/local/share/certs/ca-root-nss.crt \
 set +e
 ## scripts/cleanup.sh
 pkg clean -y
-portmaster -n --clean-distfiles
+if command -v portmaster > /dev/null ; then
+  portmaster -n --clean-distfiles ;
+fi
 
 # Purge files we don't need any longer
 rm -rf /var/db/freebsd-update/files

@@ -2,17 +2,16 @@ mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}
 qemu-img create -f qcow2 ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/${GUEST:-freebsd-x86_64-zfs}.qcow2 ${DISK_SZ:-30720M}
 
 mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/nvram
-cp -an ${NVRAM_QEMU_X64:-/usr/share/OVMF/OVMF_VARS.fd} ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/nvram/${GUEST:-freebsd-x86_64-zfs}_VARS.fd
+cp -an ${QEMU_NVRAM_X64:-/usr/share/OVMF/OVMF_VARS.fd} ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/nvram/${GUEST:-freebsd-x86_64-zfs}_VARS.fd
 chmod +w ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/nvram/${GUEST:-freebsd-x86_64-zfs}_VARS.fd
 
 qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
   -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
   -smp cpus=2 -m size=4096 -boot order=cd,menu=on -name ${GUEST:-freebsd-x86_64-zfs} \
   -nic ${NET_OPT:-user,hostfwd=tcp::4022-:22},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
-  -usb \
-  -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
+  -usb -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=hd0 \
   -drive file=${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/${GUEST:-freebsd-x86_64-zfs}.qcow2,cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=qcow2 \
   -display default,show-cursor=on -vga virtio \
-  ${QUEFI_OPTS:--smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${FIRMWARE_QEMU_X64:-/usr/share/OVMF/OVMF_CODE.fd} -drive if=pflash,unit=1,format=raw,file=${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/nvram/${GUEST:-freebsd-x86_64-zfs}_VARS.fd} \
+  ${QUEFI_OPTS:--smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${QEMU_FIRMWARE_X64:-/usr/share/OVMF/OVMF_CODE.fd} -drive if=pflash,unit=1,format=raw,file=${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/nvram/${GUEST:-freebsd-x86_64-zfs}_VARS.fd} \
   -cdrom ${ISO_PATH:-$(find ${ISOS_PARDIR:-/mnt/Data0/distros}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)} -no-reboot
 

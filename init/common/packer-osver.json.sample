@@ -1,0 +1,17 @@
+{
+  "variant": "freebsd",
+  "osver": "13.1",
+  "vol_mgr": "std",
+  "mirror_host": "download.freebsd.org/ftp",
+  "iso_url_directory": "/releases/ISO-IMAGES/13.1",
+  "iso_base": "FreeBSD-13.1-RELEASE-amd64",
+  "_mirror_host_aa64": "download.freebsd.org/ftp",
+  "_iso_url_directory_aa64": "/releases/ISO-IMAGES/13.1",
+  "_iso_base_aa64": "FreeBSD-13.1-RELEASE-arm64-aarch64",
+  "boot_cmdln_options": " ",
+
+  "_example_vbox_ostype": "FreeBSD_64 | NetBSD_64 | OpenBSD_64 | Linux_64",
+  "vboxguest_ostype": "FreeBSD_64",
+
+  "author": "imcomputer"
+}

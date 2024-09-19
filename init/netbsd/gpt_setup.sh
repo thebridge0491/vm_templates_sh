@@ -25,62 +25,62 @@ fi
 
 parttbl_bkup() {
   echo "Backing up partition table" ; sleep 3
-  gpt backup $DEVX > parttbl_${DEVX}.dump
+  gpt backup ${DEVX} > parttbl_${DEVX}.dump
   echo "to restore: gpt restore -l ${DEVX} < parttbl_${DEVX}.dump"
-  echo "            gpt bootcode -b /boot/pmbr $DEVX"
+  echo "            gpt bootcode -b /boot/pmbr ${DEVX}"
 }
 
 gpt_disk() {
   VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1}
 
   echo "Partitioning disk" ; sleep 3
-  gpt destroy $DEVX
-  gpt create -f $DEVX
-  gpt add -b 40 -a 1M -s 512K -t bios -l bios_boot $DEVX
-  gpt add -a 1M -s 512M -t efi -l ESP $DEVX
+  gpt destroy ${DEVX}
+  gpt create -f ${DEVX}
+  gpt add -b 40 -a 1M -s 512K -t bios -l bios_boot ${DEVX}
+  gpt add -a 1M -s 512M -t efi -l ESP ${DEVX}
 
-  if [ "zfs" = "$VOL_MGR" ] ; then
-    gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" $DEVX ;
-    gpt add -a 1M -t fbsd-zfs -l "${GRP_NM}-fsPool" $DEVX ;
+  if [ "zfs" = "${VOL_MGR}" ] ; then
+    gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" ${DEVX} ;
+    gpt add -a 1M -t fbsd-zfs -l "${GRP_NM}-fsPool" ${DEVX} ;
 
-    #gpt biosboot -A -i 4 $DEVX
-    gpt biosboot -L "${GRP_NM}-fsPool" $DEVX
+    #gpt biosboot -A -i 4 ${DEVX}
+    gpt biosboot -L "${GRP_NM}-fsPool" ${DEVX}
   else
-    gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" $DEVX ;
-    gpt add -a 1M -s 13312M -t ffs -l "${GRP_NM}-fsRoot" $DEVX ;
-    gpt add -a 1M -s 5G -t ffs -l "${GRP_NM}-fsVar" $DEVX ;
-    gpt add -a 1M -t ffs -l "${GRP_NM}-fsHome" $DEVX ;
+    gpt add -a 1M -s 4G -t swap -l "${GRP_NM}-fsSwap" ${DEVX} ;
+    gpt add -a 1M -s 13312M -t ffs -l "${GRP_NM}-fsRoot" ${DEVX} ;
+    gpt add -a 1M -s 5G -t ffs -l "${GRP_NM}-fsVar" ${DEVX} ;
+    gpt add -a 1M -t ffs -l "${GRP_NM}-fsHome" ${DEVX} ;
 
-    #gpt biosboot -A -i 3 $DEVX
-    gpt biosboot -L "${GRP_NM}-fsRoot" $DEVX
+    #gpt biosboot -A -i 3 ${DEVX}
+    gpt biosboot -L "${GRP_NM}-fsRoot" ${DEVX}
   fi
 
-  #gpt set -a active -i 1 $DEVX ; gpt set -a bootme -i 1 $DEVX
+  #gpt set -a active -i 1 ${DEVX} ; gpt set -a bootme -i 1 ${DEVX}
 
   sync ; sleep 3
   #newfs_msdos -L ESP /dev/${DEVX}b
-  newfs_msdos -F 16 -L ESP $(dkctl $DEVX listwedges | grep -e ESP | cut -d: -f1)
-  #gpt label -l ESP -i 2 $DEVX ; gpt label -l bios_boot -i 1 $DEVX
+  newfs_msdos -F 16 -L ESP $(dkctl ${DEVX} listwedges | grep -e ESP | cut -d: -f1)
+  #gpt label -l ESP -i 2 ${DEVX} ; gpt label -l bios_boot -i 1 ${DEVX}
 
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     PARTNM_LABELNMS="bios_boot:bios_boot ESP:ESP ${GRP_NM}-fsSwap:${GRP_NM}-fsSwap ${GRP_NM}-fsPool:${GRP_NM}-fsPool" ;
     for partnm_labelnm in ${PARTNM_LABELNMS} ; do
-      partnm=$(echo $partnm_labelnm | cut -d: -f1) ;
-      labelnm=$(echo $partnm_labelnm | cut -d: -f2) ;
-      idx=$(echo $(gpt show -l $DEVX | grep -e "$partnm") | cut -d' ' -f3) ;
-      gpt label -l "$labelnm" -i $idx $DEVX ;
+      partnm=$(echo ${partnm_labelnm} | cut -d: -f1) ;
+      labelnm=$(echo ${partnm_labelnm} | cut -d: -f2) ;
+      idx=$(echo $(gpt show -l ${DEVX} | grep -e "${partnm}") | cut -d' ' -f3) ;
+      gpt label -l "${labelnm}" -i ${idx} ${DEVX} ;
     done ;
   else
     PARTNM_LABELNMS="bios_boot:bios_boot ESP:ESP ${GRP_NM}-fsSwap:${GRP_NM}-fsSwap ${GRP_NM}-fsRoot:${GRP_NM}-fsRoot ${GRP_NM}-fsVar:${GRP_NM}-fsVar ${GRP_NM}-fsHome:${GRP_NM}-fsHome" ;
     for partnm_labelnm in ${PARTNM_LABELNMS} ; do
-      partnm=$(echo $partnm_labelnm | cut -d: -f1) ;
-      labelnm=$(echo $partnm_labelnm | cut -d: -f2) ;
-      idx=$(echo $(gpt show -l $DEVX | grep -e "$partnm") | cut -d' ' -f3) ;
-      gpt label -l "$labelnm" -i $idx $DEVX ;
+      partnm=$(echo ${partnm_labelnm} | cut -d: -f1) ;
+      labelnm=$(echo ${partnm_labelnm} | cut -d: -f2) ;
+      idx=$(echo $(gpt show -l ${DEVX} | grep -e "${partnm}") | cut -d' ' -f3) ;
+      gpt label -l "${labelnm}" -i ${idx} ${DEVX} ;
     done ;
   fi
 
-  sync ; gpt show $DEVX ; sleep 3 ; gpt show -l $DEVX ; sleep 3
+  sync ; gpt show ${DEVX} ; sleep 3 ; gpt show -l ${DEVX} ; sleep 3
 }
 
 zfspart_create() {
@@ -89,44 +89,44 @@ zfspart_create() {
   modload solaris ; modload zfs
   modstat -n zfs ; sleep 5
 
-  zpartnm=$(echo $ZPARTNM_ZPOOLNM | cut -d: -f1)
-  zpoolnm=$(echo $ZPARTNM_ZPOOLNM | cut -d: -f2)
-  idx=$(echo $(gpt show -l $DEVX | grep -e "$zpartnm") | cut -d' ' -f3)
-  dkZPart=$(dkctl $DEVX listwedges | grep -e "$zpartnm" | cut -d: -f1)
+  zpartnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f1)
+  zpoolnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f2)
+  idx=$(echo $(gpt show -l ${DEVX} | grep -e "${zpartnm}") | cut -d' ' -f3)
+  dkZPart=$(dkctl ${DEVX} listwedges | grep -e "${zpartnm}" | cut -d: -f1)
 
-  zpool destroy $zpoolnm
-  zpool labelclear -f /dev/$dkZPart
+  zpool destroy ${zpoolnm}
+  zpool labelclear -f /dev/${dkZPart}
 
   zpool create -o altroot=/mnt -O compress=lz4 -O atime=off -m none \
-	-O dedup=off -f $zpoolnm /dev/$dkZPart
-  zfs create -o mountpoint=none $zpoolnm/ROOT
-  zfs create -o canmount=noauto -o mountpoint=/ $zpoolnm/ROOT/default
-  zfs mount $zpoolnm/ROOT/default
+	-O dedup=off -f ${zpoolnm} /dev/${dkZPart}
+  zfs create -o mountpoint=none ${zpoolnm}/ROOT
+  zfs create -o canmount=noauto -o mountpoint=/ ${zpoolnm}/ROOT/default
+  zfs mount ${zpoolnm}/ROOT/default
 
-  zfs create -o exec=on -o setuid=off -o mountpoint=/tmp $zpoolnm/tmp
-  zfs create -o canmount=off -o mountpoint=/usr $zpoolnm/usr
-  zfs create -o mountpoint=/usr/home $zpoolnm/usr/home
-  zfs create -o setuid=off $zpoolnm/usr/ports
-  zfs create $zpoolnm/usr/src
-  zfs create -o canmount=off -o mountpoint=/var $zpoolnm/var
-  zfs create -o exec=off -o setuid=off $zpoolnm/var/audit
-  zfs create -o exec=off -o setuid=off $zpoolnm/var/crash
-  zfs create -o exec=off -o setuid=off $zpoolnm/var/log
-  zfs create -o atime=on $zpoolnm/var/mail
-  zfs create -o setuid=off $zpoolnm/var/tmp
+  zfs create -o exec=on -o setuid=off -o mountpoint=/tmp ${zpoolnm}/tmp
+  zfs create -o canmount=off -o mountpoint=/usr ${zpoolnm}/usr
+  zfs create -o mountpoint=/usr/home ${zpoolnm}/usr/home
+  zfs create -o setuid=off ${zpoolnm}/usr/ports
+  zfs create ${zpoolnm}/usr/src
+  zfs create -o canmount=off -o mountpoint=/var ${zpoolnm}/var
+  zfs create -o exec=off -o setuid=off ${zpoolnm}/var/audit
+  zfs create -o exec=off -o setuid=off ${zpoolnm}/var/crash
+  zfs create -o exec=off -o setuid=off ${zpoolnm}/var/log
+  zfs create -o atime=on ${zpoolnm}/var/mail
+  zfs create -o setuid=off ${zpoolnm}/var/tmp
 
-  zfs set quota=7680M $zpoolnm/usr/home
-  zfs set quota=5G $zpoolnm/var
-  zfs set quota=2G $zpoolnm/tmp
+  zfs set quota=7680M ${zpoolnm}/usr/home
+  zfs set quota=5G ${zpoolnm}/var
+  zfs set quota=2G ${zpoolnm}/tmp
 
-  zpool set bootfs=$zpoolnm/ROOT/default $zpoolnm # ??
-  zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm ; sync
+  zpool set bootfs=${zpoolnm}/ROOT/default ${zpoolnm} # ??
+  zpool set cachefile=/etc/zfs/zpool.cache ${zpoolnm} ; sync
 
-  zpool export $zpoolnm ; sync ; sleep 3
-  zpool import -R /mnt -N $zpoolnm
-  zpool import -d /dev/$dkZPart -R /mnt -N $zpoolnm
-  zfs mount $zpoolnm/ROOT/default ; zfs mount -a ; sync
-  zpool set cachefile=/etc/zfs/zpool.cache $zpoolnm
+  zpool export ${zpoolnm} ; sync ; sleep 3
+  zpool import -R /mnt -N ${zpoolnm}
+  zpool import -d /dev/${dkZPart} -R /mnt -N ${zpoolnm}
+  zfs mount ${zpoolnm}/ROOT/default ; zfs mount -a ; sync
+  zpool set cachefile=/etc/zfs/zpool.cache ${zpoolnm}
   sync ; cat /etc/zfs/zpool.cache ; sleep 3
   mkdir -p /mnt/etc/zfs ; cp /etc/zfs/zpool.cache /mnt/etc/zfs/
 
@@ -140,55 +140,55 @@ format_partitions() {
   BSD_PARTNMS=${BSD_PARTNMS:-${GRP_NM}-fsSwap ${GRP_NM}-fsRoot ${GRP_NM}-fsVar ${GRP_NM}-fsHome}
 
   echo "Formatting file systems" ; sleep 3
-  if [ "zfs" = "$VOL_MGR" ] ; then
-	zfspart_create $GRP_NM $ZPARTNM_ZPOOLNM ;
+  if [ "zfs" = "${VOL_MGR}" ] ; then
+	zfspart_create ${GRP_NM} ${ZPARTNM_ZPOOLNM} ;
 
-    zpartnm=$(echo $ZPARTNM_ZPOOLNM | cut -d: -f1) ;
-    zpoolnm=$(echo $ZPARTNM_ZPOOLNM | cut -d: -f2) ;
-    idx=$(echo $(gpt show -l $DEVX | grep -e "$zpartnm") | cut -d' ' -f3) ;
+    zpartnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f1) ;
+    zpoolnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f2) ;
+    idx=$(echo $(gpt show -l ${DEVX} | grep -e "${zpartnm}") | cut -d' ' -f3) ;
 
-    gpt label -l "$zpartnm" -i $idx $DEVX ;
+    gpt label -l "${zpartnm}" -i ${idx} ${DEVX} ;
   else
     modstat -n ffs ; sleep 5
 
     for partnm in ${BSD_PARTNMS} ; do
-	  idx=$(echo $(gpt show -l $DEVX | grep -e "$partnm") | cut -d' ' -f3) ;
-	  dkX=$(dkctl $DEVX listwedges | grep -e $partnm | cut -d: -f1) ;
-      if [ ! "${GRP_NM}-fsSwap" = "$partnm" ] ; then
-        ${MKFS_CMD} $dkX ;
-        gpt label -l "$partnm" -i $idx $DEVX ;
+	  idx=$(echo $(gpt show -l ${DEVX} | grep -e "${partnm}") | cut -d' ' -f3) ;
+	  dkX=$(dkctl ${DEVX} listwedges | grep -e ${partnm} | cut -d: -f1) ;
+      if [ ! "${GRP_NM}-fsSwap" = "${partnm}" ] ; then
+        ${MKFS_CMD} ${dkX} ;
+        gpt label -l "${partnm}" -i ${idx} ${DEVX} ;
       fi ;
-      if [ "${GRP_NM}-fsRoot" = "$partnm" ] ; then
+      if [ "${GRP_NM}-fsRoot" = "${partnm}" ] ; then
         mount -t cd9660 /dev/cd0 /mnt2 ;
-        installboot -v -o timeout=15 /dev/$dkX /mnt2/usr/mdec/bootxx_ffsv2 ;
+        installboot -v -o timeout=15 /dev/${dkX} /mnt2/usr/mdec/bootxx_ffsv2 ;
       fi ;
     done ;
   fi
 
-  sync ; gpt show $DEVX ; sleep 3 ; gpt show -l $DEVX ; sleep 3
+  sync ; gpt show ${DEVX} ; sleep 3 ; gpt show -l ${DEVX} ; sleep 3
 }
 
 part_format() {
   VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
 
-  gpt_disk $VOL_MGR $GRP_NM
-  format_partitions $VOL_MGR $GRP_NM $ZPARTNM_ZPOOLNM
+  gpt_disk ${VOL_MGR} ${GRP_NM}
+  format_partitions ${VOL_MGR} ${GRP_NM} ${ZPARTNM_ZPOOLNM}
 }
 
 mount_filesystems() {
   VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1}
   echo "Mounting file systems" ; sleep 3
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs mount -a ;
 
     mkdir -p /mnt/etc /mnt/kern /mnt/proc /mnt/compat/linux/proc ;
   else
-    dkRoot=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsRoot" | cut -d: -f1) ;
-    dkVar=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsVar" | cut -d: -f1) ;
-    dkHome=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsHome" | cut -d: -f1) ;
+    dkRoot=$(dkctl ${DEVX} listwedges | grep -e "${GRP_NM}-fsRoot" | cut -d: -f1) ;
+    dkVar=$(dkctl ${DEVX} listwedges | grep -e "${GRP_NM}-fsVar" | cut -d: -f1) ;
+    dkHome=$(dkctl ${DEVX} listwedges | grep -e "${GRP_NM}-fsHome" | cut -d: -f1) ;
 
-    mount /dev/$dkRoot /mnt ; mkdir -p /mnt/var /mnt/usr/home ;
-    mount /dev/$dkVar /mnt/var ; mount /dev/$dkHome /mnt/usr/home ;
+    mount /dev/${dkRoot} /mnt ; mkdir -p /mnt/var /mnt/usr/home ;
+    mount /dev/${dkVar} /mnt/var ; mount /dev/${dkHome} /mnt/usr/home ;
 
     mkdir -p /mnt/etc /mnt/kern /mnt/proc /mnt/compat/linux/proc ;
     sh -c 'cat > /mnt/etc/fstab' << EOF
@@ -218,12 +218,12 @@ fdesc              /dev        fdesc   ro,-o=union    0   0
 #linprocfs          /compat/linux/proc  linprocfs   rw  0   0
 
 EOF
-  dkSwap=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsSwap" | cut -d: -f1)
-  swapon /dev/$dkSwap # OR: swapctl -a -p 1 $dkSwap
+  dkSwap=$(dkctl ${DEVX} listwedges | grep -e "${GRP_NM}-fsSwap" | cut -d: -f1)
+  swapon /dev/${dkSwap} # OR: swapctl -a -p 1 ${dkSwap}
 
   cp /mnt2/usr/mdec/boot /mnt/
   cp /usr/mdec/boot /mnt/
 }
 
 #----------------------------------------
-$@
+${@}

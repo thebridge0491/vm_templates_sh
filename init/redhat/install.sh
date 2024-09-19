@@ -43,8 +43,8 @@ export DNFCMD="dnf --setopt=install_weak_deps=False --releasever=${RELEASE}"
 
 bootstrap() {
   echo "Bootstrap base pkgs" ; sleep 3
-  if [ "zfs" = "$VOL_MGR" ] ; then
-    zfs umount $ZPOOLNM/var/mail ; zfs destroy $ZPOOLNM/var/mail ;
+  if [ "zfs" = "${VOL_MGR}" ] ; then
+    zfs umount ${ZPOOLNM}/var/mail ; zfs destroy ${ZPOOLNM}/var/mail ;
   fi
   if [ "7" = "${RELEASE}" ] ; then
     REPO_DIRECTORY="/${RELEASE}/os/${UNAME_M}" ;
@@ -61,8 +61,12 @@ bootstrap() {
     rm -r /mnt/var/lib/rpm /mnt/var/cache/dnf ;
     mkdir -p /mnt/var/lib/rpm /mnt/var/cache/dnf ;
     rpm -v --root /mnt --initdb ;
+    ##repos_ver=$(curl -Ls http://${MIRROR}${REPO_DIRECTORY}/Packages | sed -n 's|.*centos-stream-repos-\(.*\).rpm.*|\1|p') ;
+    ## [wget -O file url | curl -Lo file url]
+    ##wget -O /tmp/repos.rpm http://${MIRROR}${REPO_DIRECTORY}/Packages/centos-stream-repos-${repos_ver:-9.0-26.el9.noarch}.rpm ;
+    #repos_ver=$(curl -Ls http://${MIRROR}${REPO_DIRECTORY}/Packages/r | sed -n 's|.*rocky-repos-\(.*\).rpm.*|\1|p') ;
     # [wget -O file url | curl -Lo file url]
-    #wget -O /tmp/repos.rpm http://${MIRROR}${REPO_DIRECTORY}/Packages/centos-stream-repos-9.0-18.el9.noarch.rpm ;
+    #wget -O /tmp/repos.rpm http://${MIRROR}${REPO_DIRECTORY}/Packages/r/rocky-repos-${repos_ver:-9.4-1.7.el9.noarch}.rpm ;
     #rpm -v -qip /tmp/repos.rpm ; sleep 5 ;
     #rpm -v --root /mnt --nodeps -i /tmp/repos.rpm ;
     yum-config-manager --releasever=${RELEASE} --nogpgcheck --installroot=/mnt -y --add-repo http://${MIRROR}${REPO_DIRECTORY} ;
@@ -86,7 +90,7 @@ bootstrap() {
   #setenforce 0 ; sestatus ; sleep 5
 
   #mkdir -p /mnt/var/empty /mnt/var/lock/subsys /mnt/etc/sysconfig/network-scripts
-  #cp /etc/sysconfig/network-scripts/ifcfg-$ifdev /mnt/etc/sysconfig/network-scripts/ifcfg-${ifdev}.bak
+  #cp /etc/sysconfig/network-scripts/ifcfg-${ifdev} /mnt/etc/sysconfig/network-scripts/ifcfg-${ifdev}.bak
   cp /etc/resolv.conf /mnt/etc/resolv.conf
   sleep 5
 }
@@ -181,7 +185,7 @@ sed -i '/127.0.1.1/d' /etc/hosts
 echo "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hosts
 
 ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
-sh -c "cat >> /etc/sysconfig/network-scripts/ifcfg-\$ifdev" << EOF
+sh -c "cat >> /etc/sysconfig/network-scripts/ifcfg-\${ifdev}" << EOF
 BOOTPROTO=dhcp
 STARTMODE=auto
 ONBOOT=yes
@@ -247,7 +251,7 @@ if [ "7" = "\${VERSION_MAJOR}" ] ; then
 else
   ${DNFCMD} --enablerepo=epel --enablerepo=epel-modular install -y kernel kernel-devel ;
   ${DNFCMD} --enablerepo=epel install -y kernel kernel-devel ;
-  ${DNFCMD} install -y kernel kernel-devel ;
+  ${DNFCMD} install -y kernel kernel-devel kernel-core kernel-modules ;
 fi
 
 ${DNFCMD} install -y linux-firmware shim-* grub2-* efibootmgr
@@ -257,30 +261,35 @@ fi
 #${DNFCMD} install -y dracut-tools dracut-config-generic dracut-config-rescue
 
 kver=\$(${DNFCMD} list -y --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1)
-echo \$kver ; sleep 5
+echo \${kver} ; sleep 5
 
 
 echo "Config dracut"
 echo 'hostonly="yes"' >> /etc/dracut.conf
 mkdir -p /etc/dracut.conf.d
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+modprobe vfat ; lsmod | grep -e fat ; sleep 5
+
+if [ "zfs" = "${VOL_MGR}" ] ; then
   ${DNFCMD} install -y dracut-tools dracut-config-generic dracut-config-rescue ;
 
   ## for centos-stream VERSION_ID=8, not similar 8.4
   ## get zfs-release version from EL release kernel
   if [ $(echo ${RELEASE} | grep -e '-stream') ] ; then
     #ZFS_REL=${ZFS_REL:-8_4} ; echo \${ZFS_REL} ;
-    ZFS_REL=\$(echo \$kver | sed 's|.*\.el\(.*\)$|\1|') ; echo \${ZFS_REL} ;
+    ZFS_REL=\$(echo \${kver} | sed 's|.*\.el\(.*\)$|\1|') ; echo \${ZFS_REL} ;
   fi ;
   sleep 3 ;
 
-  ${DNFCMD} install -y http://download.zfsonlinux.org/epel/zfs-release.el${ZFS_REL:-\${VERSION_ID/./_}}.noarch.rpm ;
-  ${DNFCMD} install -y http://download.zfsonlinux.org/epel/zfs-release-2-2.el\${VERSION_MAJOR}.noarch.rpm ;
-  #${DNFCMD} install -y http://download.zfsonlinux.org/epel/zfs-release-2-2\$(rpm --eval "%{dist}").noarch.rpm ;
+  ${DNFCMD} install -y https://zfsonlinux.org/epel/zfs-release-2-3.el${ZFS_REL:-\${VERSION_ID/./_}}.noarch.rpm ;
+  ${DNFCMD} install -y https://zfsonlinux.org/epel/zfs-release-2-3.el\${VERSION_MAJOR}.noarch.rpm ;
+  ${DNFCMD} install -y https://zfsonlinux.org/epel/zfs-release-2-3\$(rpm --eval "%{dist}").noarch.rpm ;
+
   rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux ;
   ${DNFCMD} repolist -y ; sleep 5 ;
-  #${DNFCMD} config-manager -y --set-disabled zfs ;
+  ${DNFCMD} config-manager -y --set-disabled zfs ;
+  ${DNFCMD} config-manager -y --set-enabled zfs-kmod ;
+
   ${DNFCMD} --enablerepo=epel --enablerepo=epel-modular --enablerepo=zfs install -y zfs zfs-dracut ;
   ${DNFCMD} --enablerepo=epel --enablerepo=zfs install -y zfs zfs-dracut ;
   ${DNFCMD} --enablerepo=zfs install -y zfs zfs-dracut ;
@@ -301,6 +310,7 @@ if [ "zfs" = "$VOL_MGR" ] ; then
 
   echo 'nofsck="yes"' >> /etc/dracut.conf.d/zol.conf ;
   echo 'add_dracutmodules+=" zfs "' >> /etc/dracut.conf.d/zol.conf ;
+  echo 'force_drivers+=" zfs "' >> /etc/dracut.conf.d/zol.conf ;
   echo 'omit_dracutmodules+=" btrfs resume "' >> /etc/dracut.conf.d/zol.conf ;
 
   echo zfs > /etc/modules-load.d/zfs.conf ; # ??
@@ -309,13 +319,13 @@ if [ "zfs" = "$VOL_MGR" ] ; then
   ${DNFCMD} versionlock -y add zfs zfs-dkms zfs-dracut kernel kernel-core \
     kernel-modules kernel-tools kernel-tools-libs kernel-devel kernel-headers ;
   ${DNFCMD} versionlock -y list ; sleep 3 ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   ${DNFCMD} install -y lvm2 ;
   # cryptsetup
   modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
 fi
 
-dracut --force --kver \$kver.${UNAME_M}
+dracut --force --kver \${kver}.${UNAME_M}
 
 
 grub2-probe /boot
@@ -323,14 +333,14 @@ grub2-probe /boot
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  grub2-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  grub2-install --force --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
   cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
   cp /boot/efi/EFI/BOOT/BOOTAA64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI.bak ;
   cp /boot/efi/EFI/BOOT/grubaa64.EFI /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
   #cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
-  grub2-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
-  grub2-install --target=i386-pc --recheck /dev/$DEVX ;
+  grub2-install --force --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
+  grub2-install --force --target=i386-pc --recheck /dev/${DEVX} ;
   cp -R /boot/efi/EFI/\${ID}/* /boot/efi/EFI/BOOT/ ;
   cp /boot/efi/EFI/BOOT/BOOTX64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI.bak ;
   cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI ;
@@ -356,12 +366,12 @@ EOF
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 text xdriver=vesa nomodeset rootdelay=5"|'  \
   /etc/default/grub
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+if [ "zfs" = "${VOL_MGR}" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|nomodeset rootdelay|nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay|' /etc/default/grub ;
   echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub ;
-elif [ "btrfs" = "$VOL_MGR" ] ; then
+elif [ "btrfs" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
@@ -373,11 +383,11 @@ cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 cp -f /boot/efi/EFI/\${ID}/grub.cfg /boot/efi/EFI/BOOT/grub.cfg
 
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
 fi
 efibootmgr -v ; sleep 3
 
@@ -389,17 +399,18 @@ exit
 EOFchroot
 
   . /mnt/etc/os-release
-  snapshot_name=${ID}_install-$(date "+%Y%m%d")
+  snapshot_name=${ID}_${VERSION_ID}-$(date -u "+%Y%m%d")
 
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs snapshot ${ZPOOLNM}/ROOT/default@${snapshot_name} ;
     # example remove: zfs destroy ospool0/ROOT/default@snap1
     zfs list -t snapshot ; sleep 5 ;
 
     zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
   else
-    if [ "lvm" = "$VOL_MGR" ] ; then
+    if [ "lvm" = "${VOL_MGR}" ] ; then
       lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+      # example remove: lvremove vg0/snap1
       lvs ;
     fi ;
     sleep 5 ; fstrim -av ;
@@ -409,11 +420,11 @@ EOFchroot
 
 unmount_reboot() {
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     sync ; swapoff -va ; umount -vR /mnt ;
-    if [ "zfs" = "$VOL_MGR" ] ; then
+    if [ "zfs" = "${VOL_MGR}" ] ; then
       #zfs umount -a ; zpool export -a ;
-      zfs umount -a ; zpool export $ZPOOLNM ;
+      zfs umount -a ; zpool export ${ZPOOLNM} ;
     fi ;
     reboot ; #poweroff ;
   fi
@@ -425,10 +436,10 @@ run_install() {
   PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_CRYPTED
+  system_config ${INIT_HOSTNAME} ${PASSWD_CRYPTED}
   kernel_bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

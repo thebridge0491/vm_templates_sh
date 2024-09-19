@@ -5,7 +5,7 @@ Fetch missing distribution sets (xbase*, xserv*, xfont*, xshare*) & sysmerge upd
     - shell: /bin/sh
     - name: |
         arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
-        setVer=$(echo $rel | tr '.' '\0')
+        setVer=$(echo ${rel} | tr '.' '\0')
         cd /tmp
         for setX in xbase xserv xfont xshare ; do
           ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/${setX}${setVer}.tgz ;

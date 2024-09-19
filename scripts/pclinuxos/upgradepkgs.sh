@@ -15,10 +15,22 @@ apt-get -y --option Retries=3 install sudo
 grep -e '^Hold' /etc/apt/apt.conf
 
 apt-get -y clean
-fstrim -av
+
+. /etc/os-release
+snapshot_name=${ID}_${VERSION}-$(date -u "+%Y%m%d")
+
 if command -v btrfs > /dev/null ; then
-  btrfs subvolume list / ;
+  btrfs subvolume snapshot / /.snapshots/${snapshot_name} ;
+  # example remove: btrfs subvolume delete /.snapshots/snap1
+
+  btrfs subvolume list / ; sleep 5 ;
 elif command -v lvcreate > /dev/null ; then
-  lvs ;
+  GRP_NM=${GRP_NM:-vg0} ;
+
+  lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+  # example remove: lvremove vg0/snap1
+
+  lvs ; sleep 5 ;
 fi
-sleep 5 ; sync
+fstrim -av
+sync

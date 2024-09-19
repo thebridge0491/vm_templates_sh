@@ -65,7 +65,7 @@ bootstrap() {
 
   mkdir -p /mnt/var/empty /mnt/var/lock/subsys \
     /mnt/etc/sysconfig/network-scripts
-  #cp /etc/sysconfig/network-scripts/ifcfg-$ifdev /mnt/etc/sysconfig/network-scripts/ifcfg-${ifdev}.bak
+  #cp /etc/sysconfig/network-scripts/ifcfg-${ifdev} /mnt/etc/sysconfig/network-scripts/ifcfg-${ifdev}.bak
   cp /etc/resolv.conf /mnt/etc/resolv.conf
   sleep 5
 }
@@ -106,10 +106,10 @@ apt-get -y update
 apt-get -y --fix-broken install
 
 pkgs_nms="basesystem-minimal bash apt rpm locales-en sudo whois dhcp-client man-pages nano dosfstools xfsprogs shorewall shorewall-ipv6 mandi-ifw lib64hal1" # task-xfce"
-apt-get -y install \$pkgs_nms
+apt-get -y install \${pkgs_nms}
 # fix AND re-attempt install for infrequent errors
 apt-get -y --fix-broken install
-apt-get -y install \$pkgs_nms
+apt-get -y install \${pkgs_nms}
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -146,7 +146,7 @@ echo "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hos
 
 ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
-sh -c "cat >> /etc/sysconfig/network-scripts/ifcfg-\$ifdev" << EOF
+sh -c "cat >> /etc/sysconfig/network-scripts/ifcfg-\${ifdev}" << EOF
 DEVICE=\${ifdev}
 BOOTPROTO=dhcp
 STARTMODE=auto
@@ -200,8 +200,8 @@ sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
 
 apt-get --fix-broken install -y
-# install/enable ssh just before finish
-apt-get install -y openssh-server
+# install/enable ssh after reboot
+#apt-get install -y openssh-server
 service sshd stop #; service network stop
 
 
@@ -223,17 +223,19 @@ if [ -e /etc/os-release ] ; then
 fi
 
 pkgs_nms="kernel-5.15.88-pclos1 mkinitrd bootloader grub2 grub2-efi microcode_ctl efibootmgr"
-apt-get -y install \$pkgs_nms
+apt-get -y install \${pkgs_nms}
 # fix AND re-attempt install for infrequent errors
 apt-get -y --fix-broken install
-apt-get -y install \$pkgs_nms
+apt-get -y install \${pkgs_nms}
 
-if [ "btrfs" = "$VOL_MGR" ] ; then
+modprobe vfat ; lsmod | grep -e fat ; sleep 5
+
+if [ "btrfs" = "${VOL_MGR}" ] ; then
   apt-get -y install btrfs-progs ;
   apt-get -y --fix-broken install ;
   apt-get -y install btrfs-progs ;
   modprobe btrfs ; sleep 5 ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   apt-get -y install lvm2 ;
   # cryptsetup
   apt-get -y --fix-broken install ;
@@ -242,7 +244,7 @@ elif [ "lvm" = "$VOL_MGR" ] ; then
 fi
 
 kver="\$(ls -A /lib/modules/ | tail -1)" # or ? $(uname -r)
-mkinitrd /boot/initrd-\$kver \$kver
+mkinitrd /boot/initrd-\${kver} \${kver}
 
 
 grub2-probe /boot
@@ -250,7 +252,7 @@ grub2-probe /boot
 echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/EFI/EFI/\${ID} /boot/EFI/EFI/BOOT
 grub2-install --target=x86_64-efi --efi-directory=/boot/EFI --bootloader-id=\${ID} --recheck --removable
-grub2-install --target=i386-pc --recheck /dev/$DEVX
+grub2-install --target=i386-pc --recheck /dev/${DEVX}
 cp -R /boot/EFI/EFI/\${ID}/* /boot/EFI/EFI/BOOT/
 cp /boot/EFI/EFI/BOOT/BOOTX64.EFI /boot/EFI/EFI/BOOT/BOOTX64.EFI.bak
 cp /boot/EFI/EFI/BOOT/grubx64.EFI /boot/EFI/EFI/BOOT/BOOTX64.EFI
@@ -262,9 +264,9 @@ cp /boot/EFI/EFI/BOOT/grubx64.EFI /boot/EFI/EFI/BOOT/BOOTX64.EFI
 sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 nokmsboot noacpi text xdriver=vesa nomodeset rootdelay=5"|'  \
   /etc/default/grub
 
-if [ "btrfs" = "$VOL_MGR" ] ; then
+if [ "btrfs" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
@@ -275,8 +277,8 @@ grub2-mkconfig -o /boot/grub2/grub.cfg
 #cp -f /boot/EFI/EFI/\${ID}/grub.cfg /boot/grub2/grub.cfg
 #cp -f /boot/EFI/EFI/\${ID}/grub.cfg /boot/EFI/EFI/BOOT/grub.cfg
 
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
 efibootmgr -v ; sleep 3
 
 whois-mkpasswd -m help ; sleep 10
@@ -286,14 +288,15 @@ exit
 EOFchroot
 
   . /mnt/etc/os-release
-  snapshot_name=${ID}_install-$(date "+%Y%m%d")
+  snapshot_name=${ID}_${VERSION}-$(date -u "+%Y%m%d")
 
-  if [ "btrfs" = "$VOL_MGR" ] ; then
+  if [ "btrfs" = "${VOL_MGR}" ] ; then
     btrfs subvolume snapshot /mnt /mnt/.snapshots/${snapshot_name} ;
     # example remove: btrfs subvolume delete /.snapshots/snap1
     btrfs subvolume list /mnt ;
-  elif [ "lvm" = "$VOL_MGR" ] ; then
+  elif [ "lvm" = "${VOL_MGR}" ] ; then
     lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+    # example remove: lvremove vg0/snap1
     lvs ;
   fi
   sleep 5 ; fstrim -av
@@ -302,7 +305,7 @@ EOFchroot
 
 unmount_reboot() {
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     sync ; swapoff -va ; umount -vR /mnt ;
     reboot ; #poweroff ;
   fi
@@ -314,10 +317,10 @@ run_install() {
   #PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_PLAIN
+  system_config ${INIT_HOSTNAME} ${PASSWD_PLAIN}
   kernel_bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

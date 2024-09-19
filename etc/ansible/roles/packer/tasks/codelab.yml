@@ -2,7 +2,7 @@
 
 - block:
   - name: "(lang: {{item}}) Coding lab packages (variant: {{variant}})"
-    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo $pkgs_lang_py
+    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo ${pkgs_lang_py}
     #ignore_errors: true
     debug: msg={{distro_pkgs.get("pkgs_lang_"+item, "").split(" ")}}
     loop: '{{langs.split(" ")}}'

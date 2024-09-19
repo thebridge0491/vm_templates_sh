@@ -132,10 +132,10 @@ for svc_runlvl in devfs:sysinit dmesg:sysinit mdev:sysinit hwdrivers:sysinit \
     mount-ro:shutdown killprocs:shutdown savecache:shutdown \
     acpid:default sshd:default crond:default ; do
     # udev:sysinit udev-postmount:default udev-trigger:sysinit ; do
-  svc=\$(echo \$svc_runlvl | cut -d: -f1) ;
-  runlvl=\$(echo \$svc_runlvl | cut -d: -f2) ;
+  svc=\$(echo \${svc_runlvl} | cut -d: -f1) ;
+  runlvl=\$(echo \${svc_runlvl} | cut -d: -f2) ;
 
-  rc-update add \$svc \$runlvl ;
+  rc-update add \${svc} \${runlvl} ;
 done
 
 
@@ -184,19 +184,19 @@ apk --arch ${UNAME_M} add linux-lts linux-lts-dev mkinitfs grub-efi efibootmgr
 if [ "x86_64" = "${UNAME_M}" ] ; then
   apk --arch ${UNAME_M} add grub-bios
 fi
-sleep 5
+modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+if [ "zfs" = "${VOL_MGR}" ] ; then
   apk --arch ${UNAME_M} add zfs ;
   modprobe zfs ; zfs version ; sleep 5 ;
 
   zgenhostid -f -o /etc/hostid ; sleep 5 ;
 
   for svc_runlvl in zfs-import:sysinit zfs-mount:sysinit ; do
-    svc=\$(echo \$svc_runlvl | cut -d: -f1) ;
-    runlvl=\$(echo \$svc_runlvl | cut -d: -f2) ;
+    svc=\$(echo \${svc_runlvl} | cut -d: -f1) ;
+    runlvl=\$(echo \${svc_runlvl} | cut -d: -f2) ;
 
-    rc-update add \$svc \$runlvl ;
+    rc-update add \${svc} \${runlvl} ;
   done
 
   features="ata base cdrom ext4 xfs keymap kms mmc raid scsi usb virtio zfs network" ;
@@ -207,7 +207,7 @@ if [ "zfs" = "$VOL_MGR" ] ; then
     apk --arch ${UNAME_M} add \${pkgX}=\$(apk --arch ${UNAME_M} info -ve \${pkgX} | sed "s|\${pkgX}-\(.*\)|\1|") ;
   done ;
   # ?? how to display held/pinned packages ??
-elif [ "btrfs" = "$VOL_MGR" ] ; then
+elif [ "btrfs" = "${VOL_MGR}" ] ; then
   apk --arch ${UNAME_M} add btrfs-progs ;
   modprobe btrfs ; sleep 5 ;
 
@@ -228,23 +228,23 @@ EOF
   chmod +x /etc/init.d/btrfs-scan ;
 
   for svc_runlvl in btrfs-scan:boot ; do
-    svc=\$(echo \$svc_runlvl | cut -d: -f1) ;
-    runlvl=\$(echo \$svc_runlvl | cut -d: -f2) ;
+    svc=\$(echo \${svc_runlvl} | cut -d: -f1) ;
+    runlvl=\$(echo \${svc_runlvl} | cut -d: -f2) ;
 
-    rc-update add \$svc \$runlvl ;
+    rc-update add \${svc} \${runlvl} ;
   done
 
   features="ata base cdrom ext4 xfs keymap kms mmc raid scsi usb virtio btrfs network" ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   apk --arch ${UNAME_M} add lvm2 ;
   # cryptsetup
   modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
 
   for svc_runlvl in lvm:boot ; do
-    svc=\$(echo \$svc_runlvl | cut -d: -f1) ;
-    runlvl=\$(echo \$svc_runlvl | cut -d: -f2) ;
+    svc=\$(echo \${svc_runlvl} | cut -d: -f1) ;
+    runlvl=\$(echo \${svc_runlvl} | cut -d: -f2) ;
 
-    rc-update add \$svc \$runlvl ;
+    rc-update add \${svc} \${runlvl} ;
   done
 
   features="ata base cdrom ext4 xfs keymap kms mmc raid scsi usb virtio lvm network" ;
@@ -267,7 +267,7 @@ if [ "aarch64" = "${UNAME_M}" ] ; then
   cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
   grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
-  grub-install --target=i386-pc --recheck /dev/$DEVX ;
+  grub-install --target=i386-pc --recheck /dev/${DEVX} ;
   cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
 fi
 
@@ -276,14 +276,14 @@ fi
 echo 'GRUB_CMDLINE_LINUX_DEFAULT="rd.auto=1 text nomodeset rootdelay=5 modules=sd-mod,usb-storage,ext4"' >> /etc/default/grub ;
 #sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
 
-if [ "zfs" = "$VOL_MGR" ] ; then
+if [ "zfs" = "${VOL_MGR}" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|\(usb-storage,ext4\)|\1,zfs|' /etc/default/grub ;
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|nomodeset rootdelay|nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay|' /etc/default/grub ;
   echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub ;
-elif [ "btrfs" = "$VOL_MGR" ] ; then
+elif [ "btrfs" = "${VOL_MGR}" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|\(usb-storage,ext4\)|\1,btrfs|' /etc/default/grub ;
   echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
-elif [ "lvm" = "$VOL_MGR" ] ; then
+elif [ "lvm" = "${VOL_MGR}" ] ; then
   sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|\(usb-storage,ext4\)|\1,lvm|' /etc/default/grub ;
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
@@ -294,11 +294,11 @@ fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
-  efibootmgr -c -d /dev/$DEVX -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
 fi
 efibootmgr -v ; sleep 3
 
@@ -309,21 +309,22 @@ exit
 EOFchroot
 
   . /mnt/etc/os-release
-  snapshot_name=${ID}_install-$(date "+%Y%m%d")
+  snapshot_name=${ID}_${VERSION_ID}-$(date -u "+%Y%m%d")
 
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs snapshot ${ZPOOLNM}/ROOT/default@${snapshot_name} ;
     # example remove: zfs destroy ospool0/ROOT/default@snap1
     zfs list -t snapshot ; sleep 5 ;
 
     zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
   else
-    if [ "btrfs" = "$VOL_MGR" ] ; then
+    if [ "btrfs" = "${VOL_MGR}" ] ; then
       btrfs subvolume snapshot /mnt /mnt/.snapshots/${snapshot_name} ;
       # example remove: btrfs subvolume delete /.snapshots/snap1
       btrfs subvolume list /mnt ;
-    elif [ "lvm" = "$VOL_MGR" ] ; then
+    elif [ "lvm" = "${VOL_MGR}" ] ; then
       lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
+      # example remove: lvremove vg0/snap1
       lvs ;
     fi ;
     sleep 5 ; fstrim -av ;
@@ -333,11 +334,11 @@ EOFchroot
 
 unmount_reboot() {
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     sync ; swapoff -va ; umount -vR /mnt ;
-    if [ "zfs" = "$VOL_MGR" ] ; then
+    if [ "zfs" = "${VOL_MGR}" ] ; then
       #zfs umount -a ; zpool export -a ;
-      zfs umount -a ; zpool export $ZPOOLNM ;
+      zfs umount -a ; zpool export ${ZPOOLNM} ;
     fi ;
     reboot ; #poweroff ;
   fi
@@ -349,10 +350,10 @@ run_install() {
   PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_CRYPTED
+  system_config ${INIT_HOSTNAME} ${PASSWD_CRYPTED}
   kernel_bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

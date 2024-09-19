@@ -42,7 +42,7 @@ fi
 
 echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
 for pkgX in xauth xterm ; do
-  apt-get -y --no-install-recommends install $pkgX ;
+  apt-get -y --no-install-recommends install ${pkgX} ;
 done
 
 set -e ; set -u

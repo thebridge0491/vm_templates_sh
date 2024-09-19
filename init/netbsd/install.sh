@@ -37,13 +37,13 @@ ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 #sysctl net.wlan.devices ; sleep 3
 
 
-idxESP=$(echo $(gpt show -l $DEVX | grep -e ESP) | cut -d' ' -f3)
-idxRoot=$(echo $(gpt show -l $DEVX | grep -e "${GRP_NM}-fsRoot") | cut -d' ' -f3)
-dkRoot=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsRoot" | cut -d: -f1)
-dkVar=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsVar" | cut -d: -f1)
-dkHome=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsHome" | cut -d: -f1)
-dkSwap=$(dkctl $DEVX listwedges | grep -e "${GRP_NM}-fsSwap" | cut -d: -f1)
-dkESP=$(dkctl $DEVX listwedges | grep -e ESP | cut -d: -f1)
+idxESP=$(echo $(gpt show -l ${DEVX} | grep -e ESP) | cut -d' ' -f3)
+idxRoot=$(echo $(gpt show -l ${DEVX} | grep -e "${GRP_NM}-fsRoot") | cut -d' ' -f3)
+dkRoot=$(dkctl ${DEVX} listwedges | grep -e "${GRP_NM}-fsRoot" | cut -d: -f1)
+dkVar=$(dkctl ${DEVX} listwedges | grep -e "${GRP_NM}-fsVar" | cut -d: -f1)
+dkHome=$(dkctl ${DEVX} listwedges | grep -e "${GRP_NM}-fsHome" | cut -d: -f1)
+dkSwap=$(dkctl ${DEVX} listwedges | grep -e "${GRP_NM}-fsSwap" | cut -d: -f1)
+dkESP=$(dkctl ${DEVX} listwedges | grep -e ESP | cut -d: -f1)
 
 
 bootstrap() {
@@ -58,7 +58,7 @@ bootstrap() {
     #cd /mnt ; mv netbsd netbsd.gen ; ln -fh netbsd.gen netbsd
   else
     for file in kern-GENERIC base comp etc man misc modules tests text ; do
-      (ftp -o - http://${MIRROR}/NetBSD-${REL}/${MACHINE}/binary/sets/${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
+      (ftp -vo - http://${MIRROR}/NetBSD-${REL}/${MACHINE}/binary/sets/${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
     done ;
   fi
 
@@ -150,11 +150,15 @@ echo "PKG_PATH=ftp://ftp.netbsd.org/pub/pkgsrc/packages/NetBSD/${MACHINE}/${REL}
 PKG_PATH=http://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/${MACHINE}/${REL}/All
 
 pkg_add -u
-pkg_add -v pkgin sudo gtar gmake
+pkg_add -v pkgin sudo gtar gmake ca-certificates
+sed -i 's|#ETCCERTSDIR|ETCCERTSDIR|' /usr/pkg/etc/ca-certificates-dir.conf
 #vim nano bzip2 findutils ggrep zip unzip
 #xfce4
-export PATH=\$PATH:/usr/pkg/sbin:/usr/pkg/bin
-pkgin -y install sudo gtar gmake
+export PATH=\${PATH}:/usr/pkg/sbin:/usr/pkg/bin
+pkgin -y install sudo gtar gmake ca-certificates
+sed -i 's|#ETCCERTSDIR|ETCCERTSDIR|' /usr/pkg/etc/ca-certificates-dir.conf
+
+update-ca-certificates
 
 
 echo "Set root passwd ; add user" ; sleep 3
@@ -197,7 +201,7 @@ EOFchroot
 }
 
 bootloader() {
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     echo 'zfs=YES' >> /mnt/etc/rc.conf ;
   fi
 
@@ -211,7 +215,7 @@ bootloader() {
     cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
   fi
 
-  if [ "zfs" = "$VOL_MGR" ] ; then
+  if [ "zfs" = "${VOL_MGR}" ] ; then
     cp /boot.cfg /boot.cfg.orig ;
     cat > /boot.cfg << EOF ;
 menu=Boot normally:load solaris;load zfs;rndseed /etc/entropy-file;boot netbsd
@@ -245,10 +249,12 @@ EOF
 }
 
 unmount_reboot() {
+  echo "NOTE: On reboot, if continually rebooting to iso, hit Esc key, .. Boot Manager, .. QEMU HardDisk" > /dev/stderr
+
   read -p "Enter 'y' if ready to unmount & reboot [yN]: " response
-  if [ "y" = "$response" ] || [ "Y" = "$response" ] ; then
+  if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
     umount /mnt/efi ; rm -r /mnt/efi ;
-    sync ; swapctl -d /dev/$dkSwap ; umount -a ;
+    sync ; swapctl -d /dev/${dkSwap} ; umount -a ;
     reboot ; #shutdown -p +3 ;
   fi
 }
@@ -259,10 +265,10 @@ run_install() {
   #PASSWD_CRYPTED=${2:-}
 
   bootstrap
-  system_config $INIT_HOSTNAME $PASSWD_PLAIN
+  system_config ${INIT_HOSTNAME} ${PASSWD_PLAIN}
   bootloader
   unmount_reboot
 }
 
 #----------------------------------------
-$@
+${@}

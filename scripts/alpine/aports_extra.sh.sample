@@ -20,5 +20,5 @@ sudo apk add alpine-sdk
 cd aports/main/debootstrap
 abuild -r
 
-sudo apk add --repository $HOME/packages/main debootstrap
+sudo apk add --repository ${HOME}/packages/main debootstrap
 apk info debootstrap ; sleep 5
