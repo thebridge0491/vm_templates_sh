@@ -56,6 +56,9 @@ else
   ##stty -echo ; read -p "Password for user(${user}): " passw ; stty echo
   entry=${entry:-appmail}
   passw=$(sh ${SCRIPTPARENT}/get_secret.sh getpass_entry ${entry} | tr '\n' '\0')
+  if [ -z "${passw}" ] ; then
+    stty -echo ; read -p "Password for user(${user}): " passw ; stty echo ;
+  fi
 
   auth_method=plain
   sasl_str=$(printf "\0${user}\0${passw}" | openssl base64)

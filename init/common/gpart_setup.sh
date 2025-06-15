@@ -39,7 +39,7 @@ parttbl_bkup() {
 }
 
 gpart_disk() {
-  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-fbsd0}
 
   echo "Partitioning disk" ; sleep 3
   #gpart destroy -F ${DEVX}
@@ -91,7 +91,7 @@ gpart_disk() {
 }
 
 zfspart_create() {
-  GRP_NM=${1:-bsd0} ; ZPARTNM_ZPOOLNM=${2:-${GRP_NM}-fsPool:fspool0}
+  GRP_NM=${1:-fbsd0} ; ZPARTNM_ZPOOLNM=${2:-${GRP_NM}-fsPool:fspool0}
 
   kldload opensolaris ; kldload zfs ; zfs version
   kldstat -h -v -m zfs ; sleep 5
@@ -104,13 +104,18 @@ zfspart_create() {
   zpool destroy ${zpoolnm}
   zpool labelclear -f /dev/${DEVX}p${idx}
 
-  zpool create -o altroot=/mnt -O compress=lz4 -O atime=off -m none \
-	-O dedup=off -f ${zpoolnm} ${DEVX}p${idx}
+  #zpool create -o altroot=/mnt -O compress=lz4 -O atime=off -O dedup=off \
+  #  -m none -f ${zpoolnm} ${DEVX}p${idx}
+  ## Note: see /usr/share/zfs/compatibility.d/* files
+  ## ex: compatibility=[openzfs-2.1-freebsd | grub2]
+  zpool create -o altroot=/mnt -o compatibility=openzfs-2.1-freebsd \
+    -O compress=lz4 -O atime=off -O dedup=off -m none -f ${zpoolnm} \
+    ${DEVX}p${idx}
   zfs create -o mountpoint=none ${zpoolnm}/ROOT
   zfs create -o canmount=noauto -o mountpoint=/ ${zpoolnm}/ROOT/default
   zfs mount ${zpoolnm}/ROOT/default
 
-  zfs create -o exec=on -o setuid=off -o mountpoint=/tmp ${zpoolnm}/tmp
+  #zfs create -o exec=on -o setuid=off -o mountpoint=/tmp ${zpoolnm}/tmp
   zfs create -o canmount=off -o mountpoint=/usr ${zpoolnm}/usr
   zfs create -o mountpoint=/usr/home ${zpoolnm}/usr/home
   zfs create -o setuid=off ${zpoolnm}/usr/ports
@@ -124,7 +129,7 @@ zfspart_create() {
 
   zfs set quota=7680M ${zpoolnm}/usr/home
   zfs set quota=5G ${zpoolnm}/var
-  zfs set quota=2G ${zpoolnm}/tmp
+  #zfs set quota=2G ${zpoolnm}/tmp
 
   zpool set bootfs=${zpoolnm}/ROOT/default ${zpoolnm} # ??
   zpool set cachefile=/etc/zfs/zpool.cache ${zpoolnm} ; sync
@@ -144,13 +149,13 @@ zfspart_create() {
 }
 
 format_partitions() {
-  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-fbsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
   MKFS_CMD=${MKFS_CMD:-newfs -U -t}
   BSD_PARTNMS=${BSD_PARTNMS:-${GRP_NM}-fsSwap ${GRP_NM}-fsRoot ${GRP_NM}-fsVar ${GRP_NM}-fsHome}
 
   echo "Formatting file systems" ; sleep 3
   if [ "zfs" = "${VOL_MGR}" ] ; then
-	zfspart_create ${GRP_NM} ${ZPARTNM_ZPOOLNM} ;
+  zfspart_create ${GRP_NM} ${ZPARTNM_ZPOOLNM} ;
 
     zpartnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f1) ;
     zpoolnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f2) ;
@@ -161,7 +166,7 @@ format_partitions() {
     kldstat -h -v -m ufs ; sleep 5 ;
 
     for partnm in ${BSD_PARTNMS} ; do
-	  idx=$(gpart show -l | grep -e "${partnm}" | cut -w -f4) ;
+    idx=$(gpart show -l | grep -e "${partnm}" | cut -w -f4) ;
       if [ ! "${GRP_NM}-fsSwap" = "${partnm}" ] ; then
         ${MKFS_CMD} -L ${partnm} /dev/gpt/${partnm} ;
         gpart modify -l ${partnm} -i ${idx} ${DEVX} ;
@@ -173,14 +178,14 @@ format_partitions() {
 }
 
 part_format() {
-  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-fbsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
 
   gpart_disk ${VOL_MGR} ${GRP_NM}
   format_partitions ${VOL_MGR} ${GRP_NM} ${ZPARTNM_ZPOOLNM}
 }
 
 mount_filesystems() {
-  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-bsd0}
+  VOL_MGR=${1:-zfs} ; GRP_NM=${2:-fbsd0}
   echo "Mounting file systems" ; sleep 3
   if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs mount -a ;
@@ -189,8 +194,8 @@ mount_filesystems() {
     mkdir -p /mnt/etc /mnt/compat/linux/proc ;
     mkdir -p /mnt/boot/efi ; mount -t msdosfs /dev/${DEVX}p2 /mnt/boot/efi ;
     (cd /mnt/boot/efi ; mkdir -p EFI/freebsd EFI/BOOT) ;
-    cp /boot/loader.efi /boot/zfsloader /mnt/boot/efi/EFI/freebsd/ ;
-    cp /boot/loader.efi /boot/zfsloader /mnt/boot/efi/EFI/BOOT/ ;
+    cp -a /boot/loader.efi /boot/zfsloader /mnt/boot/efi/EFI/freebsd/ ;
+    cp -a /boot/loader.efi /boot/zfsloader /mnt/boot/efi/EFI/BOOT/ ;
   else
     mount /dev/gpt/${GRP_NM}-fsRoot /mnt ; mkdir -p /mnt/var /mnt/usr/home ;
     mount /dev/gpt/${GRP_NM}-fsVar /mnt/var ;
@@ -203,20 +208,23 @@ mount_filesystems() {
     mkdir -p /mnt/etc /mnt/compat/linux/proc ;
     mkdir -p /mnt/boot/efi ; mount -t msdosfs /dev/${DEVX}p2 /mnt/boot/efi ;
     (cd /mnt/boot/efi ; mkdir -p EFI/freebsd EFI/BOOT) ;
-    cp /boot/loader.efi /mnt/boot/efi/EFI/freebsd/ ;
-    cp /boot/loader.efi /mnt/boot/efi/EFI/BOOT/ ;
+    cp -a /boot/loader.efi /mnt/boot/efi/EFI/freebsd/ ;
+    cp -a /boot/loader.efi /mnt/boot/efi/EFI/BOOT/ ;
     sh -c 'cat > /mnt/etc/fstab' << EOF ;
 /dev/gpt/${GRP_NM}-fsRoot    /           ufs     rw      1   1
 /dev/gpt/${GRP_NM}-fsVar     /var        ufs     rw      2   2
 /dev/gpt/${GRP_NM}-fsHome    /usr/home   ufs     rw      2   2
+
 EOF
   fi
   cat << EOF >> /mnt/etc/fstab ;
 /dev/gpt/${GRP_NM}-fsSwap    none        swap    sw      0   0
 
+tmpfs              /tmp        tmpfs   rw,nosuid,size=1g,mode=1777   0   0
 procfs             /proc       procfs  rw      0   0
 linprocfs          /compat/linux/proc  linprocfs   rw  0   0
 
+# exfat note (need add to /etc/rc.shutdown): umount /mnt/DataX
 #/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,gid=wheel,uid=0,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
 #/dev/gpt/data0    /mnt/Data0   exfat   auto,failok,rw,noatime,late,dmask=0000,fmask=0111,mountprog=/usr/local/sbin/mount.exfat-fuse   0    0
 

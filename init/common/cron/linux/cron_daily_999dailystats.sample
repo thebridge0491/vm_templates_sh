@@ -1,0 +1,43 @@
+#!/bin/sh
+
+sep='#--------------------#'
+concat_sep() {
+  if [ -f "${@}" ] ; then
+    printf "${sep}\n${@}\n" | cat - ${@} ;
+  else
+    printf "${sep}\n${@}\n" ;
+    eval `echo ${@}` ;
+  fi
+}
+sep_content() {
+  printf "${sep}\n"
+  if [ "OpenBSD" = "`uname -s`" ] ; then
+    tail -n +1 . ${@} ;
+  else
+    tail -vn +1 ${@} ;
+  fi
+}
+sep_cmd() {
+  printf "${sep}\n${@}\n" ; eval `echo ${@}`
+}
+
+sep_cmd 'df -lhT --total 2>&1 || df -lhT 2>&1 || df -lh 2>&1'
+
+#if command -v zfs > /dev/null ; then
+if [ -n "`df -lhT / | grep -e zfs`" ] ; then
+  sep_cmd 'zpool list ; zpool status -x ; zfs list -t all'
+#elif command -v btrfs > /dev/null ; then
+elif [ -n "`df -lhT / | grep -e btrfs`" ] ; then
+  sep_cmd 'btrfs filesystem show ; btrfs subvol list /'
+#elif command -v lvm > /dev/null ; then
+elif [ -n "`lsblk -nlpo name,type,mountpoint | grep -e '/[ ]*$' | grep -e lvm`" ] ; then
+  sep_cmd 'pvs ; vgs ; lvs -o vg_name,lv_name,lv_attr,lv_size'
+fi
+
+sep_cmd 'ss -atu 2>&1 || netstat -idW 2>&1'
+
+sep_cmd 'uptime'
+
+sep_cmd 'smtpctl show queue 2>&1 || mailq 2>&1'
+
+sep_cmd 'timedatectl timesync-status 2>&1 || chronyc -N sources 2>&1 || ntpctl -s peers 2>&1 || ntpq -pn 2>&1'

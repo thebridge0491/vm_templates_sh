@@ -53,6 +53,9 @@ else
   ##stty -echo ; read -p "Password for sender(${sender}): " passw ; stty echo
   entry=${entry:-appmail}
   passw=$(sh ${SCRIPTPARENT}/get_secret.sh getpass_entry ${entry} | tr '\n' '\0')
+  if [ -z "${passw}" ] ; then
+    stty -echo ; read -p "Password for sender(${sender}): " passw ; stty echo ;
+  fi
 
   auth_method=plain
   sasl_str=$(printf "\0${sender}\0${passw}" | openssl base64)
@@ -70,7 +73,7 @@ if [ "0" = "${USE_CURL:-0}" ] ; then
       echo "rcpt to: <${recip}>" ; sleep 2 ;
     done ;
     echo "data" ; sleep 2 ;
-    echo -e ${hdr_txt} ; sleep 2 ;
+    printf ${hdr_txt} ; sleep 2 ;
     cat ${infile} ; sleep 2 ;
     echo "." ; sleep 2 ;
     } | openssl s_client -crlf -connect ${host}":"${port} -4
@@ -90,7 +93,7 @@ else
     cred_opts="--user ${sender} --oauth2-bearer ${token}" ;
   fi ;
 
-  (echo -e ${hdr_txt} ; cat ${infile}) | curl --insecure --crlf --ssl-reqd \
+  (printf ${hdr_txt} ; cat ${infile}) | curl --insecure --crlf --ssl-reqd \
     ${cred_opts} --url smtps://${host}":"${port} -4 \
     --mail-from ${sender} --upload-file - ${mail_rcpts} ;
 fi

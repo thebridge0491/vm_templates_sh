@@ -5,12 +5,12 @@ DIR_MODE=0750 useradd -m -G wheel -s /bin/bash -c 'Vagrant User' vagrant
 echo -n "vagrant:vagrant" | chpasswd
 chown -R vagrant:$(id -gn vagrant) /home/vagrant
 
-#sh -c 'cat > /etc/sudoers.d/99_vagrant' << EOF
+#sh -c 'cat > /etc/sudoers.d/99_vagrantnopasswd' << EOF
 #Defaults:vagrant !requiretty
-#$(id -un vagrant) ALL=(ALL) NOPASSWD: ALL
+#vagrant ALL=(ALL:ALL) NOPASSWD: ALL
 #
 #EOF
-#chmod 0440 /etc/sudoers.d/99_vagrant
+#chmod 0440 /etc/sudoers.d/99_vagrantnopasswd
 
 pubkey_url="https://raw.githubusercontent.com/mitchellh/vagrant/master/keys/vagrant.pub"
 mkdir -p /home/vagrant/.ssh

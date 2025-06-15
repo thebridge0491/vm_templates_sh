@@ -5,11 +5,6 @@ variable "variant" {
   default = "archlinux"
 }
 
-variable "osver" {
-  type    = string
-  default = "rolling"
-}
-
 variable "vol_mgr" {
   type    = string
   default = "std"

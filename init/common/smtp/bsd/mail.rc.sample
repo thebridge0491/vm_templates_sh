@@ -1,0 +1,3 @@
+set append dot save ask crt hold
+ignore Received Message-Id Resent-Message-Id Status Mail-From Return-Path Via
+

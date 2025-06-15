@@ -12,9 +12,9 @@ sys.path.append(os.path.abspath(SCRIPTPARENT))
 
 def parse_cmdopts(args=None):
   import argparse
-  
+
   opts_parser = argparse.ArgumentParser()
-  
+
   opts_parser.add_argument('recips', nargs='+',
     help='Recipients (to)')
   opts_parser.add_argument('-e', '--endpoint', default='smtp.gmail.com',
@@ -35,34 +35,37 @@ def parse_cmdopts(args=None):
     default=sys.stdin, help='Input file (default: sys.stdin)')
   #opts_parser.add_argument('-o', '--outfile', type=argparse.FileType('w+'),
   #  default=sys.stdout, help='Output file (default: sys.stdout)')
-  
+
   return opts_parser.parse_args(args)
 
 def main(argv=None):
   #sys.path.append(os.path.abspath(SCRIPTPARENT))
-  from get_secret import getpass_entry, gettoken_entry
+  import get_secret
   from email.message import EmailMessage
   from email.mime.text import MIMEText
-  
+
   opts_hash = parse_cmdopts(argv)
   #entry = input("Input password entry: ")
-  
+
   if opts_hash.auth in ['oauthbearer', 'xoauth2']:
     entry = os.getenv('entry', 'tokenmail')
-    token = gettoken_entry(entry)
-    
+    token = get_secret.gettoken_entry(entry)
+
     sasl_str = 'n,a={0},\1auth=Bearer {1}\1\1'.format(opts_hash.sender, token)
     if 'xoauth2' == opts_hash.auth:
       sasl_str = 'user={0}\1auth=Bearer {1}\1\1'.format(opts_hash.sender, token)
   else: # plain | login
-    #import getpass
+    import getpass
     #passw = getpass.getpass("Password for sender({0}): ".format(
     #  opts_hash.sender))
     entry = os.getenv('entry', 'appmail')
-    passw = getpass_entry(entry)
-    
+    passw = get_secret.getpass_entry(entry)
+    if not passw:
+      passw = getpass.getpass("Password for sender({0}): ".format(
+        opts_hash.sender))
+
     sasl_str = '\0{0}\0{1}'.format(opts_hash.sender, passw)
-  
+
   #content = "From: {0}\nTo: {1}\nSubject: {2}\n{3}\n.\n".format(
   #  opts_hash.sender, ','.join(opts_hash.recips), opts_hash.subj,
   #  opts_hash.infile.read())
@@ -73,10 +76,10 @@ def main(argv=None):
   #msg.attach(MIMEType(opts_hash.infile.read(), 'plain'))
   msg.set_payload(opts_hash.infile.read())
   content = msg.as_string() # unixfrom=True
-  
+
   if opts_hash.use_curl:
     import io, pycurl
-    
+
     curl_conn = pycurl.Curl()
     curl_conn.setopt(curl_conn.URL, "smtps://{0}".format(opts_hash.endpoint))
     curl_conn.setopt(curl_conn.PORT, opts_hash.port)
@@ -87,35 +90,35 @@ def main(argv=None):
     #curl_conn.setopt(curl_conn.FOLLOWLOCATION, 1)
     #curl_conn.setopt(curl_conn.CONNECTTIMEOUT, 30)
     #curl_conn.setopt(curl_conn.VERBOSE, 1)
-    
+
     if opts_hash.auth in ['oauthbearer', 'xoauth2']:
       curl_conn.setopt(curl_conn.USERNAME, opts_hash.sender)
       curl_conn.setopt(curl_conn.XOAUTH2_BEARER, token)
     else:
-      curl_conn.setopt(curl_conn.USERPWD, 
+      curl_conn.setopt(curl_conn.USERPWD,
         "{0}:{1}".format(opts_hash.sender, passw))
-    
+
     curl_conn.setopt(curl_conn.MAIL_FROM, opts_hash.sender)
     curl_conn.setopt(curl_conn.MAIL_RCPT, opts_hash.recips)
-    
+
     istrm = io.BytesIO(content.encode())
     curl_conn.setopt(curl_conn.READDATA, istrm)
-    
+
     curl_conn.perform()
     #print(curl_conn.perform_rs())
-    
+
     curl_conn.close()
     sys.exit(0)
-  
+
   smtp_conn = smtplib.SMTP_SSL(opts_hash.endpoint, opts_hash.port)
-  
+
   smtp_conn.ehlo(opts_hash.endpoint)
   smtp_conn.helo(opts_hash.endpoint)
-  
+
   # auth() method base64 encodes sasl str
   smtp_conn.auth(opts_hash.auth, lambda _=None: sasl_str)
   smtp_conn.sendmail(opts_hash.sender, opts_hash.recips, content)
-  
+
   smtp_conn.quit()
 
 

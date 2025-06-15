@@ -1,122 +1,173 @@
 #!/bin/sh -eux
 
-#set path = (~/bin /bin /sbin /usr/{bin,sbin,X11R7/bin,pkg/{,s}bin,games} \
-#			/usr/local/{,s}bin)
-export PATH=${HOME}/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11R7/bin:/usr/pkg/bin:/usr/pkg/sbin:/usr/pkg/games:/usr/local/bin:/usr/local/sbin
-
-set +x
-export sed_inplace="sed -i"
 export SHAREDNODE=${1:-localhost.local} ; export PRINTNAME=${2:-printer1}
-
 set +e
 
-# fetch missing distribution sets like: xbase.tar.xz
-#arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
-#ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/xbase.tar.xz
-#tar -C / -xpJf xbase.tar.xz
+#set path = (~/bin /bin /sbin /usr/{bin,sbin,X11R7/bin,pkg/{,s}bin,games} \
+#  /usr/local/{,s}bin)
+export PATH=${HOME}/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11R7/bin:/usr/pkg/bin:/usr/pkg/sbin:/usr/pkg/games:/usr/local/bin:/usr/local/sbin
 
-arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
-cd /tmp
-for setX in xbase ; do
-  ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/${setX}.tar.xz ;
-  tar -C / -xpJf ${setX}.tar.xz ;
-done
+pkgin update
 
+#read -p "Fetch missing distribution sets? Enter 'y' to continue [yN]: " response
+#if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
+#  # fetch missing distribution sets like: xbase.tar.xz
+#  # uname_m: [amd64 | arm64] ; rel: X.Y
+#  uname_m=$(uname -m) ; rel=$(sysctl -n kern.osrelease) ;
+#  cd /tmp ;
+#  for setX in xbase ; do
+#    ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${uname_m}/binary/sets/${setX}.tar.xz ;
+#    tar -C / -xpJf ${setX}.tar.xz ;
+#  done ;
+#fi
 
-pkgin update ; pkgin -y upgrade
-. /root/init/netbsd/distro_pkgs.ini
-pkgin -yd install ${pkgs_cmdln_tools} ; pkgin -y install ${pkgs_cmdln_tools}
+. /root/scripts/distro_pkgs.ini ; echo ${pkgs_cmdln_tools}
 
-if [ -z "$(grep '^export JAVA_HOME' /etc/csh.cshrc)" ] ; then
-  echo "export JAVA_HOME=${default_java_home}" >> /etc/csh.cshrc ;
+read -p "Enter 'y' to continue [nY]: " response
+#if [ "n" = "${response}" ] || [ "N" = "${response}" ] ; then
+if [ -n "$(echo ${response} | grep -e '^[Nn].*')" ] ; then
+  exit ;
 fi
-if [ -z "$(grep '^fdesc' /etc/fstab)" ] ; then
-  echo 'fdesc  /dev/fd  fdescfs  rw  0  0' >> /etc/fstab ;
-fi
+#pkgin [-d] -y install pkg0 .. pkgN # OK, skips missing
+pkgin -y install ${pkgs_cmdln_tools}
 
-# clamd freshclamd
-for svc in dbus avahidaemon cupsd ; do
-	cp /usr/pkg/share/examples/rc.d/${svc} /etc/rc.d/ ;
-done
-mkdir -p /var/run/dbus
-
+#/usr/pkg/bin/dbus-uuidgen --ensure[=/var/lib/dbus/machine-id]
 if [ ! -z "$(sysctl -n kern.hostname | grep 0000)" ] ; then
-	#last4=$(cat /etc/hostid | cut -b33-36) ;
-	last4=$(sysctl -n machdep.dmi.system-uuid | cut -b33-36) ;
-	init_hostname=$(hostname) ;
-	NAME=$(echo ${init_hostname} | sed "s|0000|${last4}|") ;
-	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|" /etc/rc.conf ;
-	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|g" /etc/hosts ;
+  #idsuffix=$(cat /etc/hostid | cut -b33-36) ;
+  if [ ! "$(sysctl -n machdep.dmi.system-uuid)" = "00000000-0000-0000-0000-000000000000" ] ; then
+    idsuffix=$(sysctl -n machdep.dmi.system-uuid | cut -b33-36) ;
+  elif [ -e /var/lib/dbus/machine-id ] ; then
+    idsuffix=$(cat /var/lib/dbus/machine-id | cut -b29-32) ;
+  fi ;
+  for fileX in /etc/hosts /etc/rc.conf ; do
+    sed -i "/box.0000/ s|\(box.\)0000|\1${idsuffix:-0000}|g" ${fileX} ;
+  done ;
+  hostname $(cat /etc/hostname) ;
 fi
 
-set +e ; set +u
-
-#echo 'ntpd=YES' >> /etc/rc.conf
-# Set the time correctly
-#ntpd -u ntp:ntp ; ntpq -p ; sleep 3
-ntpdate -v -u -b us.pool.ntp.org
-
-pfctl -d
-echo 'pf=YES' >> /etc/rc.conf
-echo 'pflogd=YES' >> /etc/rc.conf
-sh /root/init/common/bsd/firewall/pf/pfconf.sh config_pf allow >> /etc/pf.conf
-sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outallow_in_allow.rules
-sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outdeny_out_allow.rules
-pfctl -vf /etc/pf.conf ; pfctl -s info ; sleep 5 ; pfctl -s rules -a '*'
-sleep 5
-
-#echo 'freshclamd=YES' >> /etc/rc.conf
-#echo 'clamd=YES' >> /etc/rc.conf
-#sh /root/init/common/misc_config.sh check_clamav
-
-#echo 'sshd=YES' >> /etc/rc.conf
-
-# clamd freshclamd
-for svc in dbus avahidaemon cupsd lpd ; do
-	echo "${svc}=YES" >> /etc/rc.conf ;
-done
-
-#sed -i '/hosts:/ s| dns| mdns_minimal \[NOTFOUND=return\] dns mdns|' /etc/nsswitch.conf
-sed -i '/hosts:/ s|files|files mdns_minimal \[NOTFOUND=return\]|' /etc/nsswitch.conf
-
-#usermod -G cups root
-
-#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
-sh /root/init/common/misc_config.sh cfg_printer_pdf \
-  /usr/pkg/share/cups/model/CUPS-PDF.ppd /usr/pkg/etc/cups/cups-pdf.conf
-#echo 'pass in proto udp from any to any port { mdns } keep state' >> /etc/pf/outallow_in_allow.rules
-sed -i 's|domain|domain, mdns|g' /etc/pf/outallow_in_allow.rules
-set -e ; set -u
-
-
-# As sharedfolders are not in defaults ports tree, we will use NFS sharing
-#echo 'rpcbind=YES' >> /etc/rc.conf
-#echo 'nfsd=YES' >> /etc/rc.conf
-#echo 'mountd=YES' >> /etc/rc.conf
-
-sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin no|" /etc/ssh/sshd_config
-sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /usr/pkg/etc/sudoers
-sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /usr/pkg/etc/sudoers
-if [ -z "$(grep '^%wheel ALL=(ALL) NOPASSWD: ALL' /usr/pkg/etc/sudoers)" ] ; then
-	echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /usr/pkg/etc/sudoers ;
+if [ -n "$(java -version)" ] ; then
+  #java_home=$(dirname $(dirname $(realpath $(which java)))) ;
+  java_home=$(realpath $(which java) | sed "s:/bin/java::") ;
+  #if [ -z "$(grep '^export JAVA_HOME' /etc/ksh.kshrc)" ] ; then
+  if [ -z "$(grep '^export JAVA_HOME' /etc/profile.d/jdk.sh)" ] ; then
+    echo 'export JAVA_HOME=${java_home}' >> /etc/profile.d/jdk.sh ;
+  fi ;
+  if [ -z "$(grep '^fdesc' /etc/fstab)" ] ; then
+    echo 'fdesc  /dev/fd  fdescfs  rw  0  0' >> /etc/fstab ;
+  fi ;
 fi
-sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /usr/pkg/etc/sudoers
 
-sh /root/init/common/misc_config.sh cfg_sshd
-sh /root/init/common/misc_config.sh cfg_shell_keychain /etc/skel/.cshrc
-sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
+#chgrp [mail | wheel] /var/mail ; chmod [g+ws,+t | 3775] /var/mail
+chgrp mail /var/mail ; chmod g+ws,+t /var/mail
 
 (cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
-cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
-cp -R /root/init/common/skel/_ssh/* /etc/skel/.ssh/
-cp -R /root/init/common/skel/_pki/* /etc/skel/.pki/
-cp /root/init/common/skel/_gitconfig.sample /etc/skel/.gitconfig
-cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
+(cd /root/init/common ; cp -a skel/_gnupg/* /etc/skel/.gnupg/ ; \
+  cp -a skel/_ssh/* /etc/skel/.ssh/ ; cp -a skel/_pki/* /etc/skel/.pki/ ; \
+  cp -a skel/_gitconfig.sample /etc/skel/.gitconfig ; \
+  cp -a skel/_hgrc.sample /etc/skel/.hgrc)
 
-sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
-sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
-if [ -e ${sshca_pubkey} ] ; then
-	echo "@cert-authority 192.168.* $(cat ${sshca_pubkey})" >> \
-		/etc/skel/.ssh/known_hosts ;
-	cp ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
+
+set +e ; set +u
+mkdir -p /var/run/dbus /var/db/dbus
+# clamd freshclamd
+for svc in dbus avahidaemon cupsd ; do
+  cp -a /usr/pkg/share/examples/rc.d/${svc} /etc/rc.d/ ;
+done
+
+groupadd -g 81 dbus
+useradd -c 'System message bus' -u 81 -g dbus -d '/' -s /usr/bin/false dbus
+
+# change daily security mail output to log file
+cp -an /etc/daily /etc/daily.orig
+sed -i "s|\(^.*\)\(mail .*daily insecurity output.*$\)|\1#\2\n\1cat \$SECOUT > /var/log/security.out|" /etc/daily
+
+#groupadd -g 193 cups ; usermod -G cups root
+#for file1 in lp lpq lpr lprm ; do
+#  if [ -e /usr/bin/${file1} ] ; then
+#    mv /usr/bin/${file1} /usr/bin/${file1}.old ;
+#  fi ;
+#  if [ 'NetBSD' = "$(uname -s)" ] ; then
+#    ln -s /usr/pkg/bin/${file1} /usr/bin/${file1} ;
+#  else
+#    ln -s /usr/local/bin/${file1} /usr/bin/${file1} ;
+#  fi
+#done
+
+sh /root/init/common/cron/bsd/config_cron.sh
+
+smtp_daemon=${smtp_daemon:-postfix}
+# config postfix -- maildir format vice mbox
+if [ -z "$(service -e | grep postfix)"] ; then
+  echo postfix=YES >> /etc/rc.conf ;
 fi
+service postfix restart || true
+# [home_mailbox=Maildir/ | mail_spool_directory=/var/mail/]
+#echo "mail_spool_directory = /var/mail/" >> /etc/postfix/main.cf
+postconf mail_spool_directory=/var/mail/
+postfix reload
+for userX in root packer vagrant ; do
+  [ ! -e /var/mail/${userX}.old ] && \
+    mv /var/mail/${userX} /var/mail/${userX}.old ;
+done
+
+firewall_tool=${firewall_tool:-pf}
+sh /root/init/common/firewall/bsd/config_pf.sh #config_pf allow
+#diff -s /etc/pf.conf /etc/pf.conf.new ; sleep 5
+#(sleep 120 && /sbin/pfctl -d)& && /sbin/pfctl -e
+/sbin/pfctl -e
+
+if [ -z "$(grep -e 'domain.*mdns' /etc/pf/outallow_in_allow.rules)" ] ; then
+  #echo 'pass in proto udp from any to any port { domain, mdns } keep state' >> /etc/pf/outallow_in_allow.rules ;
+  if [ 'FreeBSD' = "$(uname -s)" ] ; then
+    sed -i '' 's|domain|domain, mdns|g' /etc/pf/outallow_in_allow.rules ;
+  else
+    sed -i 's|domain|domain, mdns|g' /etc/pf/outallow_in_allow.rules ;
+  fi ;
+fi
+/sbin/pfctl -s info ; sleep 5 #; /sbin/pfctl -s rules -a '*' ; sleep 5
+
+
+set -e ; set -u
+sh /root/init/common/misc_config.sh cfg_nsswitch_mdns
+sh /root/init/common/misc_config.sh cfg_sudo_nopasswd /usr/pkg/etc/sudoers.d
+#sh /root/init/common/misc_config.sh check_clamav
+sh /root/init/common/misc_config.sh cfg_sshd
+sh /root/init/common/misc_config.sh cfg_shell_keychain /etc/skel/.cshrc
+sh /root/init/common/misc_config.sh cfg_shell_keychain /etc/skel/.shrc
+
+# As sharedfolders are not in defaults ports tree, we will use NFS sharing
+#services_enabled="${services_enabled} rpcbind mountd nfsd"
+sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
+
+#sh /root/init/common/misc_config.sh cfg_printer_pdf /usr/pkg/etc/cups \
+#  /usr/pkg/share/cups/model
+#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
+lpstat -t || true ; sleep 5
+
+set +e ; set +u
+echo "Enable|disable services" ; sleep 3
+for svc in ${services_enabled} ; do
+  if [ -z "$(service -e | grep ${svc})" ] ; then
+    echo ${svc}=YES >> /etc/rc.conf ;
+  fi ;
+done
+for svc in ${services_disabled} ; do
+  if [ -n "$(service -e | grep ${svc})" ] ; then
+    echo ${svc}=NO >> /etc/rc.conf ;
+  fi ;
+done
+
+
+cat << EOF | sendmail -t root
+To: packer
+Subject: Subject sample
+
+Email sample
+EOF
+mail_cmd=$(basename $(which nail s-nail mailx | head -n1))
+echo Sample email | ${mail_cmd:-mail} -r vagrant@$(hostname -s || hostname) \
+  -s "Sample subject" root packer
+set -e ; set -u
+
+set +e
+pkgin -y clean # #?? clean

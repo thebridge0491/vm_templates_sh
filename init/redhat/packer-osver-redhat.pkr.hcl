@@ -5,11 +5,6 @@ variable "variant" {
   default = "redhat"
 }
 
-variable "osver" {
-  type    = string
-  default = "9"
-}
-
 variable "vol_mgr" {
   type    = string
   default = "std"
@@ -30,23 +25,23 @@ variable "repo_directory_x64" {
 
 variable "iso_url_directory_x64" {
   type    = string
-  #default = "/9/live/x86_64"
+  default = "/9/live/x86_64"
   #default = "/9-stream/BaseOS/x86_64/iso"
-  default = "/9/isos/x86_64"
+  #default = "/9/isos/x86_64"
 }
 
 variable "iso_base_x64" {
   type    = string
-  ##default = "AlmaLinux-9.4-x86_64-Live-XFCE"
-  #default = "Rocky-9.4-XFCE-x86_64-20240506.0"
+  ##default = "live/AlmaLinux-9.4-x86_64-Live-XFCE"
+  default = "live/Rocky-9-XFCE-x86_64-latest"
   #default = "CentOS-Stream-9-latest-x86_64-boot"
-  #default = "AlmaLinux-9.4-x86_64-boot"
-  default = "Rocky-9.4-x86_64-boot"
+  #default = "Rocky-9-latest-x86_64-boot"
 }
 
 variable "iso_cdlabel_x64" {
   type    = string
   #default = "AlmaLinux-9.4-x86_64-Live-XFCE"
+  #default = "CentOS-Stream-Image-XFCE"
   default = "Rocky-9-4-XFCE"
 }
 
@@ -65,16 +60,17 @@ variable "repo_directory_aa64" {
 
 variable "iso_url_directory_aa64" {
   type    = string
-  #default = "/9/live/aarch64"
+  default = "/9/live/aarch64"
   #default = "/9-stream/BaseOS/aarch64/iso"
-  default = "/9/isos/aarch64"
+  #default = "/9/isos/aarch64"
 }
 
 variable "iso_base_aa64" {
   type    = string
-  #default = "CentOS-Stream-9-latest-aarch64-boot"
-  #default = "AlmaLinux-9.4-aarch64-boot"
-  default = "Rocky-9.4-aarch64-boot"
+  default = "live/aarch64/Rocky-9-XFCE-aarch64-latest"
+  #default = "aarch64/CentOS-Stream-9-latest-aarch64-boot"
+  #default = "aarch64/AlmaLinux-9.4-aarch64-boot"
+  #default = "aarch64/Rocky-9-latest-aarch64-boot"
 }
 
 variable "iso_cdlabel_aa64" {
@@ -85,7 +81,7 @@ variable "iso_cdlabel_aa64" {
 
 variable "boot_cmdln_options" {
   type    = string
-  default = " quiet nomodeset video=1024x768 "
+  default = " quiet video=1024x768 nomodeset "
 }
 
 

@@ -43,7 +43,7 @@ echo '##########'
 echo 'Manually copy updated scripts tarball, then run provision xferscripts.'
 echo "  cd #{repo_dir} ; cp -a ${HOME}/.ssh/publish_krls init/common/skel/_ssh/"
 echo "  cp -a ${HOME}/.pki/publish_crls init/common/skel/_pki/"
-echo "  tar -cf /tmp/scripts_#{variant}.tar init/common init/#{variant} -C scripts #{variant}"
+echo "  tar -cf /tmp/scripts_#{variant}.tar init/{common,#{variant}} -C scripts #{variant}"
 echo '  xfr: scp /tmp/scripts_#{variant}.tar packer@10.0.2.10:/tmp/scripts.tar'
 echo '  xfr: ssh packer@10.0.2.10 "cat - > /tmp/scripts.tar" < /tmp/scripts_#{variant}.tar'
 echo '##########'
@@ -53,13 +53,10 @@ EOF
   config.vm.provision 'xferscripts', type: 'shell', run: 'never', privileged: false do |s|
     s.inline = <<-EOF
 set -x
-sudo rm -r /tmp/init ; sudo rm -r /tmp/scripts
-mkdir -p /tmp/init ; sudo chmod 1777 /tmp
-tar -xf /tmp/scripts.tar -C /tmp
-for path in /root/scripts.tar /root/init /root/scripts ; do
-  sudo rm -r ${path} ;
-done
-mv /tmp/#{variant} /tmp/scripts ; sudo cp -fa /tmp/init /tmp/scripts /root/
+sudo rm -r /tmp/{init,scripts} /root/{init,scripts}
+tar -xf /tmp/scripts.tar -C /tmp ; mv /tmp/#{variant} /tmp/scripts
+chown -R $(id -un):$(id -gn) /tmp/{init,scripts}
+sudo cp -fa /tmp/{init,scripts} /root/
 EOF
   end
 

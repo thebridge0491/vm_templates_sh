@@ -5,11 +5,6 @@ variable "variant" {
   default = "void"
 }
 
-variable "osver" {
-  type    = string
-  default = "rolling"
-}
-
 variable "vol_mgr" {
   type    = string
   default = "std"
@@ -34,12 +29,12 @@ variable "iso_base_x64" {
 
 variable "mirror_host_aa64" {
   type    = string
-  default = null
+  default = "repo-default.voidlinux.org"
 }
 
 variable "iso_url_directory_aa64" {
   type    = string
-  default = null
+  default = "/live/current"
 }
 
 variable "iso_base_aa64" {

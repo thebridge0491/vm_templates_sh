@@ -45,7 +45,7 @@ remove repo                              (edit /etc/apt/ \        (del repofile 
 install pkg     pacman -S <pkg>          zypper install <pkg>     apk add <pkg>
 install file    pacman -U <f>            zypper install <f>
 upgrade pkg     pacman -S <pkg>          zypper update <pkg>      apk upgrade -U <pkg>
-remove pkg      pacman -R <pkg>          zypper remove <pkg>
+remove pkg      pacman -R <pkg>          zypper remove <pkg>      apk del <pkg>
 lock pkg        (edit /etc/pacman.conf \ zypper addlock <pkg>     apk add <pkg>=<ver>
                   IgnorePkg=<pkg>
 update pkg db   pacman -Sy               zypper refresh           apk update ; apk fix

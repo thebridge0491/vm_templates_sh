@@ -19,10 +19,11 @@
 ##  (client) tools:
 ##    [curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file
 
-# usage: [env variant=oshost] sh vminstall_chroot.sh [oshost_machine [GUEST]]
-#   (default) [variant=freebsd] sh vminstall_chroot.sh [freebsd_x86_64 [freebsd-x86_64-std]]
+# usage: [MACHINE=x86_64 variant=oshost] sh vminstall_chroot.sh [oshost_func [GUEST]]
+#   (default) [variant=freebsd] sh vminstall_chroot.sh [freebsd_guestvm [freebsd-x86_64-std]]
 
 STORAGE_DIR=${STORAGE_DIR:-$(dirname ${0})} ; PROVIDER=${PROVIDER:-libvirt}
+MACHINE=${MACHINE:-x86_64}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros} ; DISK_SZ=${DISK_SZ:-30720M}
 BHYVE_FIRMWARE_X64=${BHYVE_FIRMWARE_X64:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
 QEMU_FIRMWARE_X64=${QEMU_FIRMWARE_X64:-/usr/share/OVMF/OVMF_CODE.fd}
@@ -94,7 +95,7 @@ _install_x86_64() {
     #  eval "echo \"$(< vminstall_qemu.args)\"" > /tmp/install_qemu.args
     #  virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
 
-    virt-install ${CONNECT_OPT} --arch x86_64 --cpu SandyBridge \
+    virt-install ${CONNECT_OPT} --arch x86_64 --cpu Skylake-Client \
       --memory 4096 --vcpus 2 \
       --controller usb,model=ehci --controller virtio-serial \
       --console pty,target_type=virtio --graphics vnc,port=-1 \
@@ -145,7 +146,7 @@ EOF
     echo "(if needed) Quickly catch boot menu to add kernel boot parameters" ;
     sleep 5 ;
 
-    qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
+    qemu-system-x86_64 -cpu Skylake-Client -machine q35,accel=kvm:hvf:tcg \
       -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
       -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
@@ -195,7 +196,7 @@ _install_aarch64() {
     echo "(if needed) Quickly catch boot menu to add kernel boot parameters" ;
     sleep 5 ;
 
-    qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
+    qemu-system-aarch64 -cpu cortex-a72 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
       -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
       -device usb-ehci,id=usb -usb -device usb-kbd -device usb-tablet \
@@ -215,8 +216,8 @@ _install_aarch64() {
   ##!! (freebsd) login user/passwd: root/-
 
   #mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; cd /tmp
-  #mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5
-  #ifconfig ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev} {ifdev}
+  #mkdir -p /tmp/bsdinstall_etc ; ifconfig
+  #dhclient -l /tmp/dhclient.leases.{ifdev} -p /tmp/dhclient.{ifdev}.pid {ifdev}
 
   ## (FreeBSD) install via chroot
   ## NOTE, transfer [dir(s) | file(s)]: scripts_freebsd.tar (init/common, init/freebsd, scripts/freebsd)
@@ -226,51 +227,64 @@ _install_aarch64() {
   #sh init/common/gpart_setup.sh mount_filesystems [std | zfs]
 
   #[VOL_MGR=[std | zfs]] sh init/freebsd/install.sh run_install [hostname [passwd_crypted]]
-
-freebsd_x86_64() {
+freebsd_guestvm() {
   FREEBSDGUEST=1
-  variant=${variant:-freebsd} ; GUEST=${1:-${variant}-x86_64-std}
+  variant=${variant:-freebsd} ; GUEST=${1:-${variant}-${MACHINE}-std}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE-amd64)
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-aarch64-disc1.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE*-aarch64)
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE-amd64)
+  fi
 
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
-}
-freebsd_aarch64() {
-  variant=${variant:-freebsd} ; GUEST=${1:-${variant}-aarch64-std}
-
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-aarch64-disc1.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE*-aarch64)
-
-  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+  sleep 5 ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
 ## void ##
+  ##!! (void) login user/passwd: root/voidlinux
   ##!! (void) login user/passwd: anon/voidlinux
 
-  #ip link ; [dhcpcd {ifdev}]
-  #[bash;] ; mount -o remount,size=1500M /run ; df -h ; sleep 5
+  #[bash ;] mount -o remount,size=1500M /run ; df -lh ; sleep 5
+  #ip link [; dhcpcd {ifdev}]
   #sv down sshd ; export MIRRORHOST=repo-default.voidlinux.org
   #yes | xbps-install -Sy -R http://${MIRRORHOST}/current -u xbps ; sleep 3
-  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current netcat wget parted libstdc++ gptfdisk libffi libldap gnupg2 libssh2 curl [lvm2 btrfs-progs] [debootstrap pacman apk-tools]
+  #yes | xbps-install -Sy -R http://${MIRRORHOST}/current netcat wget parted gptfdisk libffi libldap gnupg openssl libssh2 curl xz zstd xtools-minimal [lvm2 btrfs-progs] [pacman debootstrap apk-tools]
 
   #------------ if using ZFS ---------------
   ## install zfs, if needed ##
-  ##yes | xbps-install -Sy [linux-headers] zfs
+  ##yes | xbps-install -Sy [linux[-lts]-headers] zfs[-lts]
   ##mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
 
   #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
+void_guestvm() {
+  variant=${variant:-void} ; GUEST=${1:-${variant}-${MACHINE}-std}
 
-void_x86_64() {
-  variant=${variant:-void} ; GUEST=${1:-${variant}-x86_64-std}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-live-x86_64-*.iso' | tail -n1)}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-hrmpf-x86_64-*.iso' | tail -n1)}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-mklive-x86_64-*.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/void ; sha256sum --ignore-missing -c sha256sum.txt)
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-live-aarch64-*.iso' | tail -n1)}
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-mklive-aarch64-*.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/void ; sha256sum --ignore-missing -c sha256sum.txt)
+  else
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-live-x86_64-*.iso' | tail -n1)}
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-hrmpf-x86_64-*.iso' | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-mklive-x86_64-*.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/void ; sha256sum --ignore-missing -c sha256sum.txt)
+  fi
 
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
+  sleep 5 ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
@@ -281,16 +295,13 @@ void_x86_64() {
   ##!! (armtix) login user/passwd: armtix/armtix
 
   #sudo su
-  # ip link ; [networkctl status ; networkctl up {ifdev}]
+  #mount -o remount,size=1500M /run/[artix|archiso]/cowspace ; df -lh ; sleep 5
+  #ip link [; networkctl status ; networkctl up {ifdev}]
   #[dhcpcd {ifdev}]
   #sed -i 's|\(^SigLevel.*\)|#\1\nSigLevel = Never|' /etc/pacman.conf
-  #(arch) mount -o remount,size=1500M /run/archiso/cowspace ; df -h ; sleep 5
-  #(arch) pacman-key --init ; pacman -Sy archlinux-keyring
-  #(arch) pacman-key --populate archlinux
-  #(artix) mount -o remount,size=1500M /run/artix/cowspace ; df -h ; sleep 5
-  #(artix) pacman-key --init ; pacman -Sy artix-keyring
-  #(artix) pacman-key --populate artix
-  #(arch|artix) sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf
+  #pacman-key --init ; pacman-key --populate [artix|archlinux]
+  #pacman -Sy [artix|archlinux]-keyring
+  #sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf
   ## NOTE, transfer archzfs config file: init/archlinux/repo_archzfs.cfg
   #cat init/archlinux/repo_archzfs.cfg >> /etc/pacman.conf
   #curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg
@@ -308,36 +319,86 @@ void_x86_64() {
 
   #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
-
-archlinux_x86_64() {
+archlinux_guestvm() {
   variant=${variant:-archlinux} ; service_mgr=${service_mgr:-runit}
-  GUEST=${1:-${variant}-x86_64-std}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'archlinux-*.iso' | tail -n1)}
-  #(cd ${ISOS_PARDIR}/archlinux ; sha1sum --ignore-missing -c sha1sums.txt)
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'artix-base-runit-*.iso' | tail -n1)}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'artix-buildiso-runit-*.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/archlinux ; sha256sum --ignore-missing -c sha256sums)
+  GUEST=${1:-${variant}-${MACHINE}-std}
 
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ;
+  else
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'archlinux-*x86_64.iso' | tail -n1)}
+    #(cd ${ISOS_PARDIR}/archlinux ; sha1sum --ignore-missing -c sha1sums.txt)
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'artix-base-runit-*x86_64.iso' | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/archlinux -name 'artix-buildiso-runit-*x86_64.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/archlinux ; sha256sum --ignore-missing -c sha256sums)
+  fi
+
+  sleep 5 ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
+}
+#----------------------------------------
+
+## alpine ##
+  ##!! (alpine) login user/passwd: root/-
+
+  #mount -o remount,size=1500M /run ; df -lh ; sleep 5
+  #ifconfig ; ifconfig {ifdev} up
+  #dhcpcd {ifdev} ; udhcpc -i {ifdev} ; cd /tmp
+
+  #service sshd stop ; rdate time.nist.gov
+  #export MIRRORHOST=dl-cdn.alpinelinux.org/alpine
+  #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories
+  #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories
+  #apk update
+  #apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl xz zstd [lvm2 btrfs-progs] util-linux multipath-tools perl arch-install-scripts [pacman debootstrap]
+  #setup-devd udev
+
+  #------------ if using ZFS ---------------
+  #apk add zfs zfs-scripts
+
+  #modprobe zfs ; zfs version ; sleep 5
+  #-----------------------------------------
+alpine_guestvm() {
+  variant=${variant:-alpine} ; GUEST=${1:-${variant}-${MACHINE}-std}
+
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-standard-*-aarch64.iso" | tail -n1)}
+    (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-standard-*-aarch64.iso.sha256)
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-extended-*-x86_64.iso" | tail -n1)}
+    (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-extended-*-x86_64.iso.sha256)
+  fi
+
+  sleep 5 ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
 ## debian ##
-  ##append to boot parameters: textmode=1 text 3 [systemd.unit=multi-user.target]
+  ##append to boot params: textmode=1 text 3 [systemd.unit=multi-user.target]
 
   ##!! (debian) login user/passwd: user/live
   ##!! (devuan) login user/passwd: devuan/devuan
 
-  #sudo su ; . /etc/os-release
-  #ip link ; [networkctl status ; networkctl up {ifdev}]
+  #sudo su
+  #mount -o remount,size=1500M /run/live/overlay ; df -lh ; sleep 5
+  #ip link [; networkctl status ; networkctl up {ifdev}]
   #[dhcpcd {ifdev} ; dhclient {ifdev}]
   #systemctl stop ssh ; invoke-rc.d ssh stop
-  #mount -o remount,size=1500M /run/live/overlay ; df -h ; sleep 5
   #sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list
   #apt-get --yes update --allow-releaseinfo-change
-  #apt-get --yes install gdisk [lvm2 btrfs-progs] [dnf zypper]
+  #apt-get --yes install gdisk [lvm2 btrfs-progs] arch-install-scripts [pacman-package-manager dnf-plugins-core zypper]
 
   #------------ if using ZFS ---------------
+  #. /etc/os-release
   #apt-get --yes install --no-install-recommends linux-headers-$(uname -r)
 
   #sed -i 's|^#deb|deb|g' /etc/apt/sources.list
@@ -346,74 +407,45 @@ archlinux_x86_64() {
 
   #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
-
-debian_x86_64() {
+debian_guestvm() {
   variant=${variant:-debian} ; service_mgr=${service_mgr:-sysvinit}
-  GUEST=${1:-${variant}-x86_64-std}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/live -name 'debian-live-*-amd64*.iso' | tail -n1)}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/live -name 'devuan_*_amd64_minimal-live.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/debian/live ; sha256sum --ignore-missing -c SHA256SUMS.txt)
+  GUEST=${1:-${variant}-${MACHINE}-std}
 
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
-}
-#----------------------------------------
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ;
+  else
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/live -name 'debian-live-*-amd64*.iso' | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/live -name 'devuan_*_amd64_minimal-live.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/debian/live ; sha256sum --ignore-missing -c SHA256SUMS.txt)
+  fi
 
-## alpine ##
-  ##!! (alpine) login user/passwd: root/-
-
-  #ifconfig ; ifconfig {ifdev} up ; udhcpc -i {ifdev} ; cd /tmp
-
-  #service sshd stop ; date +%Y.%m.%d-%H:%M -s "YYYY.mm.dd-00:01"
-  #. /etc/os-release ; mount -o remount,size=1500M /run ; df -h ; sleep 5
-  #export MIRRORHOST=dl-cdn.alpinelinux.org/alpine
-  #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories
-  #echo http://${MIRRORHOST}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories
-  #apk update
-  #apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl [lvm2 btrfs-progs] util-linux multipath-tools perl [debootstrap pacman]
-  #setup-devd udev
-
-  #------------ if using ZFS ---------------
-  #apk add zfs
-
-  #modprobe zfs ; zfs version ; sleep 5
-  #-----------------------------------------
-
-alpine_x86_64() {
-  variant=${variant:-alpine} ; GUEST=${1:-${variant}-x86_64-std}
-
-   ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-extended-*-x86_64.iso" | tail -n1)}
-  (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-extended-*-x86_64.iso.sha256)
-
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
-}
-alpine_aarch64() {
-  variant=${variant:-alpine} ; GUEST=${1:-${variant}-aarch64-std}
-
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-standard-*-aarch64.iso" | tail -n1)}
-  (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-standard-*-aarch64.iso.sha256)
-
-  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+  sleep 5 ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
 ## suse ##
-  ##append to boot parameters: textmode=1 text 3 systemd.unit=multi-user.target
+  ##append to boot params: textmode=1 text 3 systemd.unit=multi-user.target
 
   ##!! (opensuse) login user/passwd: linux/-
 
-  #sudo su ; . /etc/os-release
-  #mount -o remount,size=1500M /run/overlay ; df -h ; sleep 5
-  #export MIRRORHOST=download.opensuse.org
-  #networkctl status ; networkctl up {ifdev}
+  #sudo su
+  #mount -o remount,size=1500M /run/overlay ; df -lh ; sleep 5
+  #[networkctl status ; networkctl up {ifdev}]
   #nmcli device status ; nmcli connection up {ifdev}
-  #wicked ifstatus all ; wicked ifup {ifdev}
+  #[wicked ifstatus all ; wicked ifup {ifdev}]
   #zypper --non-interactive refresh
 
-  #zypper install ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr [lvm2 btrfsprogs] [debootstrap dnf dnf-plugins-core]
+  #zypper install ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr [lvm2 btrfsprogs] arch-install-scripts [pacman dnf-utils debootstrap apk-tools]
   #zypper --gpg-auto-import-keys refresh
   #update-ca-certificates
 
   #------------ if using ZFS ---------------
+  #export MIRRORHOST=download.opensuse.org ; . /etc/os-release
   #zypper --non-interactive install dkms kernel-devel
   #zypper --gpg-auto-import-keys addrepo http://${MIRRORHOST}/repositories/filesystems/${VERSION_ID}/filesystems.repo
   #zypper --gpg-auto-import-keys refresh
@@ -421,89 +453,101 @@ alpine_aarch64() {
 
   #modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
+suse_guestvm() {
+  variant=${variant:-suse} ; GUEST=${1:-${variant}-${MACHINE}-std}
 
-suse_x86_64() {
-  variant=${variant:-suse} ; GUEST=${1:-${variant}-x86_64-std}
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "openSUSE-Leap-*-Live-aarch64*.iso" | tail -n1)}
+    (cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-aarch64*.iso.sha256)
+  else
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "GeckoLinux_*.x86_64*.iso" | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "openSUSE-Leap-*-Live-x86_64*.iso" | tail -n1)}
+    #(cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c GeckoLinux_*.x86_64*.iso.sha256)
+    (cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-x86_64*.iso.sha256)
+  fi
 
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "GeckoLinux_*.x86_64*.iso" | tail -n1)}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "openSUSE-Leap-*-Live-x86_64*.iso" | tail -n1)}
-  #(cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c GeckoLinux_*.x86_64*.iso.sha256)
-  (cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-x86_64*.iso.sha256)
-
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
-}
-suse_aarch64() {
-  variant=${variant:-suse} ; GUEST=${1:-${variant}-aarch64-std}
-
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "openSUSE-Leap-*-Live-aarch64*.iso" | tail -n1)}
-  (cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-aarch64*.iso.sha256)
-
-  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+  sleep 5 ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
 ##redhat ##
-  ##append to boot parameters: textmode=1 text 3 systemd.unit=multi-user.target
+  ##append to boot params: textmode=1 text 3 systemd.unit=multi-user.target
 
   ##!! (rocky) login user/passwd: liveuser/-
 
-  #. /etc/os-release ; mount -o remount,size=1500M /run ; df -h ; sleep 5
-  #export MIRRORHOST=dl.rockylinux.org/pub/rocky
-  #networkctl status ; networkctl up {ifdev}
+  #mount -o remount,size=1500M /run ; df -lh ; sleep 5
+  #[networkctl status ; networkctl up {ifdev}]
   #nmcli device status ; nmcli connection up {ifdev}
   #[dnf | yum] -y check-update ; setenforce 0 ; sestatus ; sleep 5
-  #[dnf | yum] -y install nmap-ncat [lvm2] [debootstrap]
+  #dnf config-manager -y --set-enabled appstream baseos crb extras epel epel-cisco-openh264
+  #crb enable ; /usr/bin/crb enable
+  #[dnf | yum] -y install nmap-ncat gdisk [lvm2] arch-install-scripts [pacman debootstrap]
 
   #------------ if using ZFS ---------------
+  #. /etc/os-release ; echo ${VERSION_ID}
   #[dnf | yum] -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-[9 | 7].noarch.rpm
   #[dnf | yum] -y install kernel kernel-devel
-  #. /etc/os-release ; echo ${VERSION_ID}
   #kver=$(dnf list --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1)
   ##(-stream) ZFS_REL=`echo ${kver} | sed 's|.*\.el\(.*\)$|\1|'` ; echo ${ZFS_REL}
   #[dnf | yum] -y install http://download.zfsonlinux.org/epel/zfs-release.el${ZFS_REL:-${VERSION_ID/./_}}.noarch.rpm
-  #[dnf | yum] -y install http://download.zfsonlinux.org/epel/zfs-release-2-2$(rpm --eval "%{dist}").noarch.rpm
+  #[dnf | yum] -y install http://download.zfsonlinux.org/epel/zfs-release-2-3$(rpm --eval "%{dist}").noarch.rpm
   #rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux
   #[dnf | yum] --enablerepo=epel --enablerepo=zfs install -y zfs
   #echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
 
   #dkms status ; modprobe zfs ; zfs version ; sleep 5
   #-----------------------------------------
-
-redhat_x86_64() {
+redhat_guestvm() {
   RELEASE=${RELEASE:-9} ; variant=${variant:-redhat}
-  GUEST=${1:-${variant}-x86_64-std}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/live -name 'AlmaLinux-*.iso' | tail -n1)}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/live -name 'Rocky-*.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/redhat/live ; sha256sum --ignore-missing -c CHECKSUM)
+  GUEST=${1:-${variant}-${MACHINE}-std}
 
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
-}
-redhat_aarch64() {
-  RELEASE=${RELEASE:-9} ; variant=${variant:-redhat}
-  GUEST=${1:-${variant}-aarch64-std}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64/live -name 'Rocky-*-aarch64-*.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/redhat/aarch64/live ; sha256sum --ignore-missing -c CHECKSUM)
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64/live -name 'Rocky-*-aarch64-*.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/redhat/aarch64/live ; sha256sum --ignore-missing -c CHECKSUM)
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/live -name 'Rocky-*-x86_64-*.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/redhat/live ; sha256sum --ignore-missing -c CHECKSUM)
+  fi
 
-  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+  sleep 5 ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
 ## mageia ##
-  ##append to boot parameters: textmode=1 text 3 systemd.unit=multi-user.target
+  ##append to boot params: textmode=1 text 3 systemd.unit=multi-user.target
 
   ##!! (mageia) login user/passwd: live/-
 
-  #su - [; mount -o remount,size=1500M /run ; df -h ; sleep 5]
-  #export MIRRORHOST=mirrors.kernel.org/mageia
-  #networkctl status ; networkctl up {ifdev}
+  #su - [; mount -o remount,size=1500M /run ; df -lh ; sleep 5]
+  #[networkctl status ; networkctl up {ifdev}]
   #nmcli device status ; nmcli connection up {ifdev}
-  #dnf -y check-update ; [dnf -y install lvm2 btrfs-progs ;] sleep 5
+  #dnf -y check-update ; [dnf -y install gdisk lvm2 btrfs-progs ;] sleep 5
+mageia_guestvm() {
+  variant=${variant:-mageia} ; GUEST=${1:-${variant}-${MACHINE}-std}
 
-mageia_x86_64() {
-  variant=${variant:-mageia} ; GUEST=${1:-${variant}-x86_64-std}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia/live -name 'Mageia-*-Live-*-x86_64.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/mageia/live ; sha512sum --ignore-missing -c Mageia-*-Live-*-x86_64.iso.sha512)
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ;
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia/live -name 'Mageia-*-Live-*-x86_64.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/mageia/live ; sha512sum --ignore-missing -c Mageia-*-Live-*-x86_64.iso.sha512)
+  fi
+
+  sleep 5 ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
@@ -524,22 +568,23 @@ mageia_x86_64() {
   #sh init/netbsd/gpt_setup.sh mount_filesystems [std]
 
   #[VOL_MGR=std] sh init/netbsd/install.sh run_install [hostname [${PASSWD_PLAIN}]]
+netbsd_guestvm() {
+  variant=${variant:-netbsd} ; GUEST=${1:-${variant}-${MACHINE}-std}
 
-netbsd_x86_64() {
-  variant=${variant:-netbsd} ; GUEST=${1:-${variant}-x86_64-std}
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-aarch64.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512)
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-amd64.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512)
+  fi
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-amd64.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512) ; sleep 5
-
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
-}
-netbsd_aarch64() {
-  variant=${variant:-netbsd} ; GUEST=${1:-${variant}-aarch64-std}
-
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/netbsd -name 'NetBSD-*-aarch64.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/netbsd ; sha512sum --ignore-missing -c SHA512)
-
-  sleep 5 ; _prep ; sleep 3 ; _install_aarch64
+  sleep 5 ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
@@ -549,7 +594,7 @@ netbsd_aarch64() {
 
   ##mount -t mfs -s 100m md1 /tmp ; cd /tmp [; mount -t mfs -s 100m md2 /mnt]
   #mount_mfs -s 100m md1 /tmp ; cd /tmp [; mount_mfs -s 100m md2 /mnt]
-  #ifconfig ; [dhclient -L /tmp/dhclient.lease.{ifdev} {ifdev} | ifconfig {ifdev} inet autoconf]
+  #ifconfig ; [ifconfig {ifdev} inet autoconf]
 
   ## (OpenBSD) install via chroot
   ## NOTE, transfer [dir(s) | file(s)]: scripts_openbsd.tar (init/common, init/openbsd, scripts/openbsd)
@@ -559,37 +604,35 @@ netbsd_aarch64() {
   #sh init/openbsd/disklabel_setup.sh mount_filesystems
 
   #[VOL_MGR=std] sh init/openbsd/install.sh run_install [hostname [${PASSWD_PLAIN}]]
-
-openbsd_x86_64() {
-  variant=${variant:-openbsd} ; GUEST=${1:-${variant}-x86_64-std}
+openbsd_guestvm() {
+  variant=${variant:-openbsd} ; GUEST=${1:-${variant}-${MACHINE}-std}
 
   ## ?? boot uefi NOT WORKING for iso ??
   #QUEFI_OPTS=" "
   #VUEFI_OPTS=" "
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/amd64 -name 'install*.img' | tail -n1)}
-  (cd ${ISOS_PARDIR}/openbsd/amd64 ; sha256sum --ignore-missing -c SHA256)
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    CDROM_OPT=${CDROM_OPT:-" "}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/arm64 -name 'install*.img' | tail -n1)}
+    (cd ${ISOS_PARDIR}/openbsd/arm64 ; sha256sum --ignore-missing -c SHA256)
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/amd64 -name 'install*.img' | tail -n1)}
+    (cd ${ISOS_PARDIR}/openbsd/amd64 ; sha256sum --ignore-missing -c SHA256)
+  fi
 
   sleep 5 ; _prep
   qemu-img convert -O qcow2 ${ISO_PATH} ${OUT_DIR}/${GUEST}.qcow2
   qemu-img resize -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 ${DISK_SZ}
-  sleep 3 ; _install_x86_64
-}
-openbsd_aarch64() {
-  CDROM_OPT=${CDROM_OPT:-" "}
-  variant=${variant:-openbsd} ; GUEST=${1:-${variant}-aarch64-std}
-
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/arm64 -name 'install*.img' | tail -n1)}
-  (cd ${ISOS_PARDIR}/openbsd/arm64 ; sha256sum --ignore-missing -c SHA256)
-
-  sleep 5 ; _prep
-  qemu-img convert -O qcow2 ${ISO_PATH} ${OUT_DIR}/${GUEST}.qcow2
-  qemu-img resize -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 ${DISK_SZ}
-  sleep 3 ; _install_aarch64
+  sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 
 #----------------------------------------
-${@:-freebsd_x86_64 freebsd-x86_64-std}
+${@:-freebsd_guestvm freebsd-${MACHINE}-std}
 
 
 #-----------------------------------------
@@ -602,27 +645,26 @@ ${@:-freebsd_x86_64 freebsd-x86_64-std}
 #variant archlinux: distros(x86_64: arch, artix [service_mgr: runit]):
   #  package(s): libffi, curl, pacman
 
+#variant alpine: ([x86_64|aarch64] MIRROR: dl-cdn.alpinelinux.org/alpine)
+  ## dnld: http://${MIRROR}/latest-stable/main/<machine>/apk-tools-static-*.apk
+  #  package(s): apk[-tools][.static] (download apk[-tools][-static])
+
 #variant debian - distros(debian, devuan):
   # (devuan x86_64 MIRROR: deb.devuan.org/merged, service_mgr: sysvinit)
   # (devuan aarch64 MIRROR: pkgmaster.devuan.org/devuan, service_mgr: sysvinit)
   # (debian [x86_64|aarch64] MIRROR: deb.debian.org/debian)
   #  package(s): [perl,] debootstrap
 
-#variant alpine: ([x86_64|aarch64] MIRROR: dl-cdn.alpinelinux.org/alpine)
-  ## dnld: http://${MIRROR}/latest-stable/main/<machine>/apk-tools-static-*.apk
-  #  package(s): apk[-tools][.static] (download apk[-tools][-static])
-
 #variant suse - distros(opensuse): ([x86_64,aarch64] MIRROR: download.opensuse.org)
   #  package(s): zypper, rpm, ? rinse
 
-#variant redhat - distros(rocky, almalinux, centos-stream):
+#variant redhat - distros(rocky, centos-stream):
   # (rocky [x86_64|aarch64] MIRROR: dl.rockylinux.org/pub/rocky)
-  # (almalinux [x86_64|aarch64] MIRROR: repo.almalinux.org/almalinux)
   # (centos-stream [x86_64|aarch64] MIRROR: mirror.stream.centos.org)
-  #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm, ? rinse
+  #  package(s): [yum | dnf]-utils, rpm, ? rinse
 
-#variant mageia: ([x86_64,aarch64] MIRROR: mirrors.kernel.org/mageia)
-  #  package(s): [dnf, dnf-plugins-core | yum, yum-utils], rpm
+#variant mageia: ([x86_64|aarch64] MIRROR: mirrors.kernel.org/mageia)
+  #  package(s): [yum | dnf]-utils, rpm
 
 #----------------------------------------
 ## (Linux distro) install via chroot
@@ -634,3 +676,25 @@ ${@:-freebsd_x86_64 freebsd-x86_64-std}
 
 #  [VOL_MGR=[std | lvm | btrfs | zfs]] sh init/<variant>/install.sh run_install [hostname [passwd_crypted]]
 #----------------------------------------
+
+# ==========
+# cfgfile=/etc/wpa_supplicant.conf # FreeBSD, Debian, Mageia, PCLinuxOS
+# cfgfile=/etc/wpa_supplicant/wpa_supplicant[-{ifdev}].conf # Void, Arch, etc
+# ------------------------
+# ctrl_interface=/var/run/wpa_supplicant
+# ctrl_interface_group=operator # (FreeBSD) operator ; (Linux) wheel | netdev
+# #ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=wheel # Linux
+# #update_config=1 # not on FreeBSD
+# ap_scan=1
+#
+# $ wpa_passphrase ${SSID:-HOME24-WIFI} ${passphrase:-abcd0123} >> {cfgfile}
+#   -->
+#     network={
+#       ssid="HOME24-WIFI"
+#       #scan_ssid=1 # add if SSID not broadcasting
+#       psk="..."
+#     }
+#
+# $ wpa_supplicant -B -c {cfgfile} -i{ifdev}
+# $ wpa_cli list_networks ; wpa_cli select_network 0
+# ==========

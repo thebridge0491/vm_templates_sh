@@ -151,6 +151,7 @@ EOF
 
 diff_qemuimage() {
   GUEST=${1:-freebsd-${MACHINE}-zfs} ; BOXPREFIX=${BOXPREFIX:-${GUEST}*/}
+  mkdir -p ${STORAGE_DIR}/$(dirname ${GUEST})
   qemu-img create -f qcow2 -F qcow2 -o backing_file=$(cd ${STORAGE_DIR} ; find ${BOXPREFIX} -path "*${IMGEXT}" | tail -n1) \
     ${STORAGE_DIR}/${GUEST}${IMGEXT}
   echo ''
@@ -177,7 +178,7 @@ import_lxc() {
   #VIRTFS_OPTS=${VIRTFS_OPTS:---filesystem type=mount,mode=passthrough,source=/mnt/Data0,target=9p_Data0}
   VIRTFS_OPTS=${VIRTFS_OPTS:-}
 
-  virt-install ${CONNECT_OPT} --init /sbin/init --cpu SandyBridge \
+  virt-install ${CONNECT_OPT} --init /sbin/init --cpu Skylake-Client \
     --memory 2048 --vcpus 1 \
     --controller virtio-serial --console pty,target_type=virtio \
     --network network=default,model=virtio-net,mac=RANDOM --boot menu=on \
@@ -195,7 +196,7 @@ import_qemu() {
   #VIRTFS_OPTS=${VIRTFS_OPTS:---filesystem type=mount,mode=passthrough,source=/mnt/Data0,target=9p_Data0}
   VIRTFS_OPTS=${VIRTFS_OPTS:-}
 
-  virt-install ${CONNECT_OPT} --arch ${MACHINE} --cpu SandyBridge \
+  virt-install ${CONNECT_OPT} --arch ${MACHINE} --cpu Skylake-Client \
     --memory 2048 --vcpus 2 \
     --controller usb,model=ehci --controller virtio-serial \
     --console pty,target_type=virtio --graphics vnc,port=-1 \
@@ -252,13 +253,14 @@ run_qemu() {
   #VIRTFS_OPTS=${VIRTFS_OPTS:--virtfs local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough}
   VIRTFS_OPTS=${VIRTFS_OPTS:-}
 
+  mkdir -p ${STORAGE_DIR}/nvram/$(dirname ${GUEST})
   if [ "aarch64" = "${MACHINE}" ] ; then
     QUEFI_OPTS=${QUEFI_OPTS:-"-smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${QEMU_FIRMWARE_AA64} -drive if=pflash,unit=1,format=raw,file=${STORAGE_DIR}/nvram/${GUEST}_VARS.fd"}
     mkdir -p ${STORAGE_DIR}/nvram
     cp -an ${QEMU_NVRAM_AA64} ${STORAGE_DIR}/nvram/${GUEST}_VARS.fd
     chmod +w ${STORAGE_DIR}/nvram/${GUEST}_VARS.fd
 
-    qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
+    qemu-system-aarch64 -cpu cortex-a72 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
       -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
       -device usb-ehci,id=usb -usb -device usb-kbd -device usb-tablet \
@@ -272,7 +274,7 @@ run_qemu() {
     cp -an ${QEMU_NVRAM_X64} ${STORAGE_DIR}/nvram/${GUEST}_VARS.fd
     chmod +w ${STORAGE_DIR}/nvram/${GUEST}_VARS.fd
 
-    qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
+    qemu-system-x86_64 -cpu Skylake-Client -machine q35,accel=kvm:hvf:tcg \
       -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
       -smp cpus=2 -m size=2048 -boot order=cd,menu=on -name ${GUEST} \
       -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
@@ -286,4 +288,4 @@ run_qemu() {
 #------------------------------------------------
 
 #------------------------------------------------
-${@:-run_qemu freebsd-x86_64-zfs}
+${@:-run_qemu freebsd-${MACHINE}-zfs}

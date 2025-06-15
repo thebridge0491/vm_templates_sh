@@ -1,113 +1,162 @@
 #!/bin/sh -eux
 
 export SHAREDNODE=${1:-localhost.local} ; export PRINTNAME=${2:-printer1}
+set +e
 
-#urpmi.update -a ; urpmi --auto-update
-dnf -y check-update ; dnf -y upgrade
-. /root/init/mageia/distro_pkgs.ini
+snapshot_name=pre_cmdlntools-$(date -u "+%Y%m%d") \
+  sh $(dirname ${0})/upgradepkgs.sh snapshot
+
 dnf --setopt=install_weak_deps=False config-manager --save
 dnf config-manager --dump | grep -we install_weak_deps
-#urpmi --no-recommends ${pkgs_cmdln_tools}
-dnf -y --setopt=install_weak_deps=False install ${pkgs_cmdln_tools}
 
-if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
-  echo "export JAVA_HOME=${default_java_home}" >> /etc/bash.bashrc ;
+#urpmi.update -a
+dnf -y check-update
+
+. /root/scripts/distro_pkgs.ini ; echo ${pkgs_cmdln_tools}
+
+read -p "Enter 'y' to continue [nY]: " response
+#if [ "n" = "${response}" ] || [ "N" = "${response}" ] ; then
+if [ -n "$(echo ${response} | grep -e '^[Nn].*')" ] ; then
+  exit ;
 fi
-mkdir -p ${default_java_home}
-if [ -z "$(grep '^JAVA_VERSION' ${default_java_home}/release)" ] ; then
-  echo JAVA_VERSION="${default_java_version}" >> ${default_java_home}/release ;
+##urpmi [--no-install] --no-recommends pkg0 .. pkgN
+#dnf -C --skip-broken [--downloadonly] -y install pkg0 .. pkgN
+#urpmi --no-recommends ${pkgs_cmdln_tools}
+dnf -C --skip-broken -y install ${pkgs_cmdln_tools}
+dnf -C -y groups mark convert
+
+#dbus-uuidgen --ensure[=/etc/machine-id]
+#systemd-machine-id-setup --commit
+if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
+  #idsuffix=$(cat /etc/machine-id | cut -b29-32) ;
+  idsuffix=$(cat /var/lib/dbus/machine-id | cut -b29-32) ;
+  for fileX in /etc/hosts /etc/hostname /etc/sysconfig/network ; do
+    sed -i "/box.0000/ s|\(box.\)0000|\1${idsuffix:-0000}|g" ${fileX} ;
+  done ;
+  hostname -F /etc/hostname || hostname $(cat /etc/hostname) ;
+fi
+
+if [ -n "$(java -version)" ] ; then
+  #java_home=$(dirname $(dirname $(realpath $(which java)))) ;
+  java_home=$(realpath $(which java) | sed "s:/bin/java::") ;
+  #if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
+  if [ -z "$(grep '^export JAVA_HOME' /etc/profile.d/jdk.sh)" ] ; then
+    echo 'export JAVA_HOME=${java_home}' >> /etc/profile.d/jdk.sh ;
+  fi ;
+  #mkdir -p ${java_home} ;
+  #java_version=$(java -version | head -n1 | sed 's|.*"\([0-9]*\.[0-9*]\)".*|\1|') ;
+  #if [ -z "$(grep '^JAVA_VERSION' ${java_home}/release)" ] ; then
+  #  echo JAVA_VERSION="${java_version}" >> ${java_home}/release ;
+  #fi ;
 fi
 #update-alternatives --get-selections
 #update-alternatives --config [java | javac | jar | javadoc | javap | jdb | keytool]
 
+#chgrp [postfix | mail] /var/mail ; chmod [g+ws,+t | 3775] /var/mail
+chgrp postfix /var/mail ; chmod g+ws,+t /var/mail
+
+(cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
+(cd /root/init/common ; cp -a skel/_gnupg/* /etc/skel/.gnupg/ ; \
+  cp -a skel/_ssh/* /etc/skel/.ssh/ ; cp -a skel/_pki/* /etc/skel/.pki/ ; \
+  cp -a skel/_gitconfig.sample /etc/skel/.gitconfig ; \
+  cp -a skel/_hgrc.sample /etc/skel/.hgrc)
+
+
 set +e ; set +u
-
-#dbus-uuidgen --ensure[=/etc/machine-id]
-if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
-	#last4=$(cat /etc/machine-id | cut -b29-32) ;
-	last4=$(cat /var/lib/dbus/machine-id | cut -b29-32) ;
-	init_hostname=$(cat /etc/hostname) ;
-	NAME=$(echo ${init_hostname} | sed "s|0000|${last4}|") ;
-	echo "${NAME}" > /etc/hostname ;
-	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|g" /etc/hosts ;
-	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|" \
-		/etc/sysconfig/network ;
-fi
-if [ ! -e /etc/systemd/system/machineid-save.service ] ; then
-  cat << EOF > /etc/systemd/system/machineid-save.service ;
-[Unit]
-Before=network.target
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/dbus-uuidgen --ensure
-RemainAfterExit=yes
-[Install]
-WantedBy=multi-user.target
-
-EOF
-fi
-systemctl enable machineid-save.service ;
-
-
-ntpd -u ntp:ntp ; ntpq -p ; sleep 3
-systemctl enable ntpd.service
-
 touch /var/log/messages
-drakfirewall ; sleep 600 ; cat /etc/shorewall/rules.drakx ; sleep 5
-systemctl enable shorewall ; systemctl enable shorewall6
-#sh /root/init/common/linux/firewall/shorewall/config_shorewall.sh config_shorewall allow
-#ipset flush ; iptables -F ; ip6tables -F
-#ipset destroy ; iptables -X ; ip6tables -X
-#for unit in ipset iptables ip6tables ; do
-#	systemctl stop ${unit}.service ;
-#	systemctl disable ${unit}.service ; systemctl mask ${unit}.service ;
-#done
 
+#mkdir -p /var/lib/clamav ; chown -R clamav:clamav /var/lib/clamav
+#touch /var/lib/clamav/clamd.sock
 
-#sh /root/init/common/misc_config.sh check_clamav
-#systemctl enable clamav-freshclam ; systemctl enable clamav-daemon
+# Only add the secure path line if it is not already present
+#grep -q 'secure_path' /etc/sudoers \
+#  || sed -i '/Defaults\s\+env_reset/a Defaults\tsecure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' /etc/sudoers
 
-
-systemctl enable avahi-daemon ; systemctl enable nfs-utils
-systemctl enable cups ; systemctl enable cups-browsed
-
-#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
-sh /root/init/common/misc_config.sh cfg_printer_pdf \
-  /usr/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
-#iptables -A In_allow -p udp -m multiport --dports mdns -j ACCEPT
-#ip6tables -A In_allow -p udp -m multiport --dports mdns -j ACCEPT
-#sed -i 's|domain|domain, mdns|g' /etc/ipset.conf
-shorewall save ; shorewall6 save #; shorewall restore ; shorewall6 restore
-systemctl status shorewall ; systemctl status shorewall6 ; sleep 5
-set -e ; set -u
-
-sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
-sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
-if [ -z "$(grep '^%wheel ALL=(ALL) NOPASSWD: ALL' /etc/sudoers)" ] ; then
-	echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers ;
+if [ -n "$(lspci | grep -ie wireless)" ] ; then
+  psk=`wpa_passphrase ${SSID:-HOME24-WIFI} ${passphrase:-abcd0123} | sed -n 's|^[[:space:]]*psk=\(.*\)|\1|p'`
+  nmcli device wifi list ; sleep 3
+  nmcli device wifi connect ${SSID:-HOME24-WIFI} password ${psk}
+  #nmcli device connection up ${SSID:-HOME24-WIFI}
+  # see /etc/NetworkManager/system-connections/*
 fi
-sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
 
+sh /root/init/common/cron/linux/config_cron.sh
+
+smtp_daemon=${smtp_daemon:-postfix}
+# config postfix -- maildir format vice mbox
+systemctl enable postfix || true ; systemctl restart postfix || true
+# [home_mailbox=Maildir/ | mail_spool_directory=/var/spool/mail/]
+#echo "mail_spool_directory = /var/spool/mail/" >> /etc/postfix/main.cf
+postconf mail_spool_directory=/var/spool/mail/
+postfix reload
+for userX in root packer vagrant ; do
+  [ ! -e /var/mail/${userX}.old ] && \
+    mv /var/mail/${userX} /var/mail/${userX}.old ;
+done
+mkdir -p /var/mail/postfix ; chown postfix:postfix /var/mail/postfix
+(cd /var/mail ; ln -s postfix root)
+
+firewall_tool=${firewall_tool:-firewalld}
+##drakfirewall ; sleep 600
+#sh /root/init/common/firewall/linux/config_nftables.sh #config_nftables allow
+##diff -s /etc/nftables.conf /etc/nftables.conf.new
+##(sleep 120 && nft flush ruleset)& && nft -f /etc/nftables.conf
+#nft -f /etc/nftables.conf
+sh /root/init/common/firewall/linux/config_firewalld.sh #cmds_firewalld allow
+#(sleep 120 && firewall-offline-cmd --disabled)& && \
+#  (firewall-offline-cmd --enabled ; firewall-cmd --reload)
+firewall-offline-cmd --enabled ; firewall-cmd --reload
+
+#if [ -z "$(grep -e 'domain.*mdns' /etc/nftables.conf /etc/nftables/out*_nftables.conf)" ] ; then
+#  #nft add rule inet filter in_allow udp port { domain, mdns } accept ;
+#  sed -i 's|domain|domain, mdns|g' /etc/nftables.conf \
+#    /etc/nftables/out*_nftables.conf ;
+#fi
+#nft list tables ; sleep 5 ; nft list ruleset ; sleep 5
+if [ $(firewall-cmd --zone=public --query-service=mdns) ] ; then
+  #yast firewall services add zone=EXT service=service:avahi ; # openSUSE
+  firewall-cmd --permanent --zone=public --add-service=mdns ;
+fi
+firewall-cmd --get-active-zones ; sleep 5
+#ipset list ; sleep 5
+firewall-cmd --state ; sleep 5 ; firewall-cmd --zone=public --list-all ; sleep 5
+
+
+set -e ; set -u
+sh /root/init/common/misc_config.sh cfg_nsswitch_mdns
+sh /root/init/common/misc_config.sh cfg_sudo_nopasswd /etc/sudoers.d
+sh /root/init/common/misc_config.sh cfg_inputrc_histsearch
+#sh /root/init/common/misc_config.sh check_clamav
 sh /root/init/common/misc_config.sh cfg_sshd
 sh /root/init/common/misc_config.sh cfg_shell_keychain
 sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
+#sh /root/init/common/misc_config.sh cfg_printer_pdf
+#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
+lpstat -t || true ; sleep 5
 
-(cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
-cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
-cp -R /root/init/common/skel/_ssh/* /etc/skel/.ssh/
-cp -R /root/init/common/skel/_pki/* /etc/skel/.pki/
-cp /root/init/common/skel/_gitconfig.sample /etc/skel/.gitconfig
-cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
-
-sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
-sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
-if [ -e ${sshca_pubkey} ] ; then
-	echo "@cert-authority 192.168.* $(cat ${sshca_pubkey})" >> \
-		/etc/skel/.ssh/known_hosts ;
-	cp ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
-fi
+set +e ; set +u
+echo "Enable|disable services" ; sleep 3
+for svc in ${services_enabled} ; do
+  systemctl unmask ${svc} ; systemctl enable ${svc} ;
+done
+for svc in ${services_disabled} ; do
+  systemctl disable ${svc} ; systemctl mask ${svc} ;
+done
 
 
+cat << EOF | sendmail -t root
+To: packer
+Subject: Subject sample
+
+Email sample
+EOF
+mail_cmd=$(basename $(which nail s-nail mailx | head -n1))
+echo Sample email | ${mail_cmd:-mail} -r vagrant@$(hostname -s || hostname) \
+  -s "Sample subject" root packer
+set -e ; set -u
+
+
+set +e
 ## scripts/cleanup.sh
 #urpmi --clean
 dnf -y clean all ;

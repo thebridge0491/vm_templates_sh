@@ -19,10 +19,10 @@
 ##  (client) tools:
 ##    [curl | wget | aria2c | fetch | ftp] http://{host}:{port}/{path}/file
 
-# usage: [VOL_MGR=???] sh vminstall_auto.sh [oshost_machine [GUEST]]
-#   (default) [VOL_MGR=std] sh vminstall_auto.sh [freebsd_x86_64 [freebsd-x86_64-std]]
+# usage: [MACHINE=x86_64 VOL_MGR=???] sh vminstall_auto.sh [oshost_func [GUEST]]
+#   (default) [VOL_MGR=std] sh vminstall_auto.sh [freebsd_guestvm [freebsd-x86_64-std]]
 
-STORAGE_DIR=${STORAGE_DIR:-$(dirname ${0})}
+STORAGE_DIR=${STORAGE_DIR:-$(dirname ${0})} ; MACHINE=${MACHINE:-x86_64}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros} ; DISK_SZ=${DISK_SZ:-30720M}
 QEMU_FIRMWARE_X64=${QEMU_FIRMWARE_X64:-/usr/share/OVMF/OVMF_CODE.fd}
 QEMU_NVRAM_X64=${QEMU_NVRAM_X64:-/usr/share/OVMF/OVMF_VARS.fd}
@@ -88,7 +88,7 @@ _install_x86_64() {
     #  virsh ${CONNECT_OPT} domxml-from-native qemu-argv /tmp/install_qemu.args
 
     if [ -n "${EXTRA_ARGS}" ] || [ "${EXTRA_ARGS}" = " " ] ; then
-      virt-install ${CONNECT_OPT} --arch x86_64 --cpu SandyBridge \
+      virt-install ${CONNECT_OPT} --arch x86_64 --cpu Skylake-Client \
         --memory 4096 --vcpus 2 \
         --controller usb,model=ehci --controller virtio-serial \
         --console pty,target_type=virtio --graphics vnc,port=-1 \
@@ -98,7 +98,7 @@ _install_x86_64() {
         ${INST_SRC_OPTS} ${VUEFI_OPTS} -n ${GUEST} \
         --initrd-inject="/tmp/${cfg_file}" --extra-args="${EXTRA_ARGS}" &
     else
-      virt-install ${CONNECT_OPT} --arch x86_64 --cpu SandyBridge \
+      virt-install ${CONNECT_OPT} --arch x86_64 --cpu Skylake-Client \
         --memory 4096 --vcpus 2 \
         --controller usb,model=ehci --controller virtio-serial \
         --console pty,target_type=virtio --graphics vnc,port=-1 \
@@ -127,7 +127,7 @@ _install_x86_64() {
     if [ -n "${EXTRA_ARGS}" ] || [ "${EXTRA_ARGS}" = " " ] ; then
       #APPEND_OPTS="-kernel ${KERNEL_PATH} -append \'${EXTRA_ARGS}\' -initrd ${INITRD_PATH}" ;
 
-      qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
+      qemu-system-x86_64 -cpu Skylake-Client -machine q35,accel=kvm:hvf:tcg \
         -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
         -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
         -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
@@ -137,7 +137,7 @@ _install_x86_64() {
         -display default,show-cursor=on -vga virtio \
         ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot -kernel ${KERNEL_PATH} -append "${EXTRA_ARGS}" -initrd ${INITRD_PATH} &
     else
-      qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
+      qemu-system-x86_64 -cpu Skylake-Client -machine q35,accel=kvm:hvf:tcg \
         -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
         -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
         -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
@@ -203,7 +203,7 @@ _install_aarch64() {
 
     if [ -n "${EXTRA_ARGS}" ] || [ "${EXTRA_ARGS}" = " " ] ; then
       #APPEND_OPTS="-kernel ${KERNEL_PATH} -append \'${EXTRA_ARGS}\' -initrd ${INITRD_PATH}" ;
-      qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
+      qemu-system-aarch64 -cpu cortex-a72 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
         -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
         -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
         -device usb-ehci,id=usb -usb -device usb-kbd -device usb-tablet \
@@ -212,7 +212,7 @@ _install_aarch64() {
         -display default,show-cursor=on -vga none -device virtio-gpu-pci \
         ${QUEFI_OPTS} ${CDROM_OPT:--cdrom ${ISO_PATH}} -no-reboot -kernel ${KERNEL_PATH} -append "${EXTRA_ARGS}" -initrd ${INITRD_PATH} &
     else
-      qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
+      qemu-system-aarch64 -cpu cortex-a72 -machine virt,gic-version=3,acpi=off,accel=kvm:hvf:tcg \
         -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
         -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
         -device usb-ehci,id=usb -usb -device usb-kbd -device usb-tablet \
@@ -239,89 +239,34 @@ _freebsd() {
   ##!! (freebsd) login user/passwd: root/-
 
   #mdmfs -s 100m md1 /mnt ; mdmfs -s 100m md2 /tmp ; cd /tmp
-  #mkdir -p /tmp/bsdinstall_etc ; resolvconf -u ; sleep 5
-  #ifconfig ; dhclient -l /tmp/dhclient.leases -p /tmp/dhclient.lease.{ifdev} {ifdev}
+  #mkdir -p /tmp/bsdinstall_etc ; ifconfig
+  #dhclient -l /tmp/dhclient.leases.{ifdev} -p /tmp/dhclient.{ifdev}.pid {ifdev}
 
   ## (FreeBSD) install with bsdinstall script
   ## NOTE, transfer [dir(s) | file(s)]: init/common, init/freebsd
 
   #geom -t
-  #[PASSWD_CRYPTED=passwd_crypted] [INIT_HOSTNAME=freebsd-boxv0000] bsdinstall script init/freebsd/[std | zfs]-installscript
+  #[PASSWD_CRYPTED=passwd_crypted] [INIT_HOSTNAME=freebsd-boxv0000] bsdinstall script init/freebsd/installscript
 }
-freebsd_x86_64() {
+freebsd_guestvm() {
   VOL_MGR=${VOL_MGR:-std} ; variant=freebsd
   init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
+  GUEST=${1:-${variant}-${MACHINE}-${VOL_MGR}}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE-amd64)
-
-  sleep 5 ; _freebsd ; _prep ; sleep 3 ; _install_x86_64
-}
-freebsd_aarch64() {
-  VOL_MGR=${VOL_MGR:-std} ; variant=freebsd
-  init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-aarch64-${VOL_MGR}}
-
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-aarch64-disc1.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE*-aarch64)
-
-  sleep 5 ; _freebsd ; _prep ; sleep 3 ; _install_aarch64
-}
-#----------------------------------------
-
-_debian() {
-  cfg_file=preseed.cfg ; service_mgr=${service_mgr:-sysvinit}
-  #repo_host=${repo_host:-deb.debian.org} ; repo_directory=${repo_directory:-/debian}
-  repo_host=${repo_host:-deb.devuan.org} ; repo_directory=${repo_directory:-/merged}
-
-  #CFGHOST [http://<host>:<port> | file://]
-  EXTRA_ARGS=${EXTRA_ARGS:- auto=true preseed/url=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} locale=en_US keymap=us console-setup/ask_detect=false domain= hostname=${init_hostname} mirror/http/hostname=${repo_host} mirror/http/directory=${repo_directory} choose-init/select_init=${service_mgr}}
-  cp -a init/debian/${VOL_MGR}-preseed.cfg /tmp/${cfg_file}
-
-  ## NOTE, debconf-get-selections [--installer] -> auto install cfg
-}
-debian_x86_64() {
-  VOL_MGR=${VOL_MGR:-std} ; variant=debian
-  init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
-
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian -name 'debian-*-amd64-netinst.iso' | tail -n1)} ;
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian -name 'devuan_*_amd64*netinstall.iso' | tail -n1)} ;
-  if [ "${ISO_PATH}" ] ; then
-    (cd ${ISOS_PARDIR}/debian ; sha256sum --ignore-missing -c SHA256SUMS.txt) ;
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-aarch64-disc1.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE*-aarch64)
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/freebsd -name 'FreeBSD-*-amd64-disc1.iso' | tail -n1)}
+    (cd ${ISOS_PARDIR}/freebsd ; sha256sum --ignore-missing -c CHECKSUM.SHA256-FreeBSD-*-RELEASE-amd64)
   fi
 
-  ##MIRROR: pkgmaster.devuan.org/devuan
-  ##dnld: <mirror>/dists/<version>/main/installer-amd64/current/images/cdrom/debian-installer/amd64/{linux,initrd.gz}
-  KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/debian -name 'linux' | tail -n1)}
-  INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/debian -name 'initrd.gz' | tail -n1)}
-
-  sleep 5 ; _debian ; _prep ; sleep 3 ; _install_x86_64
-}
-debian_aarch64() {
-  VOL_MGR=${VOL_MGR:-std} ; variant=debian
-  init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-aarch64-${VOL_MGR}}
-
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'debian-*-arm64-netinst.iso' | tail -n1)} ;
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'mini.iso' | tail -n1)} ;
-  if [ "${ISO_PATH}" ] ; then
-    (cd ${ISOS_PARDIR}/debian/arm64 ; sha256sum --ignore-missing -c SHA256SUMS) ;
+  sleep 5 ; _freebsd ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
   fi
-
-  ##MIRROR: pkgmaster.devuan.org/devuan
-  ##dnld: <mirror>/dists/<version>/main/installer-arm64/current/images/netboot/debian-installer/arm64/{linux,initrd.gz}
-  KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'linux' | tail -n1)}
-  INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'initrd.gz' | tail -n1)}
-
-  echo '?? Unknown error - must enter grub command-line manually for reboots: '
-  echo '#NOTE: (std) rootdev=/dev/vda5  OR  (lvm) rootdev=/dev/mapper/vg0-osRoot'
-  echo '  linux (hd0,gpt3)/vmlinuz root=$rootdev resume=/dev/foo'
-  echo '  initrd (hd0,gpt3)/initrd.img'
-  echo '  boot'
-
-  sleep 5 ; _debian ; _prep ; sleep 3 ; _install_aarch64
 }
 #----------------------------------------
 
@@ -332,37 +277,93 @@ _alpine() {
 
   ##!! (alpine) login user/passwd: root/-
 
-  #ifconfig ; ifconfig {ifdev} up ; udhcpc -i {ifdev} ; cd /tmp
+  #ifconfig ; ifconfig {ifdev} up
+  #dhcpcd {ifdev} ; udhcpc -i {ifdev} ; cd /tmp
 
   ## NOTE, transfer [dir(s) | file(s)]: init/common, init/alpine
 
-  #service sshd stop
+  #service sshd stop ; rdate time.nist.gov
   #setup-devd udev ; sleep 3
   #[MKFS_CMD=mkfs.ext4] sh init/common/disk_setup.sh part_format [sgdisk | sfdisk | parted] [std | lvm | btrfs]
   #sh init/common/disk_setup.sh mount_filesystems [std | lvm | btrfs]
   #export MIRROR=dl-cdn.alpinelinux.org/alpine
-  #APKREPOSOPTS=http://${MIRROR}/latest-stable/main BOOT_SIZE=512 USE_EFI=1 [ROOTFS=ext4 VARFS=ext4] setup-alpine -f init/alpine/answers
+  #APKREPOSOPTS=http://${MIRROR}/latest-stable/main BOOT_SIZE=512 USE_EFI=1 [ROOTFS=ext4 VARFS=ext4] setup-alpine -e -f init/alpine/answers
   #[VOL_MGR=[std | lvm | btrfs]] sh init/alpine/post_autoinstall.sh run_postinstall [passwd_crypted]
 }
-alpine_x86_64() {
+alpine_guestvm() {
   VOL_MGR=${VOL_MGR:-std} ; variant=alpine
   init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
+  GUEST=${1:-${variant}-${MACHINE}-${VOL_MGR}}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-extended-*-x86_64.iso" | tail -n1)} ;
-  (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-extended-*-x86_64.iso.sha256)
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-standard-*-aarch64.iso" | tail -n1)}
+    (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-standard-*-aarch64.iso.sha256)
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-extended-*-x86_64.iso" | tail -n1)} ;
+    (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-extended-*-x86_64.iso.sha256)
+  fi
 
-  sleep 5 ; _alpine ; _prep ; sleep 3 ; _install_x86_64
+  sleep 5 ; _alpine ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
-alpine_aarch64() {
-  VOL_MGR=${VOL_MGR:-std} ; variant=alpine
+#----------------------------------------
+
+_debian() {
+  cfg_file=preseed.cfg ; service_mgr=${service_mgr:-sysvinit}
+  #repo_host=${repo_host:-deb.debian.org} ; repo_directory=${repo_directory:-/debian}
+  repo_host=${repo_host:-deb.devuan.org} ; repo_directory=${repo_directory:-/merged}
+
+  #CFGHOST [http://<host>:<port> | file://]
+  EXTRA_ARGS=${EXTRA_ARGS:- auto=true preseed/url=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} locale=en_US keymap=us console-setup/ask_detect=false domain= hostname=${init_hostname} mirror/http/hostname=${repo_host} mirror/http/directory=${repo_directory} choose-init/select_init=${service_mgr}}
+  cp -a init/debian/preseed.cfg /tmp/${cfg_file}
+
+  ## NOTE, debconf-get-selections [--installer] -> auto install cfg
+}
+debian_guestvm() {
+  VOL_MGR=${VOL_MGR:-std} ; variant=debian
   init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-aarch64-${VOL_MGR}}
+  GUEST=${1:-${variant}-${MACHINE}-${VOL_MGR}}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/alpine -name "alpine-standard-*-aarch64.iso" | tail -n1)}
-  (cd ${ISOS_PARDIR}/alpine ; sha256sum --ignore-missing -c alpine-standard-*-aarch64.iso.sha256)
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'debian-*-arm64-netinst.iso' | tail -n1)} ;
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'mini.iso' | tail -n1)} ;
+    if [ "${ISO_PATH}" ] ; then
+      (cd ${ISOS_PARDIR}/debian/arm64 ; sha256sum --ignore-missing -c SHA256SUMS) ;
+    fi
 
-  sleep 5 ; _alpine ; _prep ; sleep 3 ; _install_aarch64
+    ##MIRROR: pkgmaster.devuan.org/devuan
+    ##dnld: <mirror>/dists/<version>/main/installer-arm64/current/images/netboot/debian-installer/arm64/{linux,initrd.gz}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'linux' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/debian/arm64 -name 'initrd.gz' | tail -n1)}
+
+    echo '?? Unknown error - must enter grub command-line manually for reboots: '
+    echo '#NOTE: (std) rootdev=/dev/vda5  OR  (lvm) rootdev=/dev/mapper/vg0-osRoot'
+    echo '  linux (hd0,gpt3)/vmlinuz root=$rootdev resume=/dev/foo'
+    echo '  initrd (hd0,gpt3)/initrd.img'
+    echo '  boot'
+  else
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian -name 'debian-*-amd64-netinst.iso' | tail -n1)} ;
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/debian -name 'devuan_*_amd64*netinstall.iso' | tail -n1)} ;
+    if [ "${ISO_PATH}" ] ; then
+      (cd ${ISOS_PARDIR}/debian ; sha256sum --ignore-missing -c SHA256SUMS.txt) ;
+    fi
+
+    ##MIRROR: pkgmaster.devuan.org/devuan
+    ##dnld: <mirror>/dists/<version>/main/installer-amd64/current/images/netboot/debian-installer/amd64/{linux,initrd.gz}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/debian -name 'linux' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/debian -name 'initrd.gz' | tail -n1)}
+  fi
+
+  sleep 5 ; _debian ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
@@ -374,43 +375,43 @@ _suse() {
 
   #CFGHOST [http://<host>:<port> | file://]
   EXTRA_ARGS=${EXTRA_ARGS:- netsetup=dhcp lang=en_US install=http://${repo_host}${repo_directory} hostname=${init_hostname} domain= autoyast=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} textmode=1 text 3}
-  cp -a init/suse/${VOL_MGR}-autoinst.xml /tmp/${cfg_file}
+  cp -a init/suse/autoinst.xml /tmp/${cfg_file}
 
   ## NOTE, yast2 clone_system -> auto install config: /root/autoinst.xml
 }
-suse_x86_64() {
+suse_guestvm() {
   VOL_MGR=${VOL_MGR:-std} ; variant=suse
   init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
+  GUEST=${1:-${variant}-${MACHINE}-${VOL_MGR}}
 
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "GeckoLinux_*.x86_64*.iso" | tail -n1)}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse -name "openSUSE-Leap-*-NET-x86_64*.iso" | tail -n1)}
-  if [ "${ISO_PATH}" ] ; then
-    #(cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c GeckoLinux_*.x86_64*.iso.sha256) ;
-    (cd ${ISOS_PARDIR}/suse ; sha256sum --ignore-missing -c openSUSE-Leap-*-NET-x86_64*.iso.sha256) ;
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse -name "openSUSE-Leap-*-NET-aarch64*.iso" | tail -n1)}
+    if [ "${ISO_PATH}" ] ; then
+      (cd ${ISOS_PARDIR}/suse/aarch64 ; sha256sum --ignore-missing -c openSUSE-Leap-*-NET-aarch64*.iso.sha256) ;
+    fi
+
+    ##dnld: <mirror>/distribution/<version>/repo/oss/boot/aarch64/loader/{linux,initrd}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/suse/aarch64 -name 'linux' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/suse/aarch64 -name 'initrd' | tail -n1)}
+  else
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "GeckoLinux_*.x86_64*.iso" | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse -name "openSUSE-Leap-*-NET-x86_64*.iso" | tail -n1)}
+    if [ "${ISO_PATH}" ] ; then
+      #(cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c GeckoLinux_*.x86_64*.iso.sha256) ;
+      (cd ${ISOS_PARDIR}/suse ; sha256sum --ignore-missing -c openSUSE-Leap-*-NET-x86_64*.iso.sha256) ;
+    fi
+
+    ##dnld: <mirror>/distribution/<version>/repo/oss/boot/x86_64/loader/{linux,initrd}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/suse -name 'linux' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/suse -name 'initrd' | tail -n1)}
   fi
 
-  ##dnld: <mirror>/distribution/<version>/repo/oss/boot/x86_64/loader/{linux,initrd}
-  KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/suse -name 'linux' | tail -n1)}
-  INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/suse -name 'initrd' | tail -n1)}
-
-  sleep 5 ; _suse ; _prep ; sleep 3 ; _install_x86_64
-}
-suse_aarch64() {
-  VOL_MGR=${VOL_MGR:-std} ; variant=suse
-  init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-aarch64-${VOL_MGR}}
-
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse -name "openSUSE-Leap-*-NET-aarch64*.iso" | tail -n1)}
-  if [ "${ISO_PATH}" ] ; then
-    (cd ${ISOS_PARDIR}/suse/aarch64 ; sha256sum --ignore-missing -c openSUSE-Leap-*-NET-aarch64*.iso.sha256) ;
+  sleep 5 ; _suse ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
   fi
-
-  ##dnld: <mirror>/distribution/<version>/repo/oss/boot/aarch64/loader/{linux,initrd}
-  KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/suse/aarch64 -name 'linux' | tail -n1)}
-  INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/suse/aarch64 -name 'initrd' | tail -n1)}
-
-  sleep 5 ; _suse ; _prep ; sleep 3 ; _install_aarch64
 }
 #----------------------------------------
 
@@ -418,13 +419,12 @@ _redhat() {
   cfg_file=ks.cfg
   # [9|9-stream]/BaseOS/x86_64/os
   #repo_host=${repo_host:-mirror.stream.centos.org}
-  #repo_host=${repo_host:-repo.almalinux.org/almalinux}
   repo_host=${repo_host:-dl.rockylinux.org/pub/rocky}
 
   #CFGHOST [http://<host>:<port> | file://]
-  EXTRA_ARGS=${EXTRA_ARGS:- nomodeset video=1024x768 inst.ks=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} inst.repo=http://${repo_host}${repo_directory} ip=::::${init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text}
+  EXTRA_ARGS=${EXTRA_ARGS:- video=1024x768 nomodeset inst.ks=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} inst.repo=http://${repo_host}${repo_directory} ip=::::${init_hostname}::dhcp inst.selinux=1 inst.enforcing=0 inst.text}
   # systemd.unit=multi-user.target
-  cp -a init/redhat/${VOL_MGR}-ks.cfg /tmp/${cfg_file}
+  cp -a init/redhat/ks.cfg /tmp/${cfg_file}
 
   ## NOTE, saved auto install config: /root/anaconda-ks.cfg
 
@@ -432,72 +432,79 @@ _redhat() {
   ##  Alt-Tab to cmdline
   ##  anaconda --kickstart <path>/ks.cfg
 }
-redhat_x86_64() {
+redhat_guestvm() {
   VOL_MGR=${VOL_MGR:-std} ; variant=redhat
   init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-9}
-  repo_directory=${repo_directory:-/${RELEASE}/BaseOS/x86_64/os}
-  GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
+  repo_directory=${repo_directory:-/${RELEASE}/BaseOS/${MACHINE}/os}
+  GUEST=${1:-${variant}-${MACHINE}-${VOL_MGR}}
 
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat -name "CentOS-*-x86_64*-boot.iso" | tail -n1)}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat -name "AlmaLinux-*-x86_64*-boot.iso" | tail -n1)}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat -name "Rocky-*-x86_64*-boot.iso" | tail -n1)}
-  if [ "${ISO_PATH}" ] ; then
-    (cd ${ISOS_PARDIR}/redhat ; sha256sum --ignore-missing -c CHECKSUM) ;
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name "CentOS-*-aarch64*-boot.iso" | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name "Rocky-*-aarch64*-boot.iso" | tail -n1)}
+    if [ "${ISO_PATH}" ] ; then
+      (cd ${ISOS_PARDIR}/redhat/aarch64 ; sha256sum --ignore-missing -c CHECKSUM) ;
+    fi
+
+    ##dnld: <mirror>/<version>/BaseOS/aarch64/os/images/pxeboot/{vmlinuz,initrd.img}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name 'vmlinuz' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name 'initrd.img' | tail -n1)}
+  else
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat -name "CentOS-*-x86_64*-boot.iso" | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat -name "Rocky-*-x86_64*-boot.iso" | tail -n1)}
+    if [ "${ISO_PATH}" ] ; then
+      (cd ${ISOS_PARDIR}/redhat ; sha256sum --ignore-missing -c CHECKSUM) ;
+    fi
+
+    ##dnld: <mirror>/<version>/BaseOS/x86_64/os/images/pxeboot/{vmlinuz,initrd.img}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/redhat -name 'vmlinuz' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/redhat -name 'initrd.img' | tail -n1)}
   fi
 
-  ##dnld: <mirror>/<version>/BaseOS/x86_64/os/images/pxeboot/{vmlinuz,initrd.img}
-  KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/redhat -name 'vmlinuz' | tail -n1)}
-  INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/redhat -name 'initrd.img' | tail -n1)}
-
-  sleep 5 ; _redhat ; _prep ; sleep 3 ; _install_x86_64
-}
-redhat_aarch64() {
-  VOL_MGR=${VOL_MGR:-std} ; variant=redhat
-  init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-9}
-  repo_directory=${repo_directory:-/${RELEASE}/BaseOS/aarch64/os}
-  GUEST=${1:-${variant}-aarch64-${VOL_MGR}}
-
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name "CentOS-*-aarch64*-boot.iso" | tail -n1)}
-  #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name "AlmaLinux-*-aarch64*-boot.iso" | tail -n1)}
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name "Rocky-*-aarch64*-boot.iso" | tail -n1)}
-  if [ "${ISO_PATH}" ] ; then
-    (cd ${ISOS_PARDIR}/redhat/aarch64 ; sha256sum --ignore-missing -c CHECKSUM) ;
+  sleep 5 ; _redhat ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
   fi
-
-  ##dnld: <mirror>/<version>/BaseOS/aarch64/os/images/pxeboot/{vmlinuz,initrd.img}
-  KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name 'vmlinuz' | tail -n1)}
-  INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/redhat/aarch64 -name 'initrd.img' | tail -n1)}
-
-  sleep 5 ; _redhat ; _prep ; sleep 3 ; _install_aarch64
 }
 #----------------------------------------
 
-mageia_x86_64() {
-  VOL_MGR=${VOL_MGR:-std} ; variant=mageia
+_mageia() {
   cfg_file=auto_inst_cfg.pl
   repo_host=${repo_host:-mirrors.kernel.org/mageia}
-
-  init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-9}
-  repo_directory=${repo_directory:-/distrib/${RELEASE}/x86_64}
-  GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
 
   #CFGHOST [http://<host>:<port> | file://]
   EXTRA_ARGS=${EXTRA_ARGS:- automatic=method:http,server:${repo_host},directory:${repo_directory},network:dhcp auto_install=${CFGHOST:-http://10.0.2.1:8080}/${cfg_file} nomodeset text}
   # systemd.unit=multi-user.target
-  cp -a init/mageia/${VOL_MGR}-auto_inst.cfg.pl /tmp/${cfg_file}
+  cp -a init/mageia/auto_inst.cfg.pl /tmp/${cfg_file}
 
   ## NOTE, saved auto install config: /root/drakx/auto_inst_cfg.pl
+}
+mageia_guestvm() {
+  VOL_MGR=${VOL_MGR:-std} ; variant=mageia
+  init_hostname=${init_hostname:-${variant}-boxv0000} ; RELEASE=${RELEASE:-9}
+  repo_directory=${repo_directory:-/distrib/${RELEASE}/${MACHINE}}
+  GUEST=${1:-${variant}-${MACHINE}-${VOL_MGR}}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia -maxdepth 1 -name "Mageia-*-x86_64*.iso" | tail -n1)}
-  if [ "${ISO_PATH}" ] ; then
-  	(cd ${ISOS_PARDIR}/mageia ; sha512sum --ignore-missing -c Mageia-*-x86_64*.iso.sha512) ;
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    ;
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/mageia -maxdepth 1 -name "Mageia-*-x86_64*.iso" | tail -n1)}
+    if [ "${ISO_PATH}" ] ; then
+      (cd ${ISOS_PARDIR}/mageia ; sha512sum --ignore-missing -c Mageia-*-x86_64*.iso.sha512) ;
+    fi
+
+    ##dnld: <mirror>/distrib/<version>/x86_64/isolinux/x86_64/{vmlinuz,all.rdz}
+    KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/mageia -name 'vmlinuz' | tail -n1)}
+    INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/mageia -name 'all.rdz' | tail -n1)}
   fi
 
-  ##dnld: <mirror>/distrib/<version>/x86_64/isolinux/x86_64/{vmlinuz,all.rdz}
-  KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/mageia -name 'vmlinuz' | tail -n1)}
-  INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/mageia -name 'all.rdz' | tail -n1)}
-
-  sleep 5 ; _prep ; sleep 3 ; _install_x86_64
+  sleep 5 ; _mageia ; _prep ; sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
 #----------------------------------------
 
@@ -511,7 +518,7 @@ _openbsd() {
   ##NOTE, enter shell: S
   ##!! (openbsd) login user/passwd: root/-
 
-  #ifconfig ; [dhclient {ifdev} | ifconfig {ifdev} inet autoconf]
+  #ifconfig ; [ifconfig {ifdev} inet autoconf]
 
   ## NOTE, transfer [dir(s) | file(s)]: init/common, init/openbsd
 
@@ -519,57 +526,53 @@ _openbsd() {
   #cp -a init/openbsd/custom.disklabel init/openbsd/install.resp /tmp/
   #sh init/openbsd/autoinstall.sh [${PASSWD_PLAIN}]
 }
-openbsd_x86_64() {
+openbsd_guestvm() {
   VOL_MGR=${VOL_MGR:-std} ; variant=openbsd
   init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
+  GUEST=${1:-${variant}-${MACHINE}-${VOL_MGR}}
 
   ## ?? --boot uefi NOT WORKING for iso ??
   #QUEFI_OPTS=" "
   #VUEFI_OPTS=" "
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/amd64 -name 'install*.img' | tail -n1)} ;
-  (cd ${ISOS_PARDIR}/openbsd/amd64 ; sha256sum --ignore-missing -c SHA256) ;
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    CDROM_OPT=${CDROM_OPT:-" "}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/arm64 -name 'install*.img' | tail -n1)} ;
+    (cd ${ISOS_PARDIR}/openbsd/arm64 ; sha256sum --ignore-missing -c SHA256) ;
+  else
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/amd64 -name 'install*.img' | tail -n1)} ;
+    (cd ${ISOS_PARDIR}/openbsd/amd64 ; sha256sum --ignore-missing -c SHA256) ;
+  fi
 
   sleep 5 ; _openbsd ; _prep
   qemu-img convert -O qcow2 ${ISO_PATH} ${OUT_DIR}/${GUEST}.qcow2
   qemu-img resize -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 ${DISK_SZ}
-  sleep 3 ; _install_x86_64
+  sleep 3
+  if [ "aarch64" = "${MACHINE}" ] ; then
+    _install_aarch64 ;
+  else
+    _install_x86_64 ;
+  fi
 }
-openbsd_aarch64() {
-  CDROM_OPT=${CDROM_OPT:-" "}
-  VOL_MGR=${VOL_MGR:-std} ; variant=openbsd
-  init_hostname=${init_hostname:-${variant}-boxv0000}
-  GUEST=${1:-${variant}-aarch64-${VOL_MGR}}
-
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/openbsd/arm64 -name 'install*.img' | tail -n1)} ;
-  (cd ${ISOS_PARDIR}/openbsd/arm64 ; sha256sum --ignore-missing -c SHA256) ;
-
-  sleep 5 ; _openbsd ; _prep
-  qemu-img convert -O qcow2 ${ISO_PATH} ${OUT_DIR}/${GUEST}.qcow2
-  qemu-img resize -f qcow2 ${OUT_DIR}/${GUEST}.qcow2 ${DISK_SZ}
-  sleep 3 ; _install_aarch64
-}
-
 #----------------------------------------
 
 _pclinuxos() {
   INST_SRC_OPTS=${INST_SRC_OPTS:---cdrom="${ISO_PATH}"}
 
   echo "### Once network connected, transfer needed file(s) ###" ; sleep 5
-  ##append to boot parameters: [textmode=1 text 3]
+  ##append to boot params: [textmode=1 text 3]
 
   ##!! (pclinuxos) login user/passwd: guest/-
   ## NOTE, transfer [dir(s) | file(s)]: init/common, init/pclinuxos
 
-  #su - [; mount -o remount,size=1500M /run ; df -h ; sleep 5]
-  #export MIRRORHOST=spout.ussg.indiana.edu/linux/pclinuxos
+  #su - [; mount -o remount,size=1500M /run ; df -lh ; sleep 5]
   #nmcli device status ; nmcli connection up {ifdev}
+  #export MIRRORHOST=spout.ussg.indiana.edu/linux/pclinuxos
   #sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list
   #sed -i "/${MIRRORHOST}/ s|^.*rpm|rpm|" /etc/apt/sources.list
   #apt-get -y update ; sleep 5
-  #apt-get -y install pclinuxos-release netcat gdisk efibootmgr lib64hal1 lib64aio1 [lvm2 btrfs-progs]
-  #apt-get -y --fix-broken install
+  #apt-get -y install netcat gdisk efibootmgr lib64hal1 lib64aio1 [lvm2 btrfs-progs]
+  #apt-get --fix-broken -y install
 
   #[[sgdisk -p | sfdisk -l] /dev/[sv]da | parted /dev/[sv]da -s unit GiB print]
   #mkdir -p /mnt
@@ -580,13 +583,13 @@ _pclinuxos() {
   #draklive-install --expert --noauto || mylive-install
   #[VOL_MGR=[std | lvm | btrfs]] sh init/pclinuxos/post_liveinstall.sh run_postinstall [hostname [passwd_plain]]
 }
-pclinuxos_x86_64() {
+pclinuxos_guestvm() {
   VOL_MGR=${VOL_MGR:-std} ; variant=pclinuxos
   init_hostname=${init_hostname:-${variant}-boxv0000}
   GUEST=${1:-${variant}-x86_64-${VOL_MGR}}
 
-  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/pclinuxos -name 'pclinuxos64-*.iso' | tail -n1)}
-  (cd ${ISOS_PARDIR}/pclinuxos ; md5sum --ignore-missing -c pclinuxos64-*.md5sum)
+  ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/pclinuxos -name 'pclinuxos64-*-kde-darkstar-*.iso' | tail -n1)}
+  (cd ${ISOS_PARDIR}/pclinuxos ; md5sum --ignore-missing -c pclinuxos64-*-kde-darkstar-*.md5sum)
 
   sleep 5 ; _pclinuxos ; _prep ; sleep 3 #; _install_x86_64
   cp -a ${QEMU_FIRMWARE_X64} init/common/qemu_lxc/vmrun_bhyve.args init/common/qemu_lxc/vmrun_qemu_x86_64.args ${OUT_DIR}/
@@ -604,7 +607,7 @@ pclinuxos_x86_64() {
   echo "(if needed) Quickly catch boot menu to add kernel boot parameters" ;
   sleep 5 ;
 
-  qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
+  qemu-system-x86_64 -cpu Skylake-Client -machine q35,accel=kvm:hvf:tcg \
     -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
     -smp cpus=2 -m size=4096 -boot order=cdn,menu=on -name ${GUEST} \
     -nic ${NET_OPT:-bridge,br=br0},id=net0,model=virtio-net-pci,mac=52:54:00:${mac_last3} \
@@ -620,4 +623,4 @@ pclinuxos_x86_64() {
   _finish
 }
 #----------------------------------------
-${@:-freebsd_x86_64 freebsd-x86_64-std}
+${@:-freebsd_guestvm freebsd-${MACHINE}-std}

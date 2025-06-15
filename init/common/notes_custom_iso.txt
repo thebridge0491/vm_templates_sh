@@ -8,9 +8,12 @@ Void mklive
 # (initial) cd void-mklive ; make
 
 # (update repo) git pull [; make]
-# sudo ./mklive.sh -S "sshd dhcpcd wpa_supplicant acpid" -p "dialog cryptsetup
-#     lvm2 mdadm void-docs-browse xtools-minimal linux-headers zfs"
-#     [-o void-rescue-x86_64-<kernel_ver>-YYYYMMDD.iso]
+# sudo ./mklive.sh -S "sshd dhcpcd wpa_supplicant acpid"
+#     -p "dialog cryptsetup netcat wget parted libstdc++ gptfdisk libffi
+#     libldap gnupg libssh2 curl lvm2 btrfs-progs mdadm void-docs-browse
+#     xtools-minimal [linux-lts] linux[-lts]-headers zfs[-lts]"
+#     [-g "linux linux-headers" -v linux6.1]
+#     [-o void-live-x86_64-<kernel_ver>-YYYYMMDD.iso]
 
 
 Artix buildiso
@@ -22,21 +25,48 @@ Artix buildiso
 #           echo INITSYS=\"runit\" >> ${HOME}/.config/artools/artools-iso.conf
 # (initial) cp -a /usr/share/artools/iso-profiles ${HOME}/artools-workspace/
 #           // modify copied iso-profiles folder to customise iso
+#           // iso-profiles/common/Packages-base:
+#           //   linux[-headers] -> linux[-lts][-headers]
 # (initial) buildiso -p base -q // test the output
+
+# # if on zfs, to avert errors on step: buildiso -p base -bc
+# [sudo zfs create -V 10G ospool0/buildiso]
+# [sudo mkfs.ext2 /dev/zvol/ospool0/buildiso]
+# [sudo mount /dev/zvol/ospool0/buildiso /var/lib/artools]
 
 # buildiso -p base -x
 
 # // enter chroot to add packages/configure
 # artix-chroot /var/lib/artools/buildiso/base/artix/rootfs
-# // init keyring, add packages(zfs, etc) in chroot, xfer repo_archzfs.cfg
-# pacman-key --init ; pacman -Sy --noconfirm artix-keyring
-# pacman -U --noconfirm `ls /var/cache/pacman/pkg/artix-keyring*`
-# pacman-key --populate artix
-# pacman -S --needed artix-grub-live
-# cat repo_archzfs.cfg >> /etc/pacman.conf
-# curl -o /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg
+# // init keyring, add packages(zfs, etc) in chroot, edit /etc/pacman.conf
+# pacman-key --init ; pacman-key --populate artix
+# pacman -Sy --noconfirm artix-keyring
+# [pacman -U --noconfirm `ls /var/cache/pacman/pkg/artix-keyring*`]
+# pacman -S --needed artix-grub-live intel-ucode amd-ucode
+# for pkgX in gcc gnu-netcat parted glibc dosfstools gptfdisk lvm2 \
+#   btrfs-progs ; do pacman -Sy --needed --noconfirm $${pkgX} ;
+# done
+# cat << EOF >> /etc/pacman.conf
+# [archzfs]
+# # Origin Server - Finland
+# Server = http://archzfs.com/$repo/$arch
+# # Mirror - Germany
+# Server = http://mirror.sum7.eu/archlinux/archzfs/$repo/$arch
+# # Mirror - Germany
+# Server = http://mirror.sunred.org/archzfs/$repo/$arch
+# # Mirror - Germany
+# Server = https://mirror.biocrafting.net/archlinux/archzfs/$repo/$arch
+# # Mirror - India
+# Server = https://mirror.in.themindsmaze.com/archzfs/$repo/$arch
+# # Mirror - US
+# Server = https://zxcvfdsa.com/archzfs/$repo/$arch
+#
+# EOF
+# curl -Lo /tmp/archzfs.gpg http://archzfs.com/archzfs.gpg
 # pacman-key --add /tmp/archzfs.gpg ; pacman-key --lsign-key F75D9D76
-# pacman -S --needed linux-headers zfs-dkms zfs-utils
+# zfs_ver=$(curl -Ls https://zxcvfdsa.com/archzfs/archzfs/x86_64 | sed -n 's|.*zfs-dkms-\([0-9.]*\).*.pkg.tar.zst.*|\1|p' | head -n1)
+# pacman -Sy --needed linux[-lts]-headers zfs-dkms[=${zfs_ver:-2.2.4}] \
+#   zfs-utils[=${zfs_ver:-2.2.4}]
 # exit
 
 # buildiso -p base -sc
@@ -66,8 +96,9 @@ Alpine (aports) mkimage
 #        kernel_addons="zfs"
 #        apks="${apks}
 #            iscsi-scst zfs-scripts zfs zfs-utils-py
-#            cciss_vol_status lvm2 mdadm mkinitfs mtools nfs-utils
+#            cciss_vol_status lvm2 btrfs-progs mdadm mkinitfs mtools nfs-utils
 #            parted rsync sfdisk util-linux xfsprogs dosfstools ntfs-3g
+#            e2fsprogs sgdisk libffi gnupg curl multipath-tools perl
 #            "
 #            # if x86_64, add syslinux
 #

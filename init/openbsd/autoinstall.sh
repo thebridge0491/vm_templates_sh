@@ -13,6 +13,12 @@ fi
 
 export PASSWD_PLAIN=${1:-packer}
 
+# Set the time correctly
+#ntpctl -s peers ; sleep 3
+#rdate -v -a time.nist.gov
+
+export CHROOT_CMD=chroot
+
 (cd /dev ; sh MAKEDEV ${DEVX})
 fdisk -iy -g -b 960 ${DEVX} ; sync ; fdisk ${DEVX} ; sleep 3
 
@@ -23,41 +29,79 @@ fdisk -iy -g -b 960 ${DEVX} ; sync ; fdisk ${DEVX} ; sleep 3
 
 /install -a -f /tmp/install.resp ; sync
 
-cat << EOFchroot | chroot /mnt /bin/sh
+cat << EOFchroot | ${CHROOT_CMD} /mnt /bin/sh
 set -x
 
-chmod 1777 /tmp
+# ?? /var/tmp may be sym-link to /tmp ??
+rm -r /var/tmp ; mkdir -p /var/tmp
+chmod 1777 /tmp ; chmod 1777 /var/tmp
 
 sh -c 'cat >> /etc/fstab' << EOF
-swap	/tmp	mfs		rw,nodev,nosuid,-s=512m		0	0
+swap  /tmp  mfs   rw,nodev,nosuid,-s=512m   0  0
 
 EOF
 
 sed -i 's|rw|rw,noatime|' /etc/fstab
 
-pkg_add sudo-- gtar-- gmake--
-#vim-- nano-- bzip2-- findutils-- ggrep-- zip-- unzip--
-#xfce4
+init_hostname=\$(hostname -s)
+sed -i '/^127.0.1.1/ s|127.0.1.1|#127.0.1.1|' /etc/hosts
+echo "127.0.1.1   \${init_hostname}.localdomain  \${init_hostname}" >> /etc/hosts
+sed -n "/\.localdomain/ s|^.* \(.*\)\.localdomain.*$|\1|p" /etc/hosts \
+  > /etc/myname
+hostname \$(cat /etc/myname)
+
+
+services_enabled="sshd"
+pkg_list="sudo-- nano-- pciutils-- python--%3 gtar--"
+# vim-- bzip2-- findutils-- ggrep-- zip-- unzip-- xfce4--
+
+pkg_add -u
+for pkgX in \${pkg_list} ; do
+  pkg_add \${pkgX} ;
+done
+
+echo "Config services" ; sleep 3
+
+echo "Enable|disable services" ; sleep 3
+for svc in \${services_enabled} ; do
+  rcctl enable \${svc} ;
+done
 
 
 usermod -G operator packer
+mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 
-#sh -c 'cat >> /etc/sudoers.d/99_packer' << EOF
-#Defaults:packer !requiretty
-#\$(id -un packer) ALL=(ALL) NOPASSWD: ALL
+echo "@includedir /etc/sudoers.d" >> /etc/sudoers
+mkdir -p /etc/sudoers.d
+#sh -c 'cat | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_packernopasswd' << EOF
+##Defaults:packer !requiretty
+#packer ALL=(ALL) NOPASSWD: ALL
+#
 #EOF
-#chmod 0440 /etc/sudoers.d/99_packer
+##chmod 0440 /etc/sudoers.d/99_packernopasswd
 
 
+#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
+#Defaults:%wheel !requiretty
+%wheel ALL=(ALL:ALL) NOPASSWD: ALL
+
+EOF
+echo "#Defaults:%wheel !requiretty" >> /etc/sudoers.d/99_wheelnopasswd
+echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers.d/99_wheelnopasswd
+
+mkdir -p /etc/ssh/sshd_config.d
+if [ -z "\$(grep 'Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config)" ] ; then
+  echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config ;
+fi
 echo "Temporarily permit root login via ssh password" ; sleep 3
-sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
+#sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
+sed -i "s|.*PermitRootLogin|#PermitRootLogin|" /etc/ssh/sshd_config
+echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-rootlogin.conf
 
-sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
-sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
-sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
+mv /root/.forward /root/.forward.orig
 
-
-cp /usr/mdec/boot /boot ; cp /usr/mdec/* /
+cp -a /usr/mdec/boot /boot ; cp -a /usr/mdec/* /
 installboot -v ${DEVX:-sd0}
 installboot -v ${DEVX:-sd0}a
 installboot -v ${DEVX:-sd0} /usr/mdec/biosboot /usr/mdec/boot
@@ -88,7 +132,7 @@ EOFchroot
 
 cp /tmp/install.resp /mnt/root/install.resp.orig
 for fileX in /tmp/*.disklabel /tmp/autoinstall.sh /tmp/i/install.resp ; do
-  cp ${fileX} /mnt/root/ ;
+  cp -a ${fileX} /mnt/root/ ;
 done
 sync
 

@@ -1,165 +1,214 @@
 #!/bin/sh -eux
 
-export SED_INPLACE="sed -i"
 export SHAREDNODE=${1:-localhost.local} ; export PRINTNAME=${2:-printer1}
-
-svc_enable() {
-  svc=${1}
-  if command -v systemctl > /dev/null ; then
-    systemctl enable ${svc} ;
-  elif command -v sv > /dev/null ; then
-    ln -s /etc/sv/${svc} /var/service ;
-  elif command -v rc-update > /dev/null ; then
-    rc-update add ${svc} default ;
-  elif command -v update-rc.d > /dev/null ; then
-  	update-rc.d ${svc} defaults ;
-  fi
-}
-
 set +e
 
-. /root/init/debian/distro_pkgs.ini
+snapshot_name=pre_cmdlntools-$(date -u "+%Y%m%d") \
+  sh $(dirname ${0})/upgradepkgs.sh snapshot
+
 apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
   tee /etc/apt/apt.conf.d/999norecommends
-for pkgX in ${pkgs_cmdln_tools} ; do
-	apt-get -y --no-install-recommends install --download-only ${pkgX} ;
-done
-for pkgX in ${pkgs_cmdln_tools} ; do
-	apt-get -y --no-install-recommends install ${pkgX} ;
-done
-tasksel --list-tasks ; sleep 5
+# apt-get -o Acquire::ForceIPv4=true ...
+echo '#Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
 
-if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
-  echo "export JAVA_HOME=${default_java_home}" >> /etc/bash.bashrc ;
+apt-get --allow-releaseinfo-change -y update
+
+. /root/scripts/distro_pkgs.ini ; echo ${pkgs_cmdln_tools}
+
+read -p "Enter 'y' to continue [nY]: " response
+#if [ "n" = "${response}" ] || [ "N" = "${response}" ] ; then
+if [ -n "$(echo ${response} | grep -e '^[Nn].*')" ] ; then
+  exit ;
 fi
-mkdir -p ${default_java_home}
-if [ -z "$(grep '^JAVA_VERSION' ${default_java_home}/release)" ] ; then
-  echo JAVA_VERSION="${default_java_version}" >> ${default_java_home}/release ;
-fi
+#apt-get [--download-only] -y install pkg0 .. pkgN # ERR, doesn't skip missing
+for pkgX in ${pkgs_cmdln_tools} ; do
+  apt-get -y install ${pkgX} ;
+done
+tasksel --new-install --list-tasks ; sleep 5
 
 #dbus-uuidgen --ensure[=/etc/machine-id]
 if [ "$(hostname | grep -e 'box.0000')" ] ; then
-	last4=$(cat /var/lib/dbus/machine-id | cut -b29-32) ; # cat /etc/machine-id
-	for fileX in /etc/hosts /etc/hostname ; do
-	  sed -i "/box.0000/ s|\(box.\)0000|\1${last4}|g" ${fileX} ;
-	done ;
-	hostname --file /etc/hostname ;
+  idsuffix=$(cat /var/lib/dbus/machine-id | cut -b29-32) ; # cat /etc/machine-id
+  for fileX in /etc/hosts /etc/hostname ; do
+    sed -i "/box.0000/ s|\(box.\)0000|\1${idsuffix:-0000}|g" ${fileX} ;
+  done ;
+  hostname -F /etc/hostname || hostname $(cat /etc/hostname) ;
 fi
-if command -v systemctl > /dev/null ; then
-  if [ ! -e /etc/systemd/system/machineid-save.service ] ; then
-    cat << EOF > /etc/systemd/system/machineid-save.service ;
-[Unit]
-Before=network.target
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/dbus-uuidgen --ensure
-RemainAfterExit=yes
-[Install]
-WantedBy=multi-user.target
 
-EOF
+if [ -n "$(java -version)" ] ; then
+  #java_home=$(dirname $(dirname $(realpath $(which java)))) ;
+  java_home=$(realpath $(which java) | sed "s:/bin/java::") ;
+  #if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
+  if [ -z "$(grep '^export JAVA_HOME' /etc/profile.d/jdk.sh)" ] ; then
+    echo 'export JAVA_HOME=${java_home}' >> /etc/profile.d/jdk.sh ;
   fi ;
-  #systemctl enable machineid-save.service ;
-  svc_enable machineid-save ;
-else
-  if [ -z "$(grep -e 'dbus-uuidgen --ensure' /etc/rc.local)" ] ; then
-    #echo dbus-uuidgen --ensure=/etc/machine-id >> /etc/rc.local ;
-    echo dbus-uuidgen --ensure >> /etc/rc.local ;
-    chmod +x /etc/rc.local ;
-  fi
+  #mkdir -p ${java_home} ;
+  #java_version=$(java -version | head -n1 | sed 's|.*"\([0-9]*\.[0-9*]\)".*|\1|') ;
+  #if [ -z "$(grep '^JAVA_VERSION' ${java_home}/release)" ] ; then
+  #  echo JAVA_VERSION="${java_version}" >> ${java_home}/release ;
+  #fi ;
 fi
+#update-alternatives --get-selections
+#update-alternatives --config [java | javac | jar | javadoc | javap | jdb | keytool]
+# or
+#update-java-alternatives --list
+#update-java-alternatives --set java-[11]-openjdk-[amd64]
+
+#                      chmod [g+ws,+t | 3775] /var/mail
+chgrp mail /var/mail ; chmod g+ws,+t /var/mail
+
+(cd /etc/skel ; mkdir -p .gnupg .pki .ssh)
+(cd /root/init/common ; cp -a skel/_gnupg/* /etc/skel/.gnupg/ ; \
+  cp -a skel/_ssh/* /etc/skel/.ssh/ ; cp -a skel/_pki/* /etc/skel/.pki/ ; \
+  cp -a skel/_gitconfig.sample /etc/skel/.gitconfig ; \
+  cp -a skel/_hgrc.sample /etc/skel/.hgrc)
 
 
 set +e ; set +u
-#svc_enable ssh ; svc_enable ntp
-#svc_enable ufw
-#svc_enable clamav-freshclam
+cp -n /root/init/common/smtp/linux/mail.rc.sample /etc/mail.rc
 
-ntpd -u ntp:ntp ; ntpq -p ; sleep 3
+##cp /usr/share/doc/nftables/examples/sysvinit/nftables.init /etc/init.d/nftables
+##chmod +x /etc/init.d/nftables
+##if command -v update-rc.d > /dev/null ; then
+##  cat > /etc/network/if-pre-up.d/nftables << EOF ;
+###!/bin/sh
+##/usr/bin/env nft -f /etc/nftables.conf
+##
+##EOF
+##  chmod +x /etc/network/if-pre-up.d/nftables ;
+##fi
 
-##ufw disable
-#sh /root/init/common/linux/firewall/ufw/config_ufw.sh cmds_ufw allow
-#svc_enable nftables
-sh /root/init/common/linux/firewall/nftables/config_nftables.sh config_nftables allow	# cmds | config
-#ipset flush ; iptables -F ; ip6tables -F
-#ipset destroy ; iptables -X ; ip6tables -X
-for unit in ipset iptables ip6tables ; do
-  if command -v systemctl > /dev/null ; then
-    systemctl stop ${unit} ; systemctl disable ${unit} ;
-  elif command -v sv > /dev/null ; then
-    sv stop ${unit} ; rm /var/service/${unit} ;
-  elif command -v rc-update > /dev/null ; then
-    rc-service ${unit} stop ; rc-update del ${unit} default ;
-  elif command -v update-rc.d > /dev/null ; then
-    service ${unit} stop ; update-rc.d ${unit} remove ;
-  fi ;
-  if command -v systemctl > /dev/null ; then
-    systemctl mask ${unit} ;
-  fi ;
-done
-if command -v systemctl > /dev/null ; then
-  systemctl unmask nftables ;
-fi
-if command -v update-rc.d > /dev/null ; then
-  cat > /etc/network/if-pre-up.d/nftables << EOF ;
-#!/bin/sh
-/usr/bin/env nft -f /etc/nftables.conf
-
-EOF
-  chmod +x /etc/network/if-pre-up.d/nftables ;
-fi
-#sh /root/init/common/misc_config.sh check_clamav
-
-
-# service(s) enabled by package install trigger: [e]udev, dbus, mdns (avahi)
-# svc_enable udev ; svc_enable eudev ; svc_enable dbus ; svc_enable avahi-daemon
-
-#sed -i '/hosts:/ s|files dns|files mdns_minimal \[NOTFOUND=return\] dns mdns|' /etc/nsswitch.conf
-sed -i '/hosts:/ s|files dns|files mdns_minimal \[NOTFOUND=return\] dns|' /etc/nsswitch.conf
-#ufw allow in svc MDNS
-#nft add rule inet filter in_allow udp port mdns accept
-sed -i 's|domain|domain, mdns|g' /etc/nftables.conf
-sed -i 's|domain|domain, mdns|g' /etc/nftables/*nftables.conf
-
-
-(cd /etc/skel ; mkdir -p .gnupg .pki .ssh)
-cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
-cp -R /root/init/common/skel/_pki/* /etc/skel/.pki/
-cp -R /root/init/common/skel/_ssh/* /etc/skel/.ssh/
-cp /root/init/common/skel/_gitconfig.sample /etc/skel/.gitconfig
-cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
-cat << EOF >> /etc/skel/.inputrc
-"\e[A": history-search-backward
-"\e[B": history-search-forward
-
-EOF
-
-if [ "$(grep '^.*%sudo.*ALL.*NOPASSWD.*' /etc/sudoers)" ] ; then
-  sed -i "s|^.*%sudo.*ALL.*NOPASSWD.*|%sudo ALL=(ALL) NOPASSWD: ALL|" /etc/sudoers ;
-else
-	echo '%sudo ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers ;
-fi
-sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
+#mkdir -p /var/lib/clamav ; chown -R clamav:clamav /var/lib/clamav
+#touch /var/lib/clamav/clamd.sock
 
 # Only add the secure path line if it is not already present
 grep -q 'secure_path' /etc/sudoers \
   || sed -i '/Defaults\s\+env_reset/a Defaults\tsecure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' /etc/sudoers
 
-sh /root/init/common/misc_config.sh cfg_sshd /etc/skel/.ssh
-sh /root/init/common/misc_config.sh cfg_shell_keychain /etc/skel/.bashrc
+if [ -n "$(lspci | grep -ie wireless)" ] ; then
+  psk=`wpa_passphrase ${SSID:-HOME24-WIFI} ${passphrase:-abcd0123} | sed -n 's|^[[:space:]]*psk=\(.*\)|\1|p'`
+  nmcli device wifi list ; sleep 3
+  nmcli device wifi connect ${SSID:-HOME24-WIFI} password ${psk}
+  #nmcli device connection up ${SSID:-HOME24-WIFI}
+  # see /etc/NetworkManager/system-connections/*
+fi
+
+sh /root/init/common/cron/linux/config_cron.sh
+
+smtp_daemon=${smtp_daemon:-opensmtpd}
+# smtpd.conf location varies:
+#  /etc/mail/smtpd.conf: OpenBSD, Alpine Linux
+#  /etc/smtpd/smtpd.conf: Void Linux, Arch Linux
+#  /etc/smtpd.conf: Debian
+found_smtpdconf=$(find /etc -name smtpd.conf | head -n1)
+found_smtpdconf=${found_smtpdconf:-/etc/mail/smtpd.conf}
+# config [open]smtpd -- maildir format vice mbox
+if command -v systemctl > /dev/null ; then
+  systemctl enable ${smtp_daemon} || true ; systemctl restart ${smtp_daemon} || true ;
+elif command -v sv > /dev/null ; then
+  ln -s /etc/sv/${smtp_daemon} /etc/service/ || true ; sv restart ${smtp_daemon} || true ;
+elif command -v rc-update > /dev/null ; then
+  rc-update add ${smtp_daemon} default || true ; rc-service ${smtp_daemon} restart || true ;
+elif command -v update-rc.d > /dev/null ; then
+  update-rc.d ${smtp_daemon} defaults || true ; invoke-rc.d ${smtp_daemon} restart || true ;
+fi
+sh /root/init/common/smtp/linux/config_opensmtpd.sh
+if [ -n "$(grep 'local ! rcpt-to' ${found_smtpdconf})" ] ; then
+  for userX in packer vagrant ; do
+    [ ! -e /var/mail/${userX}.old ] && \
+      mv /var/mail/${userX} /var/mail/${userX}.old ;
+  done ;
+  if [ ! "Linux" = "$(uname -s)" ] ; then
+    mkdir -p /var/mail/packer ; chown packer:wheel /var/mail/packer ;
+  else
+    mkdir -p /var/mail/packer/{cur,new,tmp} ;
+    chown -R packer:mail /var/mail/packer ;
+  fi ;
+fi
+
+firewall_tool=${firewall_tool:-firewalld}
+##sh /root/init/common/firewall/linux/config_ufw.sh cmds_ufw allow
+##(sleep 120 && ufw disable)& && ufw enable
+#ufw enable
+#sh /root/init/common/firewall/linux/config_nftables.sh #config_nftables allow
+##diff -s /etc/nftables.conf /etc/nftables.conf.new
+##(sleep 120 && nft flush ruleset)& && nft -f /etc/nftables.conf
+#nft -f /etc/nftables.conf
+sh /root/init/common/firewall/linux/config_firewalld.sh #cmds_firewalld allow
+#(sleep 120 && firewall-offline-cmd --disabled)& && \
+#  (firewall-offline-cmd --enabled ; firewall-cmd --reload)
+firewall-offline-cmd --enabled ; firewall-cmd --reload
+
+##ufw allow in svc MDNS
+##ufw status ; sleep 5 ; ufw show user-rules ; sleep 5
+#if [ -z "$(grep -e 'domain.*mdns' /etc/nftables.conf /etc/nftables/out*_nftables.conf)" ] ; then
+#  #nft add rule inet filter in_allow udp port { domain, mdns } accept ;
+#  sed -i 's|domain|domain, mdns|g' /etc/nftables.conf \
+#    /etc/nftables/out*_nftables.conf ;
+#fi
+#nft list tables ; sleep 5 ; nft list ruleset ; sleep 5
+if [ $(firewall-cmd --zone=public --query-service=mdns) ] ; then
+  #yast firewall services add zone=EXT service=service:avahi ; # openSUSE
+  firewall-cmd --permanent --zone=public --add-service=mdns ;
+fi
+firewall-cmd --get-active-zones ; sleep 5
+#ipset list ; sleep 5
+firewall-cmd --state ; sleep 5 ; firewall-cmd --zone=public --list-all ; sleep 5
 
 
-svc_enable nfs-common
+set -e ; set -u
+sh /root/init/common/misc_config.sh cfg_nsswitch_mdns
+sh /root/init/common/misc_config.sh cfg_sudo_nopasswd /etc/sudoers.d
+sh /root/init/common/misc_config.sh cfg_inputrc_histsearch
+#sh /root/init/common/misc_config.sh check_clamav
+sh /root/init/common/misc_config.sh cfg_sshd
+sh /root/init/common/misc_config.sh cfg_shell_keychain
 sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
-
-
-#svc_enable cups ; svc_enable cups-browsed
 #sh /root/init/common/misc_config.sh cfg_printer_pdf /etc/cups \
-#    /usr/share/ppd/cups-pdf
+#  /usr/share/ppd/cups-pdf
 ##sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
-lpstat -t ; sleep 5
+lpstat -t || true ; sleep 5
+
+set +e ; set +u
+# service(s) enabled by package install trigger: dbus, mdns (avahi), firewalld, network-manager
+echo "Enable|disable services" ; sleep 3
+for svc in ${services_enabled} ; do
+  if command -v systemctl > /dev/null ; then
+    systemctl unmask ${svc} || true ; systemctl enable ${svc} || true ;
+  elif command -v sv > /dev/null ; then
+    ln -s /etc/sv/${svc} /etc/service/ || true ;
+  elif command -v rc-update > /dev/null ; then
+    rc-update add ${svc} default || true ;
+  elif command -v update-rc.d > /dev/null ; then
+    update-rc.d ${svc} defaults || true ;
+  fi ;
+done
+for svc in ${services_disabled} ; do
+  if command -v systemctl > /dev/null ; then
+    systemctl disable ${svc} || true ; systemctl mask ${svc} || true ;
+  elif command -v sv > /dev/null ; then
+    rm /var/service/${svc} || true ;
+  elif command -v rc-update > /dev/null ; then
+    rc-update del ${svc} default || true ;
+  elif command -v update-rc.d > /dev/null ; then
+    update-rc.d ${svc} remove || true ;
+  fi ;
+done
+
+
+cat << EOF | sendmail -t root
+To: packer
+Subject: Subject sample
+
+Email sample
+EOF
+mail_cmd=$(basename $(which nail s-nail mailx | head -n1))
+echo Sample email | ${mail_cmd:-mail} -r vagrant@$(hostname -s || hostname) \
+  -s "Sample subject" root packer
+
 set -e ; set -u
 
 
+set +e
 ## scripts/cleanup.sh
 apt-get -y clean

@@ -6,7 +6,78 @@
 #aria2c --check-certificate=false <url_prefix>/script.sh
 
 #========================================================================#
-SED_INPLACE=${SED_INPLACE:-"sed -i"}
+if [ 'FreeBSD' = "$(uname -s)" ] ; then
+  sed_inplace=${sed_inplace:-"sed -i ''"} ;
+else
+  sed_inplace=${sed_inplace:-"sed -i"} ;
+fi
+
+cfg_nsswitch_mdns() { # requires sudo/root access
+  if [ -e /etc/nsswitch.conf ] ; then
+    if [ 'OpenBSD' = "$(uname -s)" ] ; then
+      local MOD_LINENO=0 ;
+      cp -an /etc/nsswitch.conf /etc/nsswitch.conf.orig ;
+      ymd=$(date -r `stat -f %m /etc/nsswitch.conf` +%Y%m%d) ;
+      if [ -z "$(grep '#(old ${ymd}) hosts:' /etc/nsswitch.conf)" ] ; then
+        ${sed_inplace} "/^hosts:/ s|hosts:|#(old ${ymd}) hosts:|" /etc/nsswitch.conf ;
+        MOD_LINENO=$(grep -n "#(old ${ymd}) hosts:" /etc/nsswitch.conf | cut -d: -f1) ;
+        #${sed_inplace} "${MOD_LINENO}a\
+    #hosts:\t\tfiles mdns_minimal \[NOTFOUND=return\] dns" /etc/nsswitch.conf ;
+        awk "NR==$(expr ${MOD_LINENO} + 1){print \"hosts:\t\tfiles mdns_minimal \[NOTFOUND=return\] dns\"}1" \
+          /etc/nsswitch.conf > /etc/nsswitch.conf.new ;
+        mv /etc/nsswitch.conf.new /etc/nsswitch.conf ;
+      fi ;
+    elif [ 'FreeBSD' = "$(uname -s)" ] || [ 'NetBSD' = "$(uname -s)" ] ; then
+      ymd=$(date -r `stat -f %m /etc/nsswitch.conf` +%Y%m%d) ;
+      if [ -z "$(grep '#(old ${ymd}) hosts:' /etc/nsswitch.conf)" ] ; then
+        ${sed_inplace} "/^hosts:/ s|hosts:|#(old ${ymd}) hosts:|" /etc/nsswitch.conf ;
+        ${sed_inplace} "s|^#(old ${ymd}) hosts:.*$|&\nhosts:\t\tfiles mdns_minimal \[NOTFOUND=return\] dns|" /etc/nsswitch.conf ;
+      fi ;
+    elif [ 'Linux' = "$(uname -s)" ] ; then
+      ymd=$(date -d @`stat -c %Y /etc/nsswitch.conf` +%Y%m%d) ;
+      if [ -z "$(grep '#(old ${ymd}) hosts:' /etc/nsswitch.conf)" ] ; then
+        ${sed_inplace} "/^hosts:/ s|hosts:|#(old ${ymd}) hosts:|" /etc/nsswitch.conf ;
+        ${sed_inplace} "/^#(old ${ymd}) hosts:/a\
+hosts:\t\tfiles mdns_minimal \[NOTFOUND=return\] dns" /etc/nsswitch.conf ;
+      fi ;
+    fi ;
+  fi
+}
+
+cfg_sudo_nopasswd() { # requires sudo/root access
+  sudoersd_dir=${1:-/etc/sudoers.d}
+  groupX=wheel
+
+  . /etc/os-release
+  if [ ! -e /etc/os-release ] && [ -f /usr/lib/os-release ] ; then
+    . /usr/lib/os-release ;
+  fi
+  if [ 'debian' = "${ID_LIKE}" ] ; then
+    groupX=sudo ;
+  fi
+
+  #${sed_inplace} "/^[^#].*requiretty/ s|^|#|" [/usr/[local|pkg]]/etc/sudoers
+  if [ -z "$(grep '^%${groupX} .* NOPASSWD: ALL' ${sudoersd_dir}/99_${groupX}nopasswd)" ] ; then
+    cat << EOF | EDITOR="tee -a" visudo -f ${sudoersd_dir}/99_${groupX}nopasswd ;
+#Defaults:%${groupX} !requiretty
+%${groupX} ALL=(ALL:ALL) NOPASSWD: ALL
+
+EOF
+  fi
+}
+
+cfg_inputrc_histsearch() { # requires sudo/root access
+  #if command -v bind > /dev/null ; then
+  if [ 'Linux' = "$(uname -s)" ] ; then
+    if ! grep -q -E "history.*-search" /etc/skel/.inputrc ; then
+      cat << EOF >> /etc/skel/.inputrc
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+
+EOF
+    fi ;
+  fi
+}
 
 check_clamav() {
 	if command -v curl > /dev/null ; then
@@ -31,45 +102,19 @@ check_clamav() {
 
 cfg_sshd() { # requires sudo/root access
   skeldir_ssh=${1:-/etc/skel/.ssh}
-  SSHD_CONFIG="/etc/ssh/sshd_config"
 
   # ensure that there is a trailing newline before attempting to concatenate
-  ${SED_INPLACE} '$a\' ${SSHD_CONFIG}
+  ${sed_inplace} '$a\' /etc/ssh/sshd_config
 
-  PERMITROOT="PermitRootLogin no"
-  USEDNS="UseDNS no"
-  GSSAPI="GSSAPIAuthentication no"
-  if grep -q -E "^[[:space:]]*PermitRootLogin" ${SSHD_CONFIG} ; then
-    ${SED_INPLACE} "s|^\s*PermitRootLogin.*|${PERMITROOT}|" ${SSHD_CONFIG} ;
-  else
-    echo "${PERMITROOT}" >> ${SSHD_CONFIG} ;
+  mkdir -p /etc/ssh/sshd_config.d
+  if [ -z "$(grep 'Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config)" ] ; then
+    echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config ;
   fi
-  if grep -q -E "^[[:space:]]*UseDNS" ${SSHD_CONFIG} ; then
-    ${SED_INPLACE} "s|^\s*UseDNS.*|${USEDNS}|" ${SSHD_CONFIG} ;
-  else
-    echo "${USEDNS}" >> ${SSHD_CONFIG} ;
-  fi
-  if grep -q -E "^[[:space:]]*GSSAPIAuthentication" ${SSHD_CONFIG} ; then
-    ${SED_INPLACE} "s|^\s*GSSAPIAuthentication.*|${GSSAPI}|" ${SSHD_CONFIG} ;
-  else
-    echo "${GSSAPI}" >> ${SSHD_CONFIG} ;
-  fi
-
-  sshca_pubkey="${skeldir_ssh}/publish_krls/sshca-id_rsa.pub"
-  sshca_krl="${skeldir_ssh}/publish_krls/krl.krl"
-  if [ -e ${sshca_pubkey} ] ; then
-    #for iprange in '192.168.0.0/16' '172.16.0.0/12' '10.0.0.0/8' 'fd00::/8' ; do
-    for iprange in '192.168.0.0/16' ; do
-      if [ "$(grep \"^@cert-authority ${iprange}\" ${skeldir_ssh}/known_hosts)" ] ; then
-        ${SED_INPLACE} "s|@cert-authority ${iprange}.*|@cert-authority ${iprange} $(cat ${sshca_pubkey})|" ${skeldir_ssh}/known_hosts ;
-      else
-        echo "@cert-authority ${iprange} $(cat ${sshca_pubkey})" >> \
-        ${skeldir_ssh}/known_hosts ;
-      fi ;
-    done ;
-    cp -a ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
-  fi
-  cat << EOF >> ${SSHD_CONFIG}
+  #${sed_inplace} "s|.*PermitRootLogin|#PermitRootLogin|" /etc/ssh/sshd_config
+  echo "PermitRootLogin no" > /etc/ssh/sshd_config.d/99-rootlogin.conf
+  cat << EOF > /etc/ssh/sshd_config.d/99-custom.conf
+UseDNS no
+GSSAPIAuthentication no
 HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
 PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
 
@@ -89,6 +134,22 @@ Match User packer
   X11DisplayOffset 10
 
 EOF
+
+  sshca_pubkey="${skeldir_ssh}/publish_krls/sshca-id_rsa.pub"
+  sshca_krl="${skeldir_ssh}/publish_krls/krl.krl"
+  if [ -e ${sshca_pubkey} ] ; then
+    #for iprange in '192.168.0.0/16' '172.16.0.0/12' '10.0.0.0/8' 'fd00::/8' ; do
+    for iprange in '192.168.0.0/16' ; do
+      if [ "$(grep \"^@cert-authority ${iprange}\" ${skeldir_ssh}/known_hosts)" ] ; then
+        ${sed_inplace} "s|@cert-authority ${iprange}.*|@cert-authority ${iprange} $(cat ${sshca_pubkey})|" ${skeldir_ssh}/known_hosts ;
+      else
+        cp -a ${skeldir_ssh}/known_hosts.sample ${skeldir_ssh}/known_hosts ;
+        echo "@cert-authority ${iprange} $(cat ${sshca_pubkey})" >> \
+          ${skeldir_ssh}/known_hosts ;
+      fi ;
+    done ;
+    cp -a ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
+  fi
 }
 
 cfg_shell_keychain() { # may require sudo/root access
@@ -126,14 +187,14 @@ share_nfs_data0() { # requires sudo/root access
   #Linux NFS server example /etc/exports
     #/mnt/Data0  192.168.*.*(rw,sync,root_squash,anongid=100)
 
-  ${SED_INPLACE} "/^9p_Data0 / s|^9p_Data0|#9p_Data0|" /etc/fstab
+  ${sed_inplace} "/^9p_Data0 / s|^9p_Data0|#9p_Data0|" /etc/fstab
   if [ "Linux" = "`uname -s`" ] ; then
     nfsmount="#${sharednode}:/mnt/Data0  /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0" ;
   else
     nfsmount="#${sharednode}:/mnt/Data0  /media/nfs_Data0  nfs  rw,noauto  0  0" ;
   fi ;
   if grep -q -E "^.*:/mnt/Data0.*" /etc/fstab ; then
-    ${SED_INPLACE} "s|^.*:/mnt/Data0.*|${nfsmount}|" /etc/fstab ;
+    ${sed_inplace} "s|^.*:/mnt/Data0.*|${nfsmount}|" /etc/fstab ;
   else
     echo "${nfsmount}" >> /etc/fstab ;
   fi
@@ -144,7 +205,7 @@ cfg_printer_pdf() { # requires sudo/root access
   etcdir_cups=${1:-/etc/cups} ; cupsdir_ppd=${2:-/usr/share/cups/model}
 
   if grep -q -E "^Out .*" ${etcdir_cups}/cups-pdf.conf ; then
-    ${SED_INPLACE} "s|^Out .*|Out \${HOME}/Documents/PDF|" \
+    ${sed_inplace} "s|^Out .*|Out \${HOME}/Documents/PDF|" \
       ${etcdir_cups}/cups-pdf.conf ;
   else
     echo "Out \${HOME}/Documents/PDF" >> ${etcdir_cups}/cups-pdf.conf ;
@@ -164,6 +225,31 @@ cfg_printer_default() { # requires sudo/root access
   lpadmin -E -U root -p ${printname} \
     -v "ipp://${sharednode}/printers/${printname}"
   lpadmin -E -U root -d ${printname}
+}
+
+cfg_xorgtouchpad() { # requires sudo/root access
+  xorgconfd_dir=${1:-/etc/X11/xorg.conf.d}
+
+  # enable touchpad tapping
+  for confX in 10-evdev.conf 40-libinput.conf ; do
+    ${sed_inplace} '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+      ${xorgconfd_dir}/${confX} ;
+  done
+  ## ??? egrep -i 'synap|alps|etps|elan' /proc/bus/input/devices
+  #libinput list-devices ; xinput --list
+  #xinput list-props XX [; xinput disable YY] # by id, list-props or disable
+  #xinput set-prop <deviceid|devicename> <deviceproperty> <value>
+}
+
+cfg_xdguserdirs() { # requires sudo/root access
+  etcdir_xdg=${1:-/etc/xdg}
+
+  # add directory bin to XDG directories config
+  if [ -z "$(grep '^BIN=bin' ${etcdir_xdg}/user-dirs.defaults)" ] ; then
+    echo 'BIN=bin' >> ${etcdir_xdg}/user-dirs.defaults ;
+  fi
+  export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
+  xdg-user-dirs-update ; chmod 1777 /tmp
 }
 
 #========================================================================#

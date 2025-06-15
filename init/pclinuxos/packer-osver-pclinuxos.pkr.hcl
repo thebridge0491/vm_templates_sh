@@ -5,12 +5,6 @@ variable "variant" {
   default = "pclinuxos"
 }
 
-variable "osver" {
-  type    = string
-  default = "2022"
-  #default = "2024"
-}
-
 variable "vol_mgr" {
   type    = string
   default = "std"
@@ -49,7 +43,7 @@ variable "iso_base_aa64" {
 
 variable "boot_cmdln_options" {
   type    = string
-  default = " nokmsboot noacpi nomodeset video=1024x768 keyb=us "
+  default = " nokmsboot noacpi video=1024x768 keyb=us nomodeset "
   #default = " "
 }
 

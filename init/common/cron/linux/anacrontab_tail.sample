@@ -1,0 +1,10 @@
+
+#Note: [Alpine: /etc/periodic/daily | Others: /etc/cron.daily]
+
+1   15  cron.daily      nice run-parts /etc/cron.daily 2>&1 > /var/log/daily.out
+7   10  cron.weekly     nice run-parts /etc/cron.weekly 2>&1 > /var/log/weekly.out
+30  5   cron.monthly    nice run-parts /etc/cron.monthly 2>&1 > /var/log/monthly.out
+
+7   15  cron.daily.mail      test -s /var/log/daily.out && tail -vn +1 /var/log/daily.out
+15  10  cron.weekly.mail     test -s /var/log/weekly.out && tail -vn +1 /var/log/weekly.out
+90  5   cron.monthly.mail    test -s /var/log/monthly.out && tail -vn +1 /var/log/monthly.out

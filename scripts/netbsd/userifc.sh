@@ -1,94 +1,114 @@
 #!/bin/sh -eux
 
 ## scripts/userifc.sh
+export CHOICE_DESKTOP=${1:-xfce}
 set +e
 
-export CHOICE_DESKTOP=${1:-xfce}
-
-# fetch missing distribution sets like: xbase.tar.xz
-#arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
-#ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/xbase.tar.xz
-#tar -C / -xpJf xbase.tar.xz
-
-arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
-cd /tmp
-for setX in xbase xserver xfont xetc ; do
-  ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/${setX}.tar.xz ;
-  tar -C / -xpJf ${setX}.tar.xz ;
-done
-
-
 pkgin update
-. /root/init/netbsd/distro_pkgs.ini
-case ${CHOICE_DESKTOP} in
-	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
-	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
-esac
 
-pkgin -yd install ${pkgs_var}
-for pkgX in ${pkgs_var} ; do
-	pkgin -y install ${pkgX} ;
-done
+read -p "Fetch missing distribution sets? Enter 'y' to continue [yN]: " response
+if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
+  # fetch missing distribution sets like: xbase.tar.xz
+  # uname_m: [amd64 | arm64] ; rel: X.Y
+  uname_m=$(uname -m) ; rel=$(sysctl -n kern.osrelease) ;
+  cd /tmp ;
+  for setX in xbase xserver xfont xetc ; do
+    ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${uname_m}/binary/sets/${setX}.tar.xz ;
+    tar -C / -xpJf ${setX}.tar.xz ;
+  done ;
+fi
+
+#pkgin -dy upgrade ; pkgin -y upgrade ; pkgin -y full-upgrade
+. /root/scripts/distro_pkgs.ini
+echo ${pkgs_displaysvr} ${pkgs_deskenv_${CHOICE_DESKTOP}}
+
+read -p "Enter 'y' to continue [nY]: " response
+#if [ "n" = "${response}" ] || [ "N" = "${response}" ] ; then
+if [ -n "$(echo ${response} | grep -e '^[Nn].*')" ] ; then
+  exit ;
+fi
+#pkgin [-d] -y install pkg0 .. pkgN # OK, skips missing
+pkgin -y install ${pkgs_displaysvr} ${pkgs_deskenv_${CHOICE_DESKTOP}}
 sleep 3
 
-groupadd -g 81 dbus ; mkdir -p /var/db/dbus /var/lib/xdm /usr/pkg/etc/xdm
-useradd -c 'System message bus' -u 81 -g dbus -d '/' -s /usr/bin/false dbus
 
+mkdir -p /var/run/dbus /var/db/dbus /var/run/xdm /var/lib/xdm \
+  /usr/pkg/etc/xdm /usr/pkg/etc/xdg /usr/pkg/etc/X11/xorg.conf.d
+for confX in 10-evdev.conf 40-libinput.conf ; do
+  cp -an /usr/pkg/share/X11/xorg.conf.d/${confX} /usr/pkg/etc/X11/xorg.conf.d/ ;
+done
 for svc in dbus xdm ; do
-  cp /usr/pkg/share/examples/rc.d/${svc} /etc/rc.d/ ;
+  cp -a /usr/pkg/share/examples/rc.d/${svc} /etc/rc.d/ ;
 done
-mkdir -p /var/run/dbus /var/run/xdm /var/lib/xdm
-
 cp -R /usr/pkg/share/examples/xdm /usr/pkg/etc/
+for guiX in xfce4 lxqt ; do
+  cp -R /usr/pkg/share/examples/${guiX} /usr/pkg/etc/xdg/ ;
+done
 
-cat > /etc/X11/xorg.conf << EOF
-Section "Device"
-	Identifier "Card0"
-	Driver "wsfb"
-EndSection
-
-EOF
-
-cat >> /root/.xinitrc << EOF ;
-export XDG_DATA_DIRS=/usr/pkg/share
-export XDG_CONFIG_DIRS=/usr/pkg/etc/xdg
-
-EOF
-
-case ${CHOICE_DESKTOP} in
-	lxqt) cat >> /root/.xinitrc << EOF ;
-ck-launch-session dbus-launch --exit-with-session startlxqt
-
-EOF
-	  ;;
-	xfce) cat >> /root/.xinitrc << EOF ;
-ck-launch-session dbus-launch --exit-with-session startxfce4
-
-EOF
-	  ;;
-esac
-sleep 3
-
-#echo 'dbus=YES' >> /etc/rc.conf
-echo 'xdm=YES' >> /etc/rc.conf
-echo 'wsmoused=YES' >> /etc/rc.conf
-
-ln -s /root/.xinitrc /root/.xsession
-cp /root/.xinitrc /home/packer/.xinitrc
-chown packer:$(id -gn packer) /home/packer/.xinitrc
-(cd /home/packer ; ln -s /home/packer/.xinitrc .xsession)
+groupadd -g 81 dbus
+useradd -c 'System message bus' -u 81 -g dbus -d '/' -s /usr/bin/false dbus
 
 # set video resolution ? gop 6: 1024x768x32
 sed -i 's|;boot|;gop 6;boot|g' /boot.cfg
 
-# enable touchpad tapping
-sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
-  /etc/X11/xorg.conf.d/10-evdev.conf
-sed -i '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
-  /etc/X11/xorg.conf.d/40-libinput.conf
+if [ -z "$(grep '^export XDG_DATA_DIRS=' /root/.xinitrc)" ] || [ -z "$(grep '^export XDG_CONFIG_DIRS=' /root/.xinitrc)" ] ; then
+  cat >> /root/.xinitrc << EOF ;
+export XDG_DATA_DIRS=/usr/pkg/share
+export XDG_CONFIG_DIRS=/usr/pkg/etc/xdg
 
-# update XDG user dir config
-export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
-#sh -c "echo 'BIN=bin' >> /usr/pkg/etc/xdg/user-dirs.defaults"
-sh -c "echo 'BIN=bin' >> /etc/xdg/user-dirs.defaults"
-xdg-user-dirs-update
+EOF
+fi
+
+if [ -z "$(grep '^ck-launch-session dbus-launch --exit-with-session' /root/.xinitrc)" ] ; then
+  case ${CHOICE_DESKTOP} in
+    lxqt) cat >> /root/.xinitrc << EOF ;
+ck-launch-session dbus-launch --exit-with-session startlxqt
+
+EOF
+      ;;
+    xfce) cat >> /root/.xinitrc << EOF ;
+ck-launch-session dbus-launch --exit-with-session startxfce4
+
+EOF
+      ;;
+  esac ;
+  sleep 3 ;
+fi
+
+cp /root/.xinitrc /home/packer/.xinitrc
+for pathX in /root /home/packer ; do
+  (cd ${pathX} ; ln -s .xinitrc .xsession) ;
+done
+chown packer:$(id -gn packer) /home/packer/.xinitrc
+
+# /usr/pkg/etc/X11/xorg.conf.d/20-[wsfb|intel|radeon].conf
+sh -c 'cat > /usr/pkg/etc/X11/xorg.conf.d/20-wsfb.conf' << EOF
+Section "Device"
+  Identifier "Card0"
+  Driver "wsfb" # wsfb | intel | radeon
+  #BusID "PCI:0:2:0"
+EndSection
+
+EOF
+
+
+#sh /root/init/common/misc_config.sh cfg_xdguserdirs /usr/pkg/etc/xdg
+sh /root/init/common/misc_config.sh cfg_xdguserdirs /etc/xdg
+sh /root/init/common/misc_config.sh cfg_xorgtouchpad /usr/pkg/etc/X11/xorg.conf.d
+
+set +e ; set +u
+echo "Enable|disable services" ; sleep 3
+for svc in ${uiservices_enabled_${CHOICE_DESKTOP}} ; do
+  if [ -z "$(service -e | grep ${svc})" ] ; then
+    echo ${svc}=YES >> /etc/rc.conf ;
+  fi ;
+done
+for svc in ${uiservices_disabled_${CHOICE_DESKTOP}} ; do
+  if [ -n "$(service -e | grep ${svc})" ] ; then
+    echo ${svc}=NO >> /etc/rc.conf ;
+  fi ;
+done
+
+
+set +e
+pkgin -y clean # #?? clean

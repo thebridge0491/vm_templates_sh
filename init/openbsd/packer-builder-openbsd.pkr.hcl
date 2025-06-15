@@ -114,6 +114,7 @@ locals {
   build_timestamp  = ("" != var.build_timestamp ? var.build_timestamp :
     "${formatdate("YYYY.MM", timestamp())}")
   datestamp        = "${formatdate("YYYY.MM.DD", timestamp())}"
+  timeutc        = "${formatdate("YYYYMMDDhhmm", timestamp())}"
 
   # OS variant oriented local vars
   #iso_url         = ""
@@ -136,7 +137,7 @@ locals {
   qemu_nvram       = ("aarch64" == var.MACHINE ? var.qemu_nvram_aa64 :
     var.qemu_nvram_x64)
   qemuargs         = "aarch64" == var.MACHINE ? [
-    ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"],
+    ["-cpu", "cortex-a72"], ["-machine", "virt,gic-version=3,acpi=off"],
     ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -146,7 +147,7 @@ locals {
     ["-smbios", "type=0,uefi=on"], ["-bios", "${var.qemu_firmware_aa64}"]
     #, ["-virtfs", "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough"]
     ] : [
-    ["-cpu", "SandyBridge"], ["-machine", "q35,accel=kvm:hvf:tcg"],
+    ["-cpu", "Skylake-Client"], ["-machine", "q35,accel=kvm:hvf:tcg"],
     ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -162,20 +163,20 @@ locals {
     ("aarch64" == var.MACHINE ? "qemu-system-aarch64" : "qemu-system-x86_64"))
 
   # Source common local vars
-  vm_base          = "${var.variant}-${var.MACHINE}-${var.vol_mgr}"
+  vm_base          = "${var.variant}${var.REL}-${var.MACHINE}-${var.vol_mgr}"
   output_directory = "output-vms/${local.vm_base}"
 
-  boot_command_aa64_auto = ["<wait2m>", "S<enter><wait10>",
-    "dhclient vio0 ; ifconfig vio0 inet autoconf<enter><wait>cd /tmp ; ",
+  boot_command_aa64_auto = ["<wait2m>S<enter><wait10>",
+    "dhclient vio0 ; ifconfig vio0 inet autoconf<enter><wait>",
+    "date -u '${local.timeutc}' ; cd /tmp ; ",
     "ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.resp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/autoinstall.sh ; ",
     "sync ; sleep 3<enter>sh -x /tmp/autoinstall.sh<enter>"]
 
-  boot_command_x64_chroot  = ["<wait1m>", "S<enter><wait10>",
+  boot_command_x64_chroot  = ["<wait1m>S<enter><wait10>",
     "mount_mfs -s 100m md1 /tmp ; mount_mfs -s 100m md2 /mnt ; ",
     "mount -t mfs -s 100m md1 /tmp ; mount -t mfs -s 100m md2 /mnt ; ",
-    "dhclient -L /tmp/dhclient.lease.em0 em0 ; ",
-    "dhclient -L /tmp/dhclient.lease.vio0 vio0 ; ",
-    "ifconfig em0 inet autoconf ; ifconfig vio0 inet autoconf ; cd /tmp ; ",
+    "ifconfig em0 inet autoconf ; ifconfig vio0 inet autoconf ; ",
+    "date -u '${local.timeutc}' ; cd /tmp ; ",
     "ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/disklabel_setup.sh http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh ; ",
     "(cd /dev ; sh MAKEDEV sd0) ; ",
     "sh -x /tmp/disklabel_setup.sh part_format ${var.vol_mgr} ; ",
@@ -183,7 +184,8 @@ locals {
     "MIRROR=${var.MIRROR} REL=${var.REL} DISTARCHIVE_FETCH=${var.DISTARCHIVE_FETCH} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_plain}'<enter><wait>"]
 
   boot_command_x64_auto = ["<wait1m>", "S<enter><wait10>dhclient vio0 ; ",
-    "ifconfig vio0 inet autoconf<enter><wait>", "cd /tmp ; ",
+    "ifconfig vio0 inet autoconf<enter><wait>",
+    "date -u '${local.timeutc}' ; cd /tmp ; ",
     "ftp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/custom.disklabel http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.resp http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/autoinstall.sh ; ",
     "sync ; sleep 3<enter>sh -x /tmp/autoinstall.sh<enter>"]
 
@@ -230,7 +232,8 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
+      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.REL}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -247,11 +250,29 @@ build {
     execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
     scripts          = ["init/${var.variant}/vagrantuser.sh"]
   }
+  #provisioner "shell" {
+  #  environment_vars = ["HOME_DIR=/home/packer"]
+  #  execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
+  #  except           = ["qemu.guest_vm"]
+  #  scripts          = ["init/common/zerofill_freebsd.sh"]
+  #}
   provisioner "shell" {
-    environment_vars = ["HOME_DIR=/home/packer"]
+    environment_vars = ["HOME_DIR=/home/packer", "tarcmd=gtar"]
     execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
-    except           = ["qemu.guest_vm"]
-    scripts          = ["init/common/bsd/zerofill.sh"]
+    inline           = ["cd /tmp",
+      "sh init/common/collect_osinfo.sh collect_all"]
+    only             = ["qemu.guest_vm"]
+  }
+  provisioner "file" {
+    destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
+    direction   = "download"
+    generated   = true
+    only        = ["qemu.guest_vm"]
+    source      = "/tmp/info.tar"
+  }
+  provisioner "shell-local" {
+    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
+      "tar -xf info.tar -C ${local.build_timestamp}#${var.REL} && rm info.tar"]
   }
 
   post-processor "checksum" {

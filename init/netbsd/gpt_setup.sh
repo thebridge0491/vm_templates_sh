@@ -31,7 +31,7 @@ parttbl_bkup() {
 }
 
 gpt_disk() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1}
+  VOL_MGR=${1:-std} ; GRP_NM=${2:-nbsd0}
 
   echo "Partitioning disk" ; sleep 3
   gpt destroy ${DEVX}
@@ -84,7 +84,7 @@ gpt_disk() {
 }
 
 zfspart_create() {
-  GRP_NM=${1:-bsd1} ; ZPARTNM_ZPOOLNM=${2:-${GRP_NM}-fsPool:fspool0}
+  GRP_NM=${1:-nbsd0} ; ZPARTNM_ZPOOLNM=${2:-${GRP_NM}-fsPool:fspool0}
 
   modload solaris ; modload zfs
   modstat -n zfs ; sleep 5
@@ -98,12 +98,12 @@ zfspart_create() {
   zpool labelclear -f /dev/${dkZPart}
 
   zpool create -o altroot=/mnt -O compress=lz4 -O atime=off -m none \
-	-O dedup=off -f ${zpoolnm} /dev/${dkZPart}
+  -O dedup=off -f ${zpoolnm} /dev/${dkZPart}
   zfs create -o mountpoint=none ${zpoolnm}/ROOT
   zfs create -o canmount=noauto -o mountpoint=/ ${zpoolnm}/ROOT/default
   zfs mount ${zpoolnm}/ROOT/default
 
-  zfs create -o exec=on -o setuid=off -o mountpoint=/tmp ${zpoolnm}/tmp
+  #zfs create -o exec=on -o setuid=off -o mountpoint=/tmp ${zpoolnm}/tmp
   zfs create -o canmount=off -o mountpoint=/usr ${zpoolnm}/usr
   zfs create -o mountpoint=/usr/home ${zpoolnm}/usr/home
   zfs create -o setuid=off ${zpoolnm}/usr/ports
@@ -117,7 +117,7 @@ zfspart_create() {
 
   zfs set quota=7680M ${zpoolnm}/usr/home
   zfs set quota=5G ${zpoolnm}/var
-  zfs set quota=2G ${zpoolnm}/tmp
+  #zfs set quota=2G ${zpoolnm}/tmp
 
   zpool set bootfs=${zpoolnm}/ROOT/default ${zpoolnm} # ??
   zpool set cachefile=/etc/zfs/zpool.cache ${zpoolnm} ; sync
@@ -135,13 +135,13 @@ zfspart_create() {
 }
 
 format_partitions() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
+  VOL_MGR=${1:-std} ; GRP_NM=${2:-nbsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
   MKFS_CMD=${MKFS_CMD:-newfs -O 2 -V 2 -f 2048}
   BSD_PARTNMS=${BSD_PARTNMS:-${GRP_NM}-fsSwap ${GRP_NM}-fsRoot ${GRP_NM}-fsVar ${GRP_NM}-fsHome}
 
   echo "Formatting file systems" ; sleep 3
   if [ "zfs" = "${VOL_MGR}" ] ; then
-	zfspart_create ${GRP_NM} ${ZPARTNM_ZPOOLNM} ;
+  zfspart_create ${GRP_NM} ${ZPARTNM_ZPOOLNM} ;
 
     zpartnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f1) ;
     zpoolnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f2) ;
@@ -152,8 +152,8 @@ format_partitions() {
     modstat -n ffs ; sleep 5
 
     for partnm in ${BSD_PARTNMS} ; do
-	  idx=$(echo $(gpt show -l ${DEVX} | grep -e "${partnm}") | cut -d' ' -f3) ;
-	  dkX=$(dkctl ${DEVX} listwedges | grep -e ${partnm} | cut -d: -f1) ;
+    idx=$(echo $(gpt show -l ${DEVX} | grep -e "${partnm}") | cut -d' ' -f3) ;
+    dkX=$(dkctl ${DEVX} listwedges | grep -e ${partnm} | cut -d: -f1) ;
       if [ ! "${GRP_NM}-fsSwap" = "${partnm}" ] ; then
         ${MKFS_CMD} ${dkX} ;
         gpt label -l "${partnm}" -i ${idx} ${DEVX} ;
@@ -169,14 +169,14 @@ format_partitions() {
 }
 
 part_format() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
+  VOL_MGR=${1:-std} ; GRP_NM=${2:-nbsd0} ; ZPARTNM_ZPOOLNM=${3:-${GRP_NM}-fsPool:fspool0}
 
   gpt_disk ${VOL_MGR} ${GRP_NM}
   format_partitions ${VOL_MGR} ${GRP_NM} ${ZPARTNM_ZPOOLNM}
 }
 
 mount_filesystems() {
-  VOL_MGR=${1:-std} ; GRP_NM=${2:-bsd1}
+  VOL_MGR=${1:-std} ; GRP_NM=${2:-nbsd0}
   echo "Mounting file systems" ; sleep 3
   if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs mount -a ;
@@ -208,8 +208,8 @@ EOF
 
 NAME=${GRP_NM}-fsSwap    none        swap    sw,dp      0   0
 
-swap			         /tmp		mfs		rw,-s=512m		0	0
-tmpfs			         /var/shm	tmpfs	rw,nodev,nosuid,-m1777,-s=512m		0	0
+swap               /tmp   mfs   rw,nodev,nosuid,-s=512m    0 0
+tmpfs              /var/shm tmpfs rw,nodev,nosuid,-m1777,-s=512m    0 0
 
 kernfs             /kern       kernfs  rw      0   0
 ptyfs              /dev/pts    ptyfs   rw      0   0

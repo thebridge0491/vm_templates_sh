@@ -4,8 +4,8 @@
 # ssh user@ipaddr "sudo sh -xs - arg1 argN" < script.sh  # w/ sudo
 # ssh user@ipaddr "su -m root -c 'sh -xs - arg1 argN'" < script.sh
 
-#sh /tmp/disk_setup.sh part_format std bsd1
-#sh /tmp/disk_setup.sh mount_filesystems std bsd1
+#sh /tmp/disk_setup.sh part_format std nbsd0
+#sh /tmp/disk_setup.sh mount_filesystems std nbsd0
 
 # passwd crypted hash: [md5|sha256|sha512|yescrypt] - [$1|$5|$6|$y$j9T]$...
 # stty -echo ; openssl passwd -6 -salt 16CHARACTERSSALT -stdin ; stty echo
@@ -21,21 +21,28 @@ elif [ -e /dev/wd0 ] ; then
 fi
 
 export VOL_MGR=${VOL_MGR:-std}
-export GRP_NM=${GRP_NM:-bsd1} ; export ZPOOLNM=${ZPOOLNM:-fspool0}
-export MACHINE=${MACHINE:-$(uname -m)}
+export GRP_NM=${GRP_NM:-nbsd0} ; export ZPOOLNM=${ZPOOLNM:-fspool0}
+export UNAME_M=${UNAME_M:-$(uname -m)}
 # ftp.netbsd.org/pub/NetBSD | mirror.math.princeton.edu/pub/NetBSD
 export MIRROR=${MIRROR:-ftp.netbsd.org/pub/NetBSD}
 export REL=${REL:-$(sysctl -n kern.osrelease)}
 export DISTARCHIVE_FETCH=${DISTARCHIVE_FETCH:-0}
 
 
-# ifconfig [;ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
+# ifconfig [; ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
 # dhcpcd {ifdev}
+
+# Set the time correctly
+#ntpd -u ntp:ntp ; ntpq -p ; ntpctl -s peers ; sleep 3
+#rdate -s time.nist.gov
+ntpd -q # ntpdate -v -u -b us.pool.ntp.org
 
 ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 #wlan_adapter=$(ifconfig | grep -B3 -i wireless) # ath0 ?
 #sysctl net.wlan.devices ; sleep 3
 
+
+export CHROOT_CMD=chroot
 
 idxESP=$(echo $(gpt show -l ${DEVX} | grep -e ESP) | cut -d' ' -f3)
 idxRoot=$(echo $(gpt show -l ${DEVX} | grep -e "${GRP_NM}-fsRoot") | cut -d' ' -f3)
@@ -49,19 +56,18 @@ dkESP=$(dkctl ${DEVX} listwedges | grep -e ESP | cut -d: -f1)
 bootstrap() {
   echo "Extracting netbsd dist archives" ; sleep 3
   if [ "0" = "${DISTARCHIVE_FETCH}" ] || [ -z "${DISTARCHIVE_FETCH}" ] ; then
-    cd /${MACHINE}/binary/kernel ;
-    (cd /mnt ; gunzip -c /${MACHINE}/binary/kernel/netbsd-GENERIC.gz > netbsd-GENERIC ; mv netbsd-GENERIC netbsd) ;
-    cd /${MACHINE}/binary/sets ;
-    for file in kern-GENERIC base comp etc man misc modules tests text ; do
-      (cat ${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
+    cd /${UNAME_M}/binary/kernel ;
+    (cd /mnt ; gunzip -c /${UNAME_M}/binary/kernel/netbsd-GENERIC.gz > netbsd-GENERIC ; mv netbsd-GENERIC netbsd) ;
+    cd /${UNAME_M}/binary/sets ;
+    for setX in kern-GENERIC base comp etc man misc modules text xbase ; do
+      (cat ${setX}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
     done ;
     #cd /mnt ; mv netbsd netbsd.gen ; ln -fh netbsd.gen netbsd
   else
-    for file in kern-GENERIC base comp etc man misc modules tests text ; do
-      (ftp -vo - http://${MIRROR}/NetBSD-${REL}/${MACHINE}/binary/sets/${file}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
+    for setX in kern-GENERIC base comp etc man misc modules text xbase ; do
+      (ftp -vo - http://${MIRROR}/NetBSD-${REL}/${UNAME_M}/binary/sets/${setX}.tar.xz | tar -xpJf - -C ${DESTDIR:-/mnt}) ;
     done ;
   fi
-
 
   (cd /mnt/dev ; sh MAKEDEV all)
   mount_kernfs kernfs /mnt/kern ; mount_procfs procfs /mnt/proc
@@ -75,10 +81,10 @@ system_config() {
 
   hash_passwd=$(pwhash ${PASSWD_PLAIN})
 
-  cat << EOFchroot | chroot /mnt /bin/sh
+  cat << EOFchroot | ${CHROOT_CMD} /mnt /bin/sh
 set -x
 
-#ln -s /usr/home /home
+ln -s /usr/home /home
 chmod 1777 /tmp ; chmod 1777 /var/tmp
 
 cat >> /etc/rc.conf << EOF
@@ -86,7 +92,6 @@ cat >> /etc/rc.conf << EOF
 # . /etc/defaults/rc.conf ;
 #fi
 rc_configured=YES
-#clear_tmp=YES
 #random_file=/etc/entropy-file
 #random_file=/var/db/entropy-file
 #random_seed=YES
@@ -96,7 +101,6 @@ EOF
 
 echo "Config keymap" ; sleep 3
 echo "encoding us" >> /etc/wscons.conf
-echo 'wscons=YES' >> /etc/rc.conf
 #kbdmap
 
 
@@ -108,7 +112,6 @@ echo "Config hostname ; network" ; sleep 3
 cat >> /etc/rc.conf << EOF
 hostname=${INIT_HOSTNAME}
 #ifconfig_${ifdev}=dhcp
-dhcpcd=YES
 
 EOF
 
@@ -119,8 +122,8 @@ EOF
 
 #resolvconf -u
 cat /etc/resolv.conf ; sleep 5
-sed -i '/127.0.1.1/d' /etc/hosts
-echo "127.0.1.1    ${INIT_HOSTNAME}.localdomain    ${INIT_HOSTNAME}" >> /etc/hosts
+sed -i '/^127.0.1.1/ s|127.0.1.1|#127.0.1.1|' /etc/hosts
+echo "127.0.1.1   ${INIT_HOSTNAME}.localdomain  ${INIT_HOSTNAME}" >> /etc/hosts
 
 cat > /etc/ifconfig.${ifdev} << EOF
 up
@@ -137,57 +140,71 @@ export LC_ALL=""
 
 EOF
 
-echo "Update services" ; sleep 3
-cat >> /etc/rc.conf << EOF
-ntpd=YES
-sshd=YES
 
-EOF
-
+services_enabled="dhcpcd wscons sshd"
+pkg_list="sudo nano gmake pciutils ca-certificates python312 py312-urllib3 gtar" # vim bzip2 findutils ggrep zip unzip xfce4
 
 echo "#PKG_PATH=http://${MIRROR}" >> /etc/pkg_install.conf
-echo "PKG_PATH=ftp://ftp.netbsd.org/pub/pkgsrc/packages/NetBSD/${MACHINE}/${REL}/All" >> /etc/pkg_install.conf
-PKG_PATH=http://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/${MACHINE}/${REL}/All
+echo "PKG_PATH=ftp://ftp.netbsd.org/pub/pkgsrc/packages/NetBSD/${UNAME_M}/${REL}/All" >> /etc/pkg_install.conf
+PKG_PATH=http://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/${UNAME_M}/${REL}/All
 
 pkg_add -u
-pkg_add -v pkgin sudo gtar gmake ca-certificates
+for pkgX in pkgin \${pkg_list} ; do
+  pkg_add -v \${pkgX} ;
+done
 sed -i 's|#ETCCERTSDIR|ETCCERTSDIR|' /usr/pkg/etc/ca-certificates-dir.conf
-#vim nano bzip2 findutils ggrep zip unzip
-#xfce4
-export PATH=\${PATH}:/usr/pkg/sbin:/usr/pkg/bin
-pkgin -y install sudo gtar gmake ca-certificates
+export PATH=\${PATH}:/usr/pkg/sbin:/usr/pkg/bin:/sbin:/usr/sbin
+for pkgX in \${pkg_list} ; do
+  pkgin -y install \${pkgX} ;
+done
 sed -i 's|#ETCCERTSDIR|ETCCERTSDIR|' /usr/pkg/etc/ca-certificates-dir.conf
 
 update-ca-certificates
 
+echo "Enable services" ; sleep 3
+for svc in \${services_enabled} ; do
+  echo \${svc}=YES >> /etc/rc.conf ;
+done
+
 
 echo "Set root passwd ; add user" ; sleep 3
-usermod -p '${hash_passwd}' root
+usermod -p \$(pwhash ${PASSWD_PLAIN}) root
 #passwd
 
 #mkdir -p /home/packer
 #DIR_MODE=0750
 useradd -m -G wheel,operator -s /bin/ksh -c 'Packer User' packer
-usermod -p '${hash_passwd}' packer
+usermod -p \$(pwhash ${PASSWD_PLAIN}) packer
 
-chown -R packer:\$(id -gn packer) /home/packer
+mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 
-#sh -c 'cat >> /usr/pkg/etc/sudoers.d/99_packer' << EOF
-#Defaults:packer !requiretty
-#\$(id -un packer) ALL=(ALL) NOPASSWD: ALL
+mkdir -p /usr/pkg/etc/sudoers.d
+#sh -c 'cat | EDITOR="tee -a" visudo -f /usr/pkg/etc/sudoers.d/99_packernopasswd' << EOF
+##Defaults:packer !requiretty
+#packer ALL=(ALL:ALL) NOPASSWD: ALL
+#
 #EOF
-#chmod 0440 /usr/pkg/etc/sudoers.d/99_packer
+##chmod 0440 /usr/pkg/etc/sudoers.d/99_packernopasswd
 
 
 cd /etc/mail ; make aliases
 
 
-echo "Temporarily permit root login via ssh password" ; sleep 3
-sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
+#sed -i "/^[^#].*requiretty/ s|^|#|" /usr/pkg/etc/sudoers
+cat << EOF | EDITOR="tee -a" visudo -f /usr/pkg/etc/sudoers.d/99_wheelnopasswd
+#Defaults:%wheel !requiretty
+%wheel ALL=(ALL:ALL) NOPASSWD: ALL
 
-sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /usr/pkg/etc/sudoers
-sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /usr/pkg/etc/sudoers
-sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /usr/pkg/etc/sudoers
+EOF
+
+mkdir -p /etc/ssh/sshd_config.d
+if [ -z "\$(grep 'Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config)" ] ; then
+  echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config ;
+fi
+echo "Temporarily permit root login via ssh password" ; sleep 3
+#sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
+sed -i "s|.*PermitRootLogin|#PermitRootLogin|" /etc/ssh/sshd_config
+echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-rootlogin.conf
 
 
 #pkg_add -u
@@ -207,12 +224,12 @@ bootloader() {
 
   mkdir -p /mnt/efi ; mount_msdos -l /dev/${dkESP} /mnt/efi
   (cd /mnt/efi ; mkdir -p EFI/netbsd EFI/BOOT)
-  if [ "arm64" = "${MACHINE}" ] || [ "aarch64" = "${MACHINE}" ] ; then
-    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
-    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+  if [ "arm64" = "${UNAME_M}" ] || [ "aarch64" = "${UNAME_M}" ] ; then
+    cp -a /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
+    cp -a /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
   else
-    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
-    cp /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
+    cp -a /mnt/usr/mdec/*64.efi /mnt/efi/EFI/netbsd/ ;
+    cp -a /mnt/usr/mdec/*64.efi /mnt/efi/EFI/BOOT/ ;
   fi
 
   if [ "zfs" = "${VOL_MGR}" ] ; then

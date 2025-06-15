@@ -1,12 +1,24 @@
 #!/bin/sh -eux
 
-export SED_INPLACE="sed -i"
 LANGS=${@:-py c java} ; export LANGS
-
 set +e
 #set -e
 
-. /root/init/void/distro_pkgs.ini
+snapshot_name=pre_codelab-$(date -u "+%Y%m%d") \
+  sh $(dirname ${0})/upgradepkgs.sh snapshot
+
+xbps-install -S ; xbps-install -uy xbps
+#xbps-install -Duy ; xbps-install -uy
+. /root/scripts/distro_pkgs.ini
+for langX in ${LANGS} ; do
+  echo ${pkgs_lang_${langX}} ;
+done
+
+read -p "Enter 'y' to continue [nY]: " response
+#if [ "n" = "${response}" ] || [ "N" = "${response}" ] ; then
+if [ -n "$(echo ${response} | grep -e '^[Nn].*')" ] ; then
+  exit ;
+fi
 for langX in ${LANGS} ; do
   case ${langX} in
     py) pkgs_var=${pkgs_lang_py} ;;
@@ -27,31 +39,59 @@ for langX in ${LANGS} ; do
     swift) pkgs_var=${pkgs_lang_swift} ;;
     *) pkgs_var=${pkgs_lang_py} ;;
   esac
+  #xbps-install [-D] -y pkg0 .. pkgN # ERR, doesn't skip missing
   for pkgX in ${pkgs_var} ; do
-	xbps-install -y ${pkgX} ;
+    xbps-install -y ${pkgX} ;
   done ;
 done
 
-if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
-  echo "export JAVA_HOME=${default_java_home}" >> /etc/bash.bashrc ;
-fi
-mkdir -p ${default_java_home}
-if [ -z "$(grep '^JAVA_VERSION' ${default_java_home}/release)" ] ; then
-  echo JAVA_VERSION="${default_java_version}" >> ${default_java_home}/release ;
-fi
-if [ -z "$(grep '^export JAVAFX_HOME' /etc/bash.bashrc)" ] ; then
-  echo "export JAVAFX_HOME=${default_javafx_home}" >> /etc/bash.bashrc ;
+if [ -n "$(java -version)" ] ; then
+  #java_home=$(dirname $(dirname $(realpath $(which java)))) ;
+  java_home=$(realpath $(which java) | sed "s:/bin/java::") ;
+  #if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
+  if [ -z "$(grep '^export JAVA_HOME' /etc/profile.d/jdk.sh)" ] ; then
+    echo 'export JAVA_HOME=${java_home}' >> /etc/profile.d/jdk.sh ;
+  fi ;
+  #mkdir -p ${java_home} ;
+  #java_version=$(java -version | head -n1 | sed 's|.*"\([0-9]*\.[0-9*]\)".*|\1|') ;
+  #if [ -z "$(grep '^JAVA_VERSION' ${java_home}/release)" ] ; then
+  #  echo JAVA_VERSION="${java_version}" >> ${java_home}/release ;
+  #fi ;
+  # PATH_TO_FX location varies: # try find javafx[-.]fxml*.jar
+  #  [/usr/lib/jvm/java-[N]-openjfx|/opt/javafx-sdk-[N]]/lib: Arch Linux, Gluon download
+  #  /usr/local/openjfx[N]/lib: FreeBSD
+  #  /usr/share/openjfx: Debian
+  found_jfxjar=$(find /usr /opt -name "javafx[-.]fxml*.jar" | head -n1) ;
+  found_jfxjar=${found_jfxjar:-/usr/lib/jvm/java-11-openjfx/lib/javafx.fxml.jar} ;
+  #if [ -z "$(grep '^export PATH_TO_FX' /etc/bash.bashrc)" ] ; then
+  if [ -z "$(grep '^export PATH_TO_FX' /etc/profile.d/jdk.sh)" ] ; then
+    echo "export PATH_TO_FX=$(dirname ${found_jfxjar})" >> /etc/profile.d/jdk.sh ;
+  fi ;
 fi
 #xbps-alternatives --list [--group [jdk | python]]
 #xbps-alternatives --group jdk --set openjdk[11]
 #xbps-alternatives --group python --set python[3]
 
-echo "Install xterm,Xauth pkgs for X11 forwarding over SSH" >> /dev/stderr ; sleep 3
-for pkgX in xauth xterm ; do
-  xbps-install -y ${pkgX} ;
+
+if [ -z "$(grep -e 'dbus-uuidgen --ensure' /etc/rc.local)" ] ; then
+  #echo /usr/bin/dbus-uuidgen --ensure=/etc/machine-id >> /etc/rc.local ;
+  echo /usr/bin/dbus-uuidgen --ensure >> /etc/rc.local ;
+  chmod +x /etc/rc.local ;
+fi
+
+
+set +e ; set +u
+echo "Enable|disable services" ; sleep 3
+for svc in ${labservices_enabled} ; do
+  ln -s /etc/sv/${svc} /etc/runit/runsvdir/default/ || true ;
+  #ln -s /etc/sv/${svc} /var/service/ || true ;
+done
+for svc in ${labservices_disabled} ; do
+  rm /etc/runit/runsvdir/default/${svc} || true ;
+  #rm /var/service/${svc} || true ;
 done
 
-set -e ; set -u
 
+set +e
 ## scripts/cleanup.sh
-xbps-remove -O
+xbps-remove -oOy

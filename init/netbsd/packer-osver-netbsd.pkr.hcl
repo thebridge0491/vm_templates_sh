@@ -5,11 +5,6 @@ variable "variant" {
   default = "netbsd"
 }
 
-variable "osver" {
-  type    = string
-  default = "10.0"
-}
-
 variable "vol_mgr" {
   type    = string
   default = "std"

@@ -2,15 +2,15 @@
 
 ## freebsd/vagrantuser.sh
 mkdir -p /home/vagrant
-echo -n vagrant | pw useradd vagrant -h 0 -m -G wheel,operator -s /bin/tcsh -d /home/vagrant -c "Vagrant User"
+echo -n vagrant | pw useradd vagrant -h 0 -m -G wheel,operator -s /bin/sh -d /home/vagrant -c "Vagrant User"
 #echo 'set prompt = "%N@%m:%~ %# "' >> /home/vagrant/.cshrc
 chown -R vagrant:$(id -gn vagrant) /home/vagrant
 
-#sh -c 'cat >> /usr/local/etc/sudoers.d/99_vagrant' << EOF
+#sh -c 'cat >> /usr/local/etc/sudoers.d/99_vagrantnopasswd' << EOF
 #Defaults:vagrant !requiretty
-#$(id -un vagrant) ALL=(ALL) NOPASSWD: ALL
+#vagrant ALL=(ALL:ALL) NOPASSWD: ALL
 #EOF
-#chmod 0440 /usr/local/etc/sudoers.d/99_vagrant
+#chmod 0440 /usr/local/etc/sudoers.d/99_vagrantnopasswd
 
 pubkey_url="https://raw.githubusercontent.com/mitchellh/vagrant/master/keys/vagrant.pub"
 mkdir -p /home/vagrant/.ssh

@@ -91,7 +91,8 @@ variable "isos_pardir" {
 
 variable "foreign_pkgmgr" {
   type    = string
-  default = "dnf zypper"
+  #default = "pacman-package-manager dnf-plugins-core zypper"
+  default = ""
 }
 
 
@@ -124,7 +125,7 @@ locals {
     "https://${var.mirror_host_x64}${var.iso_url_directory_x64}/${var.iso_base_x64}.iso"]
   iso_checksum     = ("aarch64" == var.MACHINE ?
     "file:file://${var.isos_pardir}/debian/arm64/SHA256SUMS" :
-    "file:file://${var.isos_pardir}/debian/SHA256SUMS.txt")
+    "file:file://${var.isos_pardir}/debian/live/SHA256SUMS.txt")
 
   # Source provider oriented local vars
   # qemu
@@ -135,7 +136,7 @@ locals {
   qemu_nvram       = ("aarch64" == var.MACHINE ? var.qemu_nvram_aa64 :
     var.qemu_nvram_x64)
   qemuargs         = "aarch64" == var.MACHINE ? [
-    ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"],
+    ["-cpu", "cortex-a72"], ["-machine", "virt,gic-version=3,acpi=off"],
     ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -145,7 +146,7 @@ locals {
     ["-smbios", "type=0,uefi=on"], ["-bios", "${var.qemu_firmware_aa64}"]
     #, ["-virtfs", "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough"]
     ] : [
-    ["-cpu", "SandyBridge"], ["-machine", "q35,accel=kvm:hvf:tcg"],
+    ["-cpu", "Skylake-Client"], ["-machine", "q35,accel=kvm:hvf:tcg"],
     ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -161,28 +162,48 @@ locals {
     ("aarch64" == var.MACHINE ? "qemu-system-aarch64" : "qemu-system-x86_64"))
 
   # Source common local vars
-  vm_base          = "${var.variant}-${var.MACHINE}-${var.vol_mgr}"
+  vm_base          = "${var.variant}${var.RELEASE}-${var.MACHINE}-${var.vol_mgr}"
   output_directory = "output-vms/${local.vm_base}"
 
-  boot_command_aa64_auto = ["<wait5><wait>c<wait>linux /linux ${var.boot_cmdln_options} ",
-    "auto=true preseed/url=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-preseed.cfg ",
-    "hostname=${var.variant}-boxv0000 domain= locale=en_US keymap=us ",
+  boot_command_aa64_auto = ["<wait5><down><up><wait5m>c<wait>",
+    "linux /linux ",
+    "preseed/url=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/preseed.cfg ",
+    "auto=true hostname=${var.variant}-boxv0000 domain= locale=en_US keymap=us ",
     "console-setup/ask_detect=false mirror/http/hostname=${var.repo_host} ",
     "mirror/http/directory=${var.repo_directory_aa64} ",
-    "choose-init/select_init=sysvinit<enter>",
-    "initrd /initrd.gz<enter>boot<enter>"]
+    "choose-init/select_init=sysvinit ${var.boot_cmdln_options} ",
+    "textmode=1 text 3<enter><wait10>",
+    "initrd /initrd.gz<enter>",
+    "boot<enter>"
+    ]
 
-  boot_command_x64_chroot  = ["<down><up><wait>c<wait>linux /live/vmlinuz ",
-    "boot=live components username=devuan textmode=1 text 3 ",
-    "${var.boot_cmdln_options}<enter>",
-    "initrd /live/initrd.img<enter>boot<enter><wait3m><enter>",
-    "devuan<enter>devuan<enter>sudo su<enter>ip link ; sleep 3 ; ",
-    "dhcpcd eth0 ; dhclient eth0 ; systemctl stop ssh ; systemctl status ssh ; ",
+  boot_command_x64_auto = ["<wait10><down><up><wait5m><tab><wait30>",
+    #"linux /linux ",
+    "/boot/isolinux/linux ",
+    "preseed/url=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/preseed.cfg ",
+    "auto=true hostname=${var.variant}-boxv0000 domain= locale=en_US keymap=us ",
+    "console-setup/ask_detect=false mirror/http/hostname=${var.repo_host} ",
+    "mirror/http/directory=${var.repo_directory_x64} ",
+    "choose-init/select_init=sysvinit ${var.boot_cmdln_options} ",
+    "textmode=1 text 3<enter><wait10>",
+    #"initrd /initrd.gz<enter>",
+    #"boot<enter>"
+    "initrd=/boot/isolinux/initrd.gz<enter>"
+    ]
+
+  boot_command_x64_chroot  = ["<down><up><wait5m>c<wait>",
+    "linux /live/vmlinuz ",
+    "boot=live components username=devuan ${var.boot_cmdln_options} ",
+    "textmode=1 text 3<enter>",
+    "initrd /live/initrd.img<enter>",
+    "boot<enter><wait3m><enter>devuan<enter>devuan<enter>sudo su<enter>",
+    "mount -o remount,size=1500M /run/live/overlay ; df -lh ; sleep 5 ; ",
+    "systemctl stop ssh ; systemctl status ssh ; ",
     "invoke-rc.d ssh stop ; invoke-rc.d ssh status<enter>sleep 3 ; ",
-    ". /etc/os-release ; mount -o remount,size=1500M /run/live/overlay ; ",
-    "df -h ; sleep 5 ; sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list ; ",
+    "ip link ; sleep 3 ; dhcpcd eth0 ; dhclient eth0 ; ",
+    "sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list ; ",
     "apt-get --yes update --allow-releaseinfo-change ; ",
-    "apt-get --yes install gdisk lvm2 btrfs-progs ${var.foreign_pkgmgr} ; ",
+    "apt-get --yes install gdisk lvm2 btrfs-progs arch-install-scripts ${var.foreign_pkgmgr} ; ",
     "if [ 'zfs' = '${var.vol_mgr}' ] ; then ",
     ". /etc/os-release ; sed -i 's|^#deb|deb|g' /etc/apt/sources.list ; ",
     "apt-get --yes update ; apt-get --yes install --no-install-recommends linux-headers-$(uname -r) ; ",
@@ -193,25 +214,8 @@ locals {
     "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
     "env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} service_mgr=$${service_mgr:-sysvinit} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
 
-  /*
-  boot_command_x64_auto = ["<wait5><wait>c<wait>linux /linux ${var.boot_cmdln_options} ",
-    "auto=true preseed/url=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-preseed.cfg ",
-    "hostname=${var.variant}-boxv0000 domain= locale=en_US keymap=us ",
-    "console-setup/ask_detect=false mirror/http/hostname=${var.repo_host} ",
-    "mirror/http/directory=${var.repo_directory_x64} ",
-    "choose-init/select_init=sysvinit<enter>",
-    "initrd /initrd.gz<enter>boot<enter>"]
-  */
-
-  boot_command_x64_auto = ["<wait10><down><tab><wait30>/boot/isolinux/linux ${var.boot_cmdln_options} ",
-    "auto=true preseed/url=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-preseed.cfg ",
-    "hostname=${var.variant}-boxv0000 domain= locale=en_US keymap=us ",
-    "console-setup/ask_detect=false mirror/http/hostname=${var.repo_host} ",
-    "mirror/http/directory=${var.repo_directory_x64} ",
-    "choose-init/select_init=sysvinit initrd=/boot/isolinux/initrd.gz<enter>"]
-
   boot_command     = ("aarch64" == var.MACHINE ? local.boot_command_aa64_auto :
-    local.boot_command_x64_auto)
+    local.boot_command_x64_chroot)
 
   # Builder common local vars
 
@@ -253,7 +257,8 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
+      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -277,7 +282,25 @@ build {
     #execute_command  = "sudo chmod +x {{.Path}} ; env {{.Vars}} sudo -E sh -eux '{{.Path}}'"
     execute_command  = "sudo chmod +x {{.Path}} ; env {{.Vars}} sudo -E sh -c {{.Path}}"
     except           = ["qemu.guest_vm"]
-    scripts          = ["init/common/bsd/zerofill.sh"]
+    scripts          = ["init/common/zerofill_linux.sh"]
+  }
+  provisioner "shell" {
+    environment_vars = ["HOME_DIR=/home/packer"]
+    execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
+    inline           = ["cd /tmp",
+      "sh init/common/collect_osinfo.sh collect_all"]
+    only             = ["qemu.guest_vm"]
+  }
+  provisioner "file" {
+    destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
+    direction   = "download"
+    generated   = true
+    only        = ["qemu.guest_vm"]
+    source      = "/tmp/info.tar"
+  }
+  provisioner "shell-local" {
+    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
+      "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
   }
 
   post-processor "checksum" {

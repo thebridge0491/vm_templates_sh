@@ -13,9 +13,9 @@ HDR_ITEMS = os.getenv('HDR_ITEMS', 'From To Subject Date')
 
 def parse_cmdopts(args=None):
   import argparse
-  
+
   opts_parser = argparse.ArgumentParser()
-  
+
   opts_parser.add_argument('-e', '--endpoint', default='smtp.gmail.com',
     help='Specify imap endpoint(host)(default: smtp.gmail.com)')
   opts_parser.add_argument('-p', '--port', default=993,
@@ -41,35 +41,38 @@ def parse_cmdopts(args=None):
   #  default=sys.stdin, help='Input file (default: sys.stdin)')
   #opts_parser.add_argument('-o', '--outfile', type=argparse.FileType('w+'),
   #  default=sys.stdout, help='Output file (default: sys.stdout)')
-  
+
   return opts_parser.parse_args(args)
 
 def main(argv=None):
   #sys.path.append(os.path.abspath(SCRIPTPARENT))
-  from get_secret import getpass_entry, gettoken_entry
-  
+  import get_secret
+
   opts_hash = parse_cmdopts(argv)
   #entry = input("Input password entry: ")
-  
+
   if opts_hash.auth in ['oauthbearer', 'xoauth2']:
     entry = os.getenv('entry', 'tokenmail')
-    token = gettoken_entry(entry)
-    
+    token = get_secret.gettoken_entry(entry)
+
     sasl_str = 'n,a={0},\1auth=Bearer {1}\1\1'.format(opts_hash.user, token)
     if 'xoauth2' == opts_hash.auth:
       sasl_str = 'user={0}\1auth=Bearer {1}\1\1'.format(opts_hash.user, token)
   else: # plain | login
-    #import getpass
+    import getpass
     #passw = getpass.getpass("Password for user({0}): ".format(
     #  opts_hash.user))
     entry = os.getenv('entry', 'appmail')
-    passw = getpass_entry(entry)
-    
+    passw = get_secret.getpass_entry(entry)
+    if not passw:
+      passw = getpass.getpass("Password for user({0}): ".format(
+        opts_hash.user))
+
     sasl_str = '\0{0}\0{1}'.format(opts_hash.user, passw)
-  
+
   if opts_hash.use_curl:
     import io, pycurl
-    
+
     curl_conn = pycurl.Curl()
     curl_conn.setopt(curl_conn.URL, "imaps://{0}".format(opts_hash.endpoint))
     curl_conn.setopt(curl_conn.PORT, opts_hash.port)
@@ -80,18 +83,18 @@ def main(argv=None):
     #curl_conn.setopt(curl_conn.FOLLOWLOCATION, 1)
     #curl_conn.setopt(curl_conn.CONNECTTIMEOUT, 30)
     #curl_conn.setopt(curl_conn.VERBOSE, 1)
-    
+
     if opts_hash.auth in ['oauthbearer', 'xoauth2']:
       curl_conn.setopt(curl_conn.USERNAME, opts_hash.user)
       curl_conn.setopt(curl_conn.XOAUTH2_BEARER, token)
     else:
-      curl_conn.setopt(curl_conn.USERPWD, 
+      curl_conn.setopt(curl_conn.USERPWD,
         "{0}:{1}".format(opts_hash.user, passw))
-    
+
     curl_conn.setopt(curl_conn.CUSTOMREQUEST,
       'examine {0}'.format(opts_hash.mailbox))
     curl_conn.perform()
-    
+
     if '0' != opts_hash.idx_spec:
       curl_conn.setopt(curl_conn.URL, 'imaps://{0}/{1}'.format(
         opts_hash.endpoint, opts_hash.mailbox))
@@ -128,16 +131,16 @@ def main(argv=None):
       curl_conn.setopt(curl_conn.CUSTOMREQUEST,
         'search {0}'.format(opts_hash.criterion))
       curl_conn.perform()
-    
+
     curl_conn.close()
     sys.exit(0)
-  
+
   imap_conn = imaplib.IMAP4_SSL(opts_hash.endpoint, opts_hash.port)
-  
+
   # auth() method base64 encodes sasl str
   imap_conn.authenticate(opts_hash.auth, lambda _=None: sasl_str)
   imap_conn.select(opts_hash.mailbox, True) # mailbox='INBOX', readonly=False
-  
+
   if '0' != opts_hash.idx_spec:
     if opts_hash.brief:
       resptype, respdata = imap_conn.fetch(opts_hash.idx_spec,
@@ -175,7 +178,7 @@ def main(argv=None):
     resptype, respdata = imap_conn.search(None, opts_hash.criterion)
     print('search', resptype)
     print(respdata[0].decode())
-  
+
   imap_conn.close()
   imap_conn.logout()
 

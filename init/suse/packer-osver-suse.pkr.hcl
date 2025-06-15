@@ -5,11 +5,6 @@ variable "variant" {
   default = "suse"
 }
 
-variable "osver" {
-  type    = string
-  default = "15.5"
-}
-
 variable "vol_mgr" {
   type    = string
   default = "std"
@@ -33,9 +28,9 @@ variable "iso_url_directory_x64" {
 
 variable "iso_base_x64" {
   type    = string
-  ##default = "GeckoLinux_STATIC_BareBones.x86_64-154.220822.0"
+  ##default = "live/GeckoLinux_STATIC_BareBones.x86_64-154.220822.0"
   #default = "openSUSE-Leap-15.5-NET-x86_64-Media"
-  default = "openSUSE-Leap-15.5-XFCE-Live-x86_64-Media"
+  default = "live/openSUSE-Leap-15.5-XFCE-Live-x86_64-Media"
 }
 
 variable "iso_cdlabel_x64" {
@@ -57,7 +52,7 @@ variable "iso_url_directory_aa64" {
 variable "iso_base_aa64" {
   type    = string
   #default = "openSUSE-Leap-15.5-NET-aarch64-Media"
-  default = "openSUSE-Leap-15.5-XFCE-Live-aarch64-Media"
+  default = "live/openSUSE-Leap-15.5-XFCE-Live-aarch64-Media"
 }
 
 variable "iso_cdlabel_aa64" {

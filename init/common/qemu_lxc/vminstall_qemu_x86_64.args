@@ -5,7 +5,7 @@ mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/nvram
 cp -an ${QEMU_NVRAM_X64:-/usr/share/OVMF/OVMF_VARS.fd} ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/nvram/${GUEST:-freebsd-x86_64-zfs}_VARS.fd
 chmod +w ${OUT_DIR:-build/${GUEST:-freebsd-x86_64-zfs}}/nvram/${GUEST:-freebsd-x86_64-zfs}_VARS.fd
 
-qemu-system-x86_64 -cpu SandyBridge -machine q35,accel=kvm:hvf:tcg \
+qemu-system-x86_64 -cpu Skylake-Client -machine q35,accel=kvm:hvf:tcg \
   -global PIIX4_PM.disable_s3=1 -global PIIX4_PM.disable_s4=1 \
   -smp cpus=2 -m size=4096 -boot order=cd,menu=on -name ${GUEST:-freebsd-x86_64-zfs} \
   -nic ${NET_OPT:-user,hostfwd=tcp::4022-:22},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \

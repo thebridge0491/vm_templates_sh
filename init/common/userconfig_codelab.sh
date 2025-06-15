@@ -14,10 +14,13 @@ elif grep -q -E "bash" "${SHELL}" ; then
   shell_rc=${shell_rc:-${HOME}/.bashrc} ;
 elif grep -q -E "zsh" "${SHELL}" ; then
   shell_rc=${shell_rc:-${HOME}/.zshrc} ;
+elif grep -q -E "ksh" "${SHELL}" ; then
+  shell_rc=${shell_rc:-${HOME}/.kshrc} ;
 else
   shell_rc=${shell_rc:-${HOME}/.shrc} ;
 fi
-if command -v bind > /dev/null ; then
+#if command -v bind > /dev/null ; then
+if [ "Linux" = "`uname -s`" ] ; then
   if ! grep -q -E "history.*-search" ${HOME}/.inputrc ; then
     cat << EOF >> ${HOME}/.inputrc
 "\e[A": history-search-backward
@@ -74,9 +77,10 @@ _prep_lang_c() {
 _prep_lang_py() {
   echo "Configuring for Python language ..." >> /dev/stderr ; sleep 3
   #echo "TBD: No config steps needed, as yet." >> /dev/stderr ; sleep 3
+  # pip install [--break-system-packages] --user xx
   ${PYTHON:-python3} -m pip install --user build
   #${PYTHON:-python3} -m pip install --user wheel pytest pytest-timeout nose2 \
-  #  hyothesis coverage pylint pep8 pycodestyle pydocstyle sphinx cffi click \
+  #  hypothesis coverage pylint pep8 pycodestyle pydocstyle sphinx cffi click \
   #  pyyaml toml configparser
 }
 

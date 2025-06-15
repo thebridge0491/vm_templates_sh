@@ -5,11 +5,6 @@ variable "variant" {
   default = "alpine"
 }
 
-variable "osver" {
-  type    = string
-  default = "v3.20"
-}
-
 variable "vol_mgr" {
   type    = string
   default = "std"

@@ -38,7 +38,7 @@ Content-Type: text/plain; charset=utf-8
 Content-Transfer-Encoding: 7bit
 Content-Disposition: inline
 
-$(echo "Enter body(file(s): ${infile}): " > /dev/stderr)
+$(echo "Enter body(file(s): ${infiles}): " > /dev/stderr)
 $(echo '' ; cat ${body})
 
 EOF

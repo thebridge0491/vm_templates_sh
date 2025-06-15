@@ -122,6 +122,9 @@ etc/ansible/hosts
 etc/ansible/**/*.retry
 etc/ansible/**/vault
 
+etc/salt/master
 etc/salt/roster
+etc/salt/pki/*
 var/*
 srv/pillar/*
+srv/salt/tmp

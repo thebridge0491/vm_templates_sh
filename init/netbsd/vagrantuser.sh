@@ -9,11 +9,11 @@ usermod -p $(pwhash vagrant) vagrant
 #echo 'set prompt = "%N@%m:%~ %# "' >> /home/vagrant/.cshrc
 chown -R vagrant:$(id -gn vagrant) /home/vagrant
 
-#sh -c 'cat >> /usr/pkg/etc/sudoers.d/99_vagrant' << EOF
+#sh -c 'cat >> /usr/pkg/etc/sudoers.d/99_vagrantnopasswd' << EOF
 #Defaults:vagrant !requiretty
-#$(id -un vagrant) ALL=(ALL) NOPASSWD: ALL
+#vagrant ALL=(ALL:ALL) NOPASSWD: ALL
 #EOF
-#chmod 0440 /usr/pkg/etc/sudoers.d/99_vagrant
+#chmod 0440 /usr/pkg/etc/sudoers.d/99_vagrantnopasswd
 
 pubkey_url="https://raw.githubusercontent.com/mitchellh/vagrant/master/keys/vagrant.pub"
 mkdir -p /home/vagrant/.ssh

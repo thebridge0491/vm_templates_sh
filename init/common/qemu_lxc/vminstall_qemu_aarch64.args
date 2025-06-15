@@ -5,7 +5,7 @@ mkdir -p ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/nvram
 cp -an ${QEMU_NVRAM_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd} ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/nvram/${GUEST:-freebsd-aarch64-zfs}_VARS.fd
 chmod +w ${OUT_DIR:-build/${GUEST:-freebsd-aarch64-std}}/nvram/${GUEST:-freebsd-aarch64-zfs}_VARS.fd
 
-qemu-system-aarch64 -cpu cortex-a57 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
+qemu-system-aarch64 -cpu cortex-a72 -machine virt,gic-version=3,accel=kvm:hvf:tcg \
   -smp cpus=2 -m size=4096 -boot order=cd,menu=on -name ${GUEST:-freebsd-aarch64-std} \
   -nic ${NET_OPT:-user,hostfwd=tcp::4022-:22},id=net0,model=virtio-net-pci,mac=52:54:00:$(openssl rand -hex 3 | sed 's|\(..\)|\1:|g; s|:$||') \
   -usb -device usb-kbd -device usb-tablet -device virtio-blk-pci,drive=hd0 \

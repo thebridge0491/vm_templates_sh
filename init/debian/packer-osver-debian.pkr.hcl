@@ -5,12 +5,6 @@ variable "variant" {
   default = "debian"
 }
 
-variable "osver" {
-  type    = string
-  ##default = "12"
-  default = "5"
-}
-
 variable "vol_mgr" {
   type    = string
   default = "std"
@@ -38,16 +32,16 @@ variable "iso_url_directory_x64" {
   type    = string
   ##default = "/current-live/amd64/iso-hybrid"
   ##default = "/current/amd64/iso-cd"
-  #default = "/devuan_daedalus/minimal-live"
-  default = "/devuan_daedalus/installer-iso"
+  default = "/devuan_daedalus/minimal-live"
+  #default = "/devuan_daedalus/installer-iso"
 }
 
 variable "iso_base_x64" {
   type    = string
-  ##default = "debian-live-12.7.0-amd64-standard"
+  ##default = "live/debian-live-12.7.0-amd64-standard"
   ##default = "debian-12.7.0-amd64-netinst"
-  #default = "devuan_daedalus_5.0.0_amd64_minimal-live"
-  default = "devuan_daedalus_5.0.1_amd64_netinstall"
+  default = "live/devuan_daedalus_5.0.0_amd64_minimal-live"
+  #default = "devuan_daedalus_5.0.1_amd64_netinstall"
 }
 
 variable "iso_cdlabel_x64" {
@@ -76,7 +70,7 @@ variable "iso_url_directory_aa64" {
 variable "iso_base_aa64" {
   type    = string
   ##default = "debian-12.7.0-arm64-netinst"
-  default = "netboot/mini"
+  default = "arm64/netboot/mini"
 }
 
 variable "boot_cmdln_options" {

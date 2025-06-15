@@ -91,7 +91,8 @@ variable "isos_pardir" {
 
 variable "foreign_pkgmgr" {
   type    = string
-  default = "debootstrap dnf dnf-plugins-core"
+  #default = "pacman dnf-utils debootstrap apk-tools"
+  default = ""
 }
 
 
@@ -118,13 +119,13 @@ locals {
   # OS variant oriented local vars
   #iso_url         = ""
   iso_urls         = "aarch64" == var.MACHINE ? [
-    "file://${var.isos_pardir}/suse/live/${var.iso_base_aa64}.iso",
+    "file://${var.isos_pardir}/suse/${var.iso_base_aa64}.iso",
     "https://${var.mirror_host_aa64}${var.iso_url_directory_aa64}/${var.iso_base_aa64}.iso"] : [
-    "file://${var.isos_pardir}/suse/live/${var.iso_base_x64}.iso",
+    "file://${var.isos_pardir}/suse/${var.iso_base_x64}.iso",
     "https://${var.mirror_host_x64}${var.iso_url_directory_x64}/${var.iso_base_x64}.iso"]
   iso_checksum     = ("aarch64" == var.MACHINE ?
-    "file:file://${var.isos_pardir}/suse/live/${var.iso_base_aa64}.iso.sha256" :
-    "file:file://${var.isos_pardir}/suse/live/${var.iso_base_x64}.iso.sha256")
+    "file:file://${var.isos_pardir}/suse/${var.iso_base_aa64}.iso.sha256" :
+    "file:file://${var.isos_pardir}/suse/${var.iso_base_x64}.iso.sha256")
 
   # Source provider oriented local vars
   # qemu
@@ -135,7 +136,7 @@ locals {
   qemu_nvram       = ("aarch64" == var.MACHINE ? var.qemu_nvram_aa64 :
     var.qemu_nvram_x64)
   qemuargs         = "aarch64" == var.MACHINE ? [
-    ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"],
+    ["-cpu", "cortex-a72"], ["-machine", "virt,gic-version=3,acpi=off"],
     ["-smp", "cpus=2"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -145,7 +146,7 @@ locals {
     ["-smbios", "type=0,uefi=on"], ["-bios", "${var.qemu_firmware_aa64}"]
     #, ["-virtfs", "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough"]
     ] : [
-    ["-cpu", "SandyBridge"], ["-machine", "q35,accel=kvm:hvf:tcg"],
+    ["-cpu", "Skylake-Client"], ["-machine", "q35,accel=kvm:hvf:tcg"],
     ["-smp", "cpus=2"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -161,19 +162,30 @@ locals {
     ("aarch64" == var.MACHINE ? "qemu-system-aarch64" : "qemu-system-x86_64"))
 
   # Source common local vars
-  vm_base          = "${var.variant}-${var.MACHINE}-${var.vol_mgr}"
+  vm_base          = "${var.variant}${var.RELEASE}-${var.MACHINE}-${var.vol_mgr}"
   output_directory = "output-vms/${local.vm_base}"
 
-  boot_command_aa64_chroot = ["<wait>c<wait>linux /boot/aarch64/loader/linux ",
+  boot_command_aa64_auto  = ["<down><up><wait5m>c<wait>",
+    "linuxefi /boot/aarch64/loader/linux ",
+    "netsetup=dhcp lang=en_US install=http://${var.mirror_host_x64}${var.repo_directory} ",
+    "hostname=${var.variant}-boxv0000 domain= systemd.unit=multi-user.target ",
+    "autoyast=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/autoinst.xml ",
+    "textmode=1 text 3 systemd.unit=multi-user.target<enter><wait10>",
+    "initrdefi /boot/aarch64/loader/initrd<enter>",
+    "<wait10>boot<enter><wait10>"]
+
+  boot_command_aa64_chroot = ["<down><up><wait5m>c<wait>",
+    "linux /boot/aarch64/loader/linux ",
     "root=live:CDLABEL=${var.iso_cdlabel_aa64} ro rd.live.image ",
-    "rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 textmode=1 text 3 ",
-    "systemd.unit=multi-user.target ${var.boot_cmdln_options}<enter>",
-    "initrd /boot/aarch64/loader/initrd<enter>boot<enter><wait5m><enter>",
-    "linux<enter><wait10>sudo su<enter><wait10>systemctl stop sshd ; ",
-    "systemctl disable sshd ; . /etc/os-release ; ",
-    "mount -o remount,size=1500M /run/overlay ; df -h ; sleep 5 ; ",
+    "rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 ",
+    "${var.boot_cmdln_options} ",
+    "textmode=1 text 3 systemd.unit=multi-user.target<enter>",
+    "initrd /boot/aarch64/loader/initrd<enter>",
+    "boot<enter><wait5m><enter>linux<enter><wait10>sudo su<enter><wait10>",
+    "mount -o remount,size=1500M /run/overlay ; df -lh ; sleep 5 ; ",
+    "systemctl stop sshd ; systemctl disable sshd ; ",
     "zypper --non-interactive refresh ; ",
-    "zypper --non-interactive install ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr lvm2 btrfsprogs ${var.foreign_pkgmgr} ; ",
+    "zypper --non-interactive install ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr lvm2 btrfsprogs arch-install-scripts ${var.foreign_pkgmgr} ; ",
     "update-ca-certificates ; ",
     "if [ 'zfs' = '${var.vol_mgr}' ] ; then ",
     ". /etc/os-release ; zypper --non-interactive install dkms kernel-devel ; ",
@@ -186,22 +198,27 @@ locals {
     "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
     "env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
 
-  boot_command_x64_auto  = ["<wait>c<wait>linuxefi /boot/x86_64/loader/linux ",
+  boot_command_x64_auto  = ["<down><up><wait5m>c<wait>",
+    "linuxefi /boot/x86_64/loader/linux ",
     "netsetup=dhcp lang=en_US install=http://${var.mirror_host_x64}${var.repo_directory} ",
-    "hostname=${var.variant}-boxv0000 domain= textmode=1 text 3 ",
-    "systemd.unit=multi-user.target autoyast=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-autoinst.xml<enter><wait10>",
-    "initrdefi /boot/x86_64/loader/initrd<enter><wait10>boot<enter><wait10>"]
+    "hostname=${var.variant}-boxv0000 domain= ",
+    "autoyast=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/autoinst.xml ",
+    "textmode=1 text 3 systemd.unit=multi-user.target<enter><wait10>",
+    "initrdefi /boot/x86_64/loader/initrd<enter>",
+    "<wait10>boot<enter><wait10>"]
 
-  boot_command_x64_chroot = ["<wait>c<wait>linuxefi /boot/x86_64/loader/linux ",
+  boot_command_x64_chroot = ["<down><up><wait5m>c<wait>",
+    "linuxefi /boot/x86_64/loader/linux ",
     "root=live:CDLABEL=${var.iso_cdlabel_x64} ro rd.live.image ",
-    "rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 textmode=1 text 3 ",
-    "systemd.unit=multi-user.target ${var.boot_cmdln_options}<enter>",
-    "initrdefi /boot/x86_64/loader/initrd<enter>boot<enter><wait3m><enter>",
-    "linux<enter><wait10>sudo su<enter><wait10>systemctl stop sshd ; ",
-    "systemctl disable sshd ; . /etc/os-release ; ",
-    "mount -o remount,size=1500M /run/overlay ; df -h ; sleep 5 ; ",
+    "rd.live.overlay.persistent rd.live.overlay.cowfs=ext4 ",
+    "${var.boot_cmdln_options} ",
+    "textmode=1 text 3 systemd.unit=multi-user.target<enter>",
+    "initrdefi /boot/x86_64/loader/initrd<enter>",
+    "boot<enter><wait3m><enter>linux<enter><wait10>sudo su<enter><wait10>",
+    "mount -o remount,size=1500M /run/overlay ; df -lh ; sleep 5 ; ",
+    "systemctl stop sshd ; systemctl disable sshd ; ",
     "zypper --non-interactive refresh ; ",
-    "zypper --non-interactive install ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr lvm2 btrfsprogs ${var.foreign_pkgmgr} ; ",
+    "zypper --non-interactive install ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr lvm2 btrfsprogs arch-install-scripts ${var.foreign_pkgmgr} ; ",
     "update-ca-certificates ; ",
     "if [ 'zfs' = '${var.vol_mgr}' ] ; then ",
     ". /etc/os-release ; zypper --non-interactive install dkms kernel-devel ; ",
@@ -257,7 +274,8 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
+      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -281,7 +299,25 @@ build {
     #execute_command  = "sudo chmod +x {{.Path}} ; env {{.Vars}} sudo -E sh -eux '{{.Path}}'"
     execute_command  = "sudo chmod +x {{.Path}} ; env {{.Vars}} sudo -E sh -c {{.Path}}"
     except           = ["qemu.guest_vm"]
-    scripts          = ["init/common/bsd/zerofill.sh"]
+    scripts          = ["init/common/zerofill_linux.sh"]
+  }
+  provisioner "shell" {
+    environment_vars = ["HOME_DIR=/home/packer"]
+    execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
+    inline           = ["cd /tmp",
+      "sh init/common/collect_osinfo.sh collect_all"]
+    only             = ["qemu.guest_vm"]
+  }
+  provisioner "file" {
+    destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
+    direction   = "download"
+    generated   = true
+    only        = ["qemu.guest_vm"]
+    source      = "/tmp/info.tar"
+  }
+  provisioner "shell-local" {
+    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
+      "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
   }
 
   post-processor "checksum" {

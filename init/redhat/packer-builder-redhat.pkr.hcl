@@ -91,7 +91,8 @@ variable "isos_pardir" {
 
 variable "foreign_pkgmgr" {
   type    = string
-  default = "debootstrap"
+  #default = "pacman debootstrap"
+  default = ""
 }
 
 
@@ -123,8 +124,8 @@ locals {
     "file://${var.isos_pardir}/redhat/${var.iso_base_x64}.iso",
     "https://${var.mirror_host_x64}${var.iso_url_directory_x64}/${var.iso_base_x64}.iso"]
   iso_checksum     = ("aarch64" == var.MACHINE ?
-    "file:file://${var.isos_pardir}/redhat/aarch64/CHECKSUM" :
-    "file:file://${var.isos_pardir}/redhat/CHECKSUM")
+    "file:file://${var.isos_pardir}/redhat/aarch64/${var.iso_base_aa64}.iso.CHECKSUM" :
+    "file:file://${var.isos_pardir}/redhat/${var.iso_base_x64}.iso.CHECKSUM")
 
   # Source provider oriented local vars
   # qemu
@@ -135,7 +136,7 @@ locals {
   qemu_nvram       = ("aarch64" == var.MACHINE ? var.qemu_nvram_aa64 :
     var.qemu_nvram_x64)
   qemuargs         = "aarch64" == var.MACHINE ? [
-    ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"],
+    ["-cpu", "cortex-a72"], ["-machine", "virt,gic-version=3,acpi=off"],
     ["-smp", "cpus=2"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -145,7 +146,7 @@ locals {
     ["-smbios", "type=0,uefi=on"], ["-bios", "${var.qemu_firmware_aa64}"]
     #, ["-virtfs", "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough"]
     ] : [
-    ["-cpu", "SandyBridge"], ["-machine", "q35,accel=kvm:hvf:tcg"],
+    ["-cpu", "Skylake-Client"], ["-machine", "q35,accel=kvm:hvf:tcg"],
     ["-smp", "cpus=2"], ["-m", "size=4096"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -161,57 +162,84 @@ locals {
     ("aarch64" == var.MACHINE ? "qemu-system-aarch64" : "qemu-system-x86_64"))
 
   # Source common local vars
-  vm_base          = "${var.variant}-${var.MACHINE}-${var.vol_mgr}"
+  vm_base          = "${var.variant}${var.RELEASE}-${var.MACHINE}-${var.vol_mgr}"
   output_directory = "output-vms/${local.vm_base}"
 
-  boot_command_aa64_auto = ["<wait>c<wait>linux /images/pxeboot/vmlinuz* ",
-    "inst.stage2=hd:LABEL=${var.iso_cdlabel_aa64} ro ${var.boot_cmdln_options} ",
-     "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.mirror_host_aa64}${var.repo_directory_aa64} ",
+  boot_command_aa64_auto = ["<down><up><wait5m>c<wait>",
+    "linux /images/pxeboot/vmlinuz* inst.stage2=hd:LABEL=${var.iso_cdlabel_aa64} ro ",
+     "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/ks.cfg inst.repo=http://${var.mirror_host_aa64}${var.repo_directory_aa64} ",
      "ip=::::${var.variant}-boxv0000::dhcp inst.selinux=1 inst.enforcing=0 ",
-     "inst.text<enter><wait10>",
-    "initrd /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
+     "inst.text ${var.boot_cmdln_options}<enter><wait10>",
+    "initrd /images/pxeboot/initrd*.img<enter>",
+    "<wait10>boot<enter><wait10>"]
 
-  /*
-  boot_command_x64_auto = ["<wait>c<wait>linuxefi /isolinux/vmlinuz* ",
-    "inst.stage2=hd:LABEL=${var.iso_cdlabel_x64} ro ${var.boot_cmdln_options} ",
-     "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg inst.repo=http://${var.mirror_host_x64}${var.repo_directory_x64} ",
-     "ip=::::${var.variant}-boxv0000::dhcp inst.selinux=1 inst.enforcing=0 ",
-     "inst.text<enter><wait10>",
-     "initrdefi /isolinux/initrd*.img<enter><wait10>boot<enter><wait10>"]
-  */
-
-  boot_command_x64_auto  = ["<wait>c<wait>linuxefi /images/pxeboot/vmlinuz* ${var.boot_cmdln_options} ",
-    "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/${var.vol_mgr}-ks.cfg ",
-    "inst.repo=http://${var.mirror_host_x64}${var.repo_directory_x64} ",
-    "ip=::::${var.variant}-boxv0000::dhcp inst.selinux=1 inst.enforcing=0 ",
-    "inst.text<enter><wait10>",
-    "initrdefi /images/pxeboot/initrd*.img<enter><wait10>boot<enter><wait10>"]
-
-  boot_command_x64_chroot = ["<down><up><wait><wait><wait>c<wait>",
+  boot_command_aa64_chroot = ["<down><up><wait5m>c<wait>",
     "linuxefi /isolinux/vmlinuz* root=live:LABEL=${var.iso_cdlabel_x64} ro ",
-    "rd.live.image rhgb text ${var.boot_cmdln_options} textmode=1 text 3 ",
-    "systemd.unit=multi-user.target<enter>",
-    "initrdefi /isolinux/initrd*.img<enter>boot<enter><wait2m>",
-    "<enter>liveuser<enter><wait10>sudo su<enter><wait10>",
+    "rd.live.image rhgb ${var.boot_cmdln_options} ",
+    "textmode=1 text 3 systemd.unit=multi-user.target<enter>",
+    "initrdefi /isolinux/initrd*.img<enter>",
+    "boot<enter><wait2m><enter>liveuser<enter><wait10>sudo su<enter><wait10>",
+    "mount -o remount,size=1500M /run ; df -lh ; sleep 5 ; ",
     "dnf -y check-update ; setenforce 0 ; sestatus ; ",
-    "dnf -y install nmap-ncat lvm2 ${var.foreign_pkgmgr} ; sleep 5 ; ",
+    "dnf config-manager -y --set-enabled appstream baseos crb extras epel epel-cisco-openh264 ; ",
+    "crb enable ; /usr/bin/crb enable ; ",
+    "dnf -y install nmap-ncat gdisk lvm2 arch-install-scripts ${var.foreign_pkgmgr} ; sleep 5 ; ",
     "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; ",
     "if [ 'zfs' = '${var.vol_mgr}' ] ; then ",
-    ". /etc/os-release ; mount -o remount,size=1500M /run ; df -h ; sleep 5 ; ",
+    ". /etc/os-release ; ",
     "dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(echo $${VERSION_ID} | cut -d. -f1).noarch.rpm ; ",
     "dnf -y install kernel kernel-devel ; ",
-    "dnf -y install http://download.zfsonlinux.org/epel/zfs-release-2-2.el$${VERSION_ID/.*/}.noarch.rpm ; ",
+    "dnf -y install http://zfsonlinux.org/epel/zfs-release-2-3.el$${VERSION_ID/.*/}.noarch.rpm ; ",
     "rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux ; ",
     "dnf config-manager --disable zfs ; dnf config-manager --enable zfs-kmod ; ",
-    "dnf -y install zfs ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ; ",
+    "dnf -y install zfs zfs-dracut ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ; ",
     "dkms status ; dnf config-manager --disable zfs-kmod ; ",
     "dnf config-manager --enable zfs ; sleep 5 ; ",
     "fi ; ", "env MKFS_CMD=$${MKFS_CMD:-mkfs.ext4} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; ",
     "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
     "env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
 
-  boot_command     = ("aarch64" == var.MACHINE ? local.boot_command_aa64_auto :
-    local.boot_command_x64_auto)
+  boot_command_x64_auto  = ["<down><up><wait5m>c<wait>",
+    #"linuxefi /isolinux/vmlinuz* inst.stage2=hd:LABEL=${var.iso_cdlabel_x64} ro ",
+    "linuxefi /images/pxeboot/vmlinuz* ",
+    "inst.ks=http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/ks.cfg ",
+    "inst.repo=http://${var.mirror_host_x64}${var.repo_directory_x64} ",
+    "ip=::::${var.variant}-boxv0000::dhcp inst.selinux=1 inst.enforcing=0 ",
+    "inst.text ${var.boot_cmdln_options}<enter><wait10>",
+    #"initrdefi /isolinux/initrd*.img<enter>",
+    "initrdefi /images/pxeboot/initrd*.img<enter>",
+    "<wait10>boot<enter><wait10>"]
+
+  boot_command_x64_chroot = ["<down><up><wait5m>c<wait>",
+    #"linuxefi /isolinux/vmlinuz* root=live:LABEL=${var.iso_cdlabel_x64} ro ",
+    "linuxefi /images/pxeboot/vmlinuz* root=live:LABEL=${var.iso_cdlabel_x64} ro ",
+    "rd.live.image rhgb ${var.boot_cmdln_options} ",
+    "textmode=1 text 3 systemd.unit=multi-user.target<enter>",
+    #"initrdefi /isolinux/initrd*.img<enter>boot<enter><wait2m>",
+    "initrdefi /images/pxeboot/initrd*.img<enter>",
+    "boot<enter><wait2m><enter>liveuser<enter><wait10>sudo su<enter><wait10>",
+    "mount -o remount,size=1500M /run ; df -lh ; sleep 5 ; ",
+    "dnf -y check-update ; setenforce 0 ; sestatus ; ",
+    "dnf config-manager -y --set-enabled appstream baseos crb extras epel epel-cisco-openh264 ; ",
+    "crb enable ; /usr/bin/crb enable ; ",
+    "dnf -y install nmap-ncat gdisk lvm2 arch-install-scripts ${var.foreign_pkgmgr} ; sleep 5 ; ",
+    "cd /tmp ; wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; ",
+    "if [ 'zfs' = '${var.vol_mgr}' ] ; then ",
+    ". /etc/os-release ; ",
+    "dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(echo $${VERSION_ID} | cut -d. -f1).noarch.rpm ; ",
+    "dnf -y install kernel kernel-devel ; ",
+    "dnf -y install http://zfsonlinux.org/epel/zfs-release-2-3.el$${VERSION_ID/.*/}.noarch.rpm ; ",
+    "rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux ; ",
+    "dnf config-manager --disable zfs ; dnf config-manager --enable zfs-kmod ; ",
+    "dnf -y install zfs zfs-dracut ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ; ",
+    "dkms status ; dnf config-manager --disable zfs-kmod ; ",
+    "dnf config-manager --enable zfs ; sleep 5 ; ",
+    "fi ; ", "env MKFS_CMD=$${MKFS_CMD:-mkfs.ext4} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; ",
+    "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
+    "env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
+
+  boot_command     = ("aarch64" == var.MACHINE ?
+    local.boot_command_aa64_chroot : local.boot_command_x64_chroot)
 
   # Builder common local vars
 
@@ -253,7 +281,8 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
+      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -277,7 +306,25 @@ build {
     #execute_command  = "sudo chmod +x {{.Path}} ; env {{.Vars}} sudo -E sh -eux '{{.Path}}'"
     execute_command  = "sudo chmod +x {{.Path}} ; env {{.Vars}} sudo -E sh -c {{.Path}}"
     except           = ["qemu.guest_vm"]
-    scripts          = ["init/common/bsd/zerofill.sh"]
+    scripts          = ["init/common/zerofill_linux.sh"]
+  }
+  provisioner "shell" {
+    environment_vars = ["HOME_DIR=/home/packer"]
+    execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
+    inline           = ["cd /tmp",
+      "sh init/common/collect_osinfo.sh collect_all"]
+    only             = ["qemu.guest_vm"]
+  }
+  provisioner "file" {
+    destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
+    direction   = "download"
+    generated   = true
+    only        = ["qemu.guest_vm"]
+    source      = "/tmp/info.tar"
+  }
+  provisioner "shell-local" {
+    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
+      "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
   }
 
   post-processor "checksum" {

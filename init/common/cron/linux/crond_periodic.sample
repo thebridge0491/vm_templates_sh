@@ -1,0 +1,15 @@
+
+#Note: [Alpine: /etc/periodic/daily | Others: /etc/cron.daily]
+#  printf '#!/bin/sh\nanacron -u cron.%s\n' 'daily' > \
+#    /etc/[cron.daily|periodic/daily]/0anacron # [daily|weekly|monthly]
+#  echo "02 6-22 * * * root anacron -s" > /etc/cron.d/anacron
+#  [printf '#!/bin/sh\nanacron -s\n' > /etc/periodic/hourly/0anacron]
+
+# Perform daily/weekly/monthly maintenance.
+01  4   *   *   *   root    { nice run-parts /etc/cron.daily 2>&1 > /var/log/daily.out }
+15  4   *   *   6   root    nice run-parts /etc/cron.weekly 2>&1 > /var/log/weekly.out
+30  4   1   *   *   root    nice run-parts /etc/cron.monthly 2>&1 > /var/log/monthly.out
+
+15  4   *   *   1   root    { test -s /var/log/daily.out && tail -vn+1 /var/log/daily.out } ; anacron -u cron.daily.mail
+30  4   14,28   *   *   root    { test -s /var/log/weekly.out && tail -vn+1 /var/log/weekly.out } ; anacron -u cron.weekly.mail
+45  4   1   1,4,7,10    *   root    { test -s /var/log/monthly.out && tail -vn+1 /var/log/monthly.out } ; anacron -u cron.monthly.mail

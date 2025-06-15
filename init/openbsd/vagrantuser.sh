@@ -1,5 +1,9 @@
 #!/bin/sh -eux
 
+sed -n "/\.localdomain/ s|^.* \(.*\)\.localdomain.*$|\1|p" /etc/hosts \
+  > /etc/myname
+hostname $(cat /etc/myname)
+
 ## openbsd/vagrantuser.sh
 #mkdir -p /home/vagrant
 #DIR_MODE=0750
@@ -8,11 +12,11 @@ usermod -p $(echo -n vagrant | encrypt) vagrant
 #echo 'set prompt = "%N@%m:%~ %# "' >> /home/vagrant/.cshrc
 chown -R vagrant:$(id -gn vagrant) /home/vagrant
 
-#sh -c 'cat >> /etc/sudoers.d/99_vagrant' << EOF
+#sh -c 'cat >> /etc/sudoers.d/99_vagrantnopasswd' << EOF
 #Defaults:vagrant !requiretty
-#$(id -un vagrant) ALL=(ALL) NOPASSWD: ALL
+#vagrant ALL=(ALL:ALL) NOPASSWD: ALL
 #EOF
-#chmod 0440 /etc/sudoers.d/99_vagrant
+#chmod 0440 /etc/sudoers.d/99_vagrantnopasswd
 
 pubkey_url="https://raw.githubusercontent.com/mitchellh/vagrant/master/keys/vagrant.pub"
 mkdir -p /home/vagrant/.ssh
@@ -35,3 +39,5 @@ fi
 chown -R vagrant:$(id -gn vagrant) /home/vagrant
 chown -R vagrant:$(id -gn vagrant) /home/vagrant/.ssh
 chmod -R go-rwsx /home/vagrant/.ssh
+
+sleep 300

@@ -1,6 +1,5 @@
 {
   "variant": "freebsd",
-  "osver": "13.1",
   "vol_mgr": "std",
   "mirror_host": "download.freebsd.org/ftp",
   "iso_url_directory": "/releases/ISO-IMAGES/13.1",

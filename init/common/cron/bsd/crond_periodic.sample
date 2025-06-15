@@ -1,0 +1,14 @@
+
+#Note: [FreeBSD: periodic daily | NetBSD,OpenBSD: /bin/sh /etc/daily]
+#  printf '#!/bin/sh\n/usr/[local|pkg]/sbin/anacron -u %s\n' 'daily' >> \
+#    [/etc/periodic/daily/0anacron|/etc/daily.local] # [daily|weekly|monthly]
+#  echo "02 6-22 * * * root /usr/[local|pkg]/sbin/anacron -s" > /etc/cron.d/anacron
+
+01  4   *   *   *   root    { rm -f /var/log/security.out ; nice periodic daily 2>&1 > /var/log/daily.out }
+15  4   *   *   6   root    nice periodic weekly 2>&1 > /var/log/weekly.out
+30  4   1   *   *   root    nice periodic monthly 2>&1 > /var/log/monthly.out
+
+15  4   *   *   1   root    { test -s /var/log/security.out && tail -vn+1 /var/log/security.out } ; /usr/local/sbin/anacron -u daily_sec.mail
+16  4   *   *   1   root    { test -s /var/log/daily.out && tail -vn+1 /var/log/daily.out } ; /usr/local/sbin/anacron -u daily.mail
+30  4   14,28   *   *   root    { test -s /var/log/weekly.out && tail -vn+1 /var/log/weekly.out } ; /usr/local/sbin/anacron -u weekly.mail
+45  4   1   1,4,7,10    *   root    { test -s /var/log/monthly.out && tail -vn+1 /var/log/monthly.out } ; /usr/local/sbin/anacron -u monthly.mail

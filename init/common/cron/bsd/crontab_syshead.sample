@@ -1,0 +1,8 @@
+# /etc/crontab - root's crontab for FreeBSD
+#
+#
+SHELL=/bin/sh
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+#
+#minute	hour	mday	month	wday	who	command
+

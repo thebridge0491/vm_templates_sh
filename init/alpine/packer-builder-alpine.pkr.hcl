@@ -91,8 +91,9 @@ variable "isos_pardir" {
 
 variable "foreign_pkgmgr" {
   type    = string
-  #default = "--repository=https://dl-cdn.alpinelinux.org/alpine/latest-stable/main debootstrap pacman"
-  default = "debootstrap pacman"
+  #default = "--repository=https://dl-cdn.alpinelinux.org/alpine/latest-stable/main pacman debootstrap"
+  #default = "pacman debootstrap"
+  default = ""
 }
 
 
@@ -136,7 +137,7 @@ locals {
   qemu_nvram       = ("aarch64" == var.MACHINE ? var.qemu_nvram_aa64 :
     var.qemu_nvram_x64)
   qemuargs         = "aarch64" == var.MACHINE ? [
-    ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"],
+    ["-cpu", "cortex-a72"], ["-machine", "virt,gic-version=3,acpi=off"],
     ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -146,7 +147,7 @@ locals {
     ["-smbios", "type=0,uefi=on"], ["-bios", "${var.qemu_firmware_aa64}"]
     #, ["-virtfs", "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough"]
     ] : [
-    ["-cpu", "SandyBridge"], ["-machine", "q35,accel=kvm:hvf:tcg"],
+    ["-cpu", "Skylake-Client"], ["-machine", "q35,accel=kvm:hvf:tcg"],
     ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -162,48 +163,70 @@ locals {
     ("aarch64" == var.MACHINE ? "qemu-system-aarch64" : "qemu-system-x86_64"))
 
   # Source common local vars
-  vm_base          = "${var.variant}-${var.MACHINE}-${var.vol_mgr}"
+  vm_base          = "${var.variant}${var.RELEASE}-${var.MACHINE}-${var.vol_mgr}"
   output_directory = "output-vms/${local.vm_base}"
 
-  boot_command_aa64_chroot = ["<wait5m>root<enter><wait>ifconfig eth0 up ; ",
-    "udhcpc -i eth0<enter><wait1m>",
-    "date +%Y.%m.%d-%H:%M -s '${local.datestamp}-00:01' ; cd /tmp ; ",
-    "wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; ",
-    ". /etc/os-release ; echo http://${var.mirror_host_aa64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; ",
-    "echo http://${var.mirror_host_aa64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; ",
-    "apk update ; apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl lvm2 btrfs-progs util-linux multipath-tools perl ${var.foreign_pkgmgr} ; ",
-    "if [ 'zfs' = '${var.vol_mgr}' ] ; then ",
-    "apk add zfs ; sleep 5 ; ",
-    "fi ; ", "setup-devd udev ; sleep 3 ; ",
-    "env MKFS_CMD=$${MKFS_CMD:-mkfs.ext4} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; ",
-    "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
-    "env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
-
-  boot_command_x64_auto  = ["<wait10>root<enter><wait>ifconfig eth0 up ; ",
-    "udhcpc -i eth0<enter><wait10>",
-    "date +%Y.%m.%d-%H:%M -s '${local.datestamp}-00:01' ; cd /tmp ; ",
+  boot_command_aa64_auto  = ["<wait5m>root<enter><wait>",
+    "mount -o remount,size=1500M /run ; df -lh ; sleep 5 ; ",
+    "ifconfig eth0 up ; udhcpc -i eth0<enter><wait1m>",
+    "rdate time.nist.gov ; sleep 3 ; date -u ; sleep 3 ; cd /tmp ; ",
     "wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/answers' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/post_autoinstall.sh' ; ",
-    ". /etc/os-release ; mount -o remount,size=1500M /run ; df -h ; ",
-    "sleep 5 ; echo http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; ",
+    "echo http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; ",
     "echo http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; ",
     "apk update ; apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl lvm2 btrfs-progs util-linux multipath-tools perl ; ",
     "service sshd stop ; setup-devd udev ; sleep 3 ; ",
     "env MKFS_CMD=$${MKFS_CMD:-mkfs.ext4} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; ",
     "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
-    "env APKREPOSOPTS=http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main BOOT_SIZE=512 USE_EFI=1 setup-alpine -f /tmp/answers",
+    "env APKREPOSOPTS=http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main BOOT_SIZE=512 USE_EFI=1 setup-alpine -e -f /tmp/answers",
     "<enter><wait2m>",
     "env mirror_host=${var.mirror_host_x64} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/post_autoinstall.sh run_postinstall '${var.passwd_crypted}'<enter>"]
 
-  boot_command_x64_chroot = ["<wait10>root<enter><wait>ifconfig eth0 up ; ",
-    "udhcpc -i eth0<enter><wait1m>",
-    "date +%Y.%m.%d-%H:%M -s '${local.datestamp}-00:01' ; cd /tmp ; ",
+  boot_command_aa64_chroot = ["<wait5m>root<enter><wait>",
+    "mount -o remount,size=1500M /run ; df -lh ; sleep 5 ; ",
+    "ifconfig eth0 up ; udhcpc -i eth0<enter><wait1m>",
+    "rdate time.nist.gov ; sleep 3 ; date -u ; sleep 3 ; cd /tmp ; ",
     "wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; ",
-    ". /etc/os-release ; mount -o remount,size=1500M /run ; df -h ; ",
-    "sleep 5 ; echo http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; ",
-    "echo http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; ",
-    "apk update ; apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl lvm2 btrfs-progs util-linux multipath-tools perl ${var.foreign_pkgmgr} ; ",
+    "echo http://${var.mirror_host_aa64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; ",
+    "echo http://${var.mirror_host_aa64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; ",
+    "apk update ; apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl xz zstd lvm2 btrfs-progs util-linux multipath-tools perl arch-install-scripts ${var.foreign_pkgmgr} ; ",
     "if [ 'zfs' = '${var.vol_mgr}' ] ; then ",
-    "apk add zfs ; sleep 5 ; ",
+    "apk add zfs zfs-scripts ; sleep 5 ; ",
+    "fi ; ", "setup-devd udev ; sleep 3 ; ",
+    "env MKFS_CMD=$${MKFS_CMD:-mkfs.ext4} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; ",
+    "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
+    "env MIRROR=${var.MIRROR} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/install.sh run_install ${var.variant}-boxv0000 '${var.passwd_crypted}'<enter><wait>"]
+
+  boot_command_x64_auto  = ["<wait10>root<enter><wait>",
+    "mount -o remount,size=1500M /run ; df -lh ; sleep 5 ; ",
+    "ifconfig eth0 up ; udhcpc -i eth0<enter><wait1m>",
+    "rdate time.nist.gov ; sleep 3 ; date -u ; sleep 3 ; cd /tmp ; ",
+    "wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/answers' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/post_autoinstall.sh' ; ",
+    "echo http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; ",
+    "echo http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; ",
+    "apk update ; apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl lvm2 btrfs-progs util-linux multipath-tools perl ; ",
+    "service sshd stop ; setup-devd udev ; sleep 3 ; ",
+    "env MKFS_CMD=$${MKFS_CMD:-mkfs.ext4} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; ",
+    "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
+    "env APKREPOSOPTS=http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main BOOT_SIZE=512 USE_EFI=1 setup-alpine -e -f /tmp/answers",
+    "<enter><wait2m>",
+    "env mirror_host=${var.mirror_host_x64} RELEASE=${var.RELEASE} VOL_MGR=${var.vol_mgr} sh -x /tmp/post_autoinstall.sh run_postinstall '${var.passwd_crypted}'<enter>"]
+
+  boot_command_x64_chroot = [#"<down><up><wait5m>c<wait>",
+    #"linux /boot/vmlinuz-lts ",
+    #"modules=loop,squashfs,sd-mod,usb-storage quiet<enter>",
+    #"initrd /boot/intel-ucode.img /boot/amd-ucode.img ",
+    #"/boot/initramfs-lts<enter>",
+    #"boot<enter>",
+    "<wait10>root<enter><wait>",
+    "mount -o remount,size=1500M /run ; df -lh ; sleep 5 ; ",
+    "ifconfig eth0 up ; udhcpc -i eth0<enter><wait1m>",
+    "rdate time.nist.gov ; sleep 3 ; date -u ; sleep 3 ; cd /tmp ; ",
+    "wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; ",
+    "echo http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/main >> /etc/apk/repositories ; ",
+    "echo http://${var.mirror_host_x64}/v$(cat /etc/alpine-release | cut -d. -f1-2)/community >> /etc/apk/repositories ; ",
+    "apk update ; apk add e2fsprogs xfsprogs dosfstools sgdisk libffi gnupg curl xz zstd lvm2 btrfs-progs util-linux multipath-tools perl arch-install-scripts ${var.foreign_pkgmgr} ; ",
+    "if [ 'zfs' = '${var.vol_mgr}' ] ; then ",
+    "apk add zfs zfs-scripts ; sleep 5 ; ",
     "fi ; ", "setup-devd udev ; sleep 3 ; ",
     "env MKFS_CMD=$${MKFS_CMD:-mkfs.ext4} sh -x /tmp/disk_setup.sh part_format sgdisk ${var.vol_mgr} ; ",
     "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
@@ -252,7 +275,8 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
+      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -276,7 +300,25 @@ build {
     #execute_command  = "sudo chmod +x {{.Path}} ; env {{.Vars}} sudo -E sh -eux '{{.Path}}'"
     execute_command  = "sudo chmod +x {{.Path}} ; env {{.Vars}} sudo -E sh -c {{.Path}}"
     except           = ["qemu.guest_vm"]
-    scripts          = ["init/common/bsd/zerofill.sh"]
+    scripts          = ["init/common/zerofill_linux.sh"]
+  }
+  provisioner "shell" {
+    environment_vars = ["HOME_DIR=/home/packer"]
+    execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
+    inline           = ["cd /tmp",
+      "sh init/common/collect_osinfo.sh collect_all"]
+    only             = ["qemu.guest_vm"]
+  }
+  provisioner "file" {
+    destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
+    direction   = "download"
+    generated   = true
+    only        = ["qemu.guest_vm"]
+    source      = "/tmp/info.tar"
+  }
+  provisioner "shell-local" {
+    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
+      "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
   }
 
   post-processor "checksum" {

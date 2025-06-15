@@ -1,62 +1,88 @@
 #!/bin/sh -eux
 
 ## scripts/userifc.sh
+export CHOICE_DESKTOP=${1:-xfce}
 set +e
 
-export CHOICE_DESKTOP=${1:-xfce}
+snapshot_name=pre_userifc-$(date -u "+%Y%m%d") \
+  sh $(dirname ${0})/upgradepkgs.sh snapshot
 
 if command -v aria2c > /dev/null ; then
-	FETCH_CMD=${FETCH_CMD:-aria2c} ;
+  FETCH_CMD=${FETCH_CMD:-aria2c} ;
 fi
 
-pkg update ; pkg fetch -dy --available-updates ; pkg upgrade -y
-. /root/init/freebsd/distro_pkgs.ini
-case ${CHOICE_DESKTOP} in
-	lxqt) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_lxqt}" ;;
-	*) pkgs_var="${pkgs_displaysvr_xorg} ${pkgs_deskenv_xfce}" ;;
-esac
+pkg update
+#pkg upgrade --fetch-only -Uy ; pkg upgrade -Uy
+. /root/scripts/distro_pkgs.ini
+echo ${pkgs_displaysvr} ${pkgs_deskenv_${CHOICE_DESKTOP}}
 
-for pkgX in ${pkgs_var} ; do
-	pkg fetch -Udy ${pkgX} ;
+read -p "Enter 'y' to continue [nY]: " response
+#if [ "n" = "${response}" ] || [ "N" = "${response}" ] ; then
+if [ -n "$(echo ${response} | grep -e '^[Nn].*')" ] ; then
+  exit ;
+fi
+#pkg install [--fetch-only] -Uy pkg0 .. pkgN # ERR, doesn't skip missing
+for pkgX in ${pkgs_displaysvr} ${pkgs_deskenv_${CHOICE_DESKTOP}} ; do
+  pkg install -Uy ${pkgX} ;
 done
-for pkgX in ${pkgs_var} ; do
-	pkg install -Uy ${pkgX} ;
-done
-sleep 3
 
-case ${CHOICE_DESKTOP} in
-	lxqt) sysrc sddm_enable="YES" ;;
-	*) #mv /usr/local/etc/lightdm /usr/local/etc/lightdm.old ;
-	  sysrc lightdm_enable="YES" ;;
-esac
-sleep 3 ; chmod 1777 /tmp
+
+mkdir -p /usr/local/etc/X11/xorg.conf.d
+for confX in 10-evdev.conf 40-libinput.conf ; do
+  cp -an /usr/local/share/X11/xorg.conf.d/${confX} /usr/local/etc/X11/xorg.conf.d/ ;
+done
+sysrc wpa_supplicant_progam="/usr/local/sbin/wpa_supplicant"
+sysrc kld_list+=i915kms # i915kms | amdgpu
 
 # config xorg
-sh -c 'cat >> /boot/loader.conf' << EOF
+if [ -z "$(grep '^kern.vty=' /boot/loader.conf)" ] || [ -z "$(grep '^hw.psm.synaptics_support=' /boot/loader.conf)" ] ; then
+  sh -c 'cat >> /boot/loader.conf' << EOF
+#exec="gop set 3"
+#exec="mode 3"
 kern.vty=vt
 hw.psm.synaptics_support="1"
 
 EOF
-sh -c 'cat >> /etc/profile.conf' << EOF
+fi
+if [ -z "$(grep '^LANG=' /etc/profile.conf)" ] ; then
+  sh -c 'cat >> /etc/profile.conf' << EOF
 LANG=en_US.UTF-8 ; export LANG
+
+EOF
+fi
+if [ -z "$(grep '^CHARSET=' /etc/profile.conf)" ] ; then
+  sh -c 'cat >> /etc/profile.conf' << EOF
 CHARSET=UTF-8 ; export CHARSET
 
 EOF
-sysrc dbus_enable="YES"
-sysrc hald_enable="YES"
-#sysrc mixer_enable="YES"
-sysrc moused_enable="YES"
+fi
 
-# enable touchpad tapping
-sed -i '' '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
-  /usr/local/share/X11/xorg.conf.d/10-evdev.conf
-sed -i '' '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
-  /usr/local/share/X11/xorg.conf.d/40-libinput.conf
-#libinput list-devices ; xinput --list
-#xinput list-props XX [; xinput disable YY] # by id, list-props or disable
-#xinput set-prop <deviceid|devicename> <deviceproperty> <value>
+## /usr/local/etc/X11/xorg.conf.d/20-[intel|radeon|scfb].conf
+#sh -c 'cat > /usr/local/etc/X11/xorg.conf.d/20-intel.conf' << EOF
+#Section "Device"
+#  Identifier "Card0"
+#  Driver "intel" # intel | radeon | scfb
+#  #BusID "PCI:0:2:0"
+#EndSection
+#
+#EOF
 
-# update XDG user dir config
-export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
-sh -c "echo 'BIN=bin' >> /usr/local/etc/xdg/user-dirs.defaults"
-xdg-user-dirs-update
+
+sh /root/init/common/misc_config.sh cfg_xdguserdirs /usr/local/etc/xdg
+sh /root/init/common/misc_config.sh cfg_xorgtouchpad /usr/local/etc/X11/xorg.conf.d
+
+set +e ; set +u
+echo "Enable|disable services" ; sleep 3
+for svc in ${uiservices_enabled_${CHOICE_DESKTOP}} ; do
+  sysrc ${svc}_enable="YES" ;
+done
+for svc in ${uiservices_disabled_${CHOICE_DESKTOP}} ; do
+  sysrc ${svc}_enable="NO" ;
+done
+
+set +e
+## scripts/cleanup.sh
+ASSUME_ALWAYS_YES=yes pkg clean -y
+if command -v portmaster > /dev/null ; then
+  portmaster -a ; portmaster -n --clean-distfiles ;
+fi

@@ -30,39 +30,88 @@ export UNAME_M=$(uname -m)
 
 # ip link ; dhcpcd {ifdev}
 
+#ntpd -u ntp:ntp ; ntpq -p ; ntpctl -s peers ; sleep 3
+
 #ifdev=$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
+export CHROOT_CMD=chroot
+#if command -v arch-chroot > /dev/null ; then
+#  export CHROOT_CMD=arch-chroot ; # (archlinux: pkg arch-install-scripts)
+#elif command -v artix-chroot > /dev/null ; then
+#  export CHROOT_CMD=artix-chroot ; # (artix: pkg artools-base)
+#elif command -v xchroot > /dev/null ; then
+#  export CHROOT_CMD=xchroot ; # (void: pkg xtools[-minimal])
+#fi
+
+_rootfs_extract() {
+  tarball_ver=$(curl -Ls http://${MIRROR}/live/current | sed -n "s|.*void-${UNAME_M}-ROOTFS-\(.*\).tar.xz.*|\1|p" | tail -n1)
+  curl -Lo /tmp/rootfs.tar.xz \
+    http://${MIRROR}/live/current/void-${UNAME_M}-ROOTFS-${tarball_ver:-20240314}.tar.xz
+  curl -Lo /tmp/rootfs.tar.xz.CHECKSUM \
+    http://${MIRROR}/live/current/sha256sum.txt
+  grep "void-${UNAME_M}-ROOTFS" /tmp/rootfs.tar.xz.CHECKSUM | grep '^SHA256' \
+    | sed -E 's|.*= ([a-z0-9]*)$|\1  rootfs.tar.xz|' > /tmp/CHECKSUM
+  #cp -a /tmp/rootfs.tar.xz.CHECKSUM /tmp/CHECKSUM
+  sha256sum --ignore-missing -c /tmp/CHECKSUM
+
+  #(cat /tmp/rootfs.tar.xz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt})
+  (cat /tmp/rootfs.tar.xz | tar -xaJf - -C ${DESTDIR:-/mnt})
+}
+
 bootstrap() {
   echo "Bootstrap base pkgs" ; sleep 3
-  pkg_list="libgcc ethtool base-voidstrap bash openssh sudo mkpasswd"
+  pkg_list="libgcc ethtool base-container-full mkpasswd"
   if command -v xbps-install > /dev/null ; then
     if [ "aarch64" = "${UNAME_M}" ] ; then
-      yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current/aarch64 -r /mnt ${pkg_list} ;
+      yes | XBPS_ARCH=${UNAME_M} xbps-install -R http://${MIRROR}/current/aarch64 -r /mnt -Sy ${pkg_list} ;
     else
-      yes | XBPS_ARCH=${UNAME_M} xbps-install -Sy -R http://${MIRROR}/current -r /mnt ${pkg_list} ;
+      yes | XBPS_ARCH=${UNAME_M} xbps-install -R http://${MIRROR}/current -r /mnt -Sy ${pkg_list} ;
     fi ;
   else
-    curl -LO http://${MIRROR}/static/xbps-static-latest.${UNAME_M}-musl.tar.xz ;
-    tar -xf xbps-static-latest.${UNAME_M}-musl.tar.xz ;
-    if [ "aarch64" = "${UNAME_M}" ] ; then
-      yes | XBPS_ARCH=${UNAME_M} ./usr/bin/xbps-install.static -Sy -R http://${MIRROR}/current/aarch64 -r /mnt ${pkg_list} ;
+    if [ ! "1" = "${USE_ROOTFS:-0}" ] ; then
+      curl -LO http://${MIRROR}/static/xbps-static-latest.${UNAME_M}-musl.tar.xz ;
+      tar -xf xbps-static-latest.${UNAME_M}-musl.tar.xz ;
+      if [ "aarch64" = "${UNAME_M}" ] ; then
+        yes | XBPS_ARCH=${UNAME_M} SSL_NO_VERIFY_PEER=1 ./usr/bin/xbps-install.static -R http://${MIRROR}/current/aarch64 -r /mnt -Sy ${pkg_list} ;
+      else
+        yes | XBPS_ARCH=${UNAME_M} SSL_NO_VERIFY_PEER=1 ./usr/bin/xbps-install.static -R http://${MIRROR}/current -r /mnt -Sy ${pkg_list} ;
+      fi ;
     else
-      yes | XBPS_ARCH=${UNAME_M} ./usr/bin/xbps-install.static -Sy -R http://${MIRROR}/current -r /mnt ${pkg_list} ;
+      mv /mnt/etc/fstab /mnt/etc/fstab.disk_setup ;
+      _rootfs_extract ;
+      cp -a /mnt/etc/fstab /mnt/etc/fstab.rootfs ;
+      cp -a /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
+      mv /mnt/etc/resolv.conf /mnt/etc/resolv.conf.rootfs ;
+      cp /etc/resolv.conf /mnt/etc/resolv.conf ; cp /etc/mtab /mnt/etc/mtab ;
+      # LANG=[C|en_US].UTF-8
+      cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en ${CHROOT_CMD} /mnt /bin/sh ;
+set -x
+
+unalias -a
+
+exit
+
+EOFchroot
     fi ;
   fi
+  sleep 5
 
-  echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
   cp /etc/mtab /mnt/etc/mtab
-  mkdir -p /mnt/dev /mnt/proc /mnt/sys /mnt/run
-  mount --rbind /proc /mnt/proc ; mount --rbind /sys /mnt/sys
-  mount --rbind /dev /mnt/dev
+  mkdir -p /mnt/proc /mnt/sys /mnt/dev /mnt/run
+  if [ "chroot" = "${CHROOT_CMD}" ] ; then
+    echo "Prepare chroot (mount --[r]bind devices)" ; sleep 3
+    cp /etc/resolv.conf /mnt/etc/resolv.conf
 
-  mount --rbind /dev/pts /mnt/dev/pts ; mount --rbind /run /mnt/run
+    #mount --rbind /proc /mnt/proc ; mount --rbind /sys /mnt/sys
+    #mount --rbind /dev /mnt/dev ; mount --rbind /dev/pts /mnt/dev/pts
+    #mount --rbind /run /mnt/run ; mount --rbind /dev/shm /mnt/dev/shm
+    for fsX in /proc /sys /dev /dev/pts /run /dev/shm ; do
+      mount --rbind ${fsX} /mnt${fsX} ;
+    done
+  fi
   modprobe efivarfs
   mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars/
-
-  cp /etc/resolv.conf /mnt/etc/resolv.conf
   sleep 5
 }
 
@@ -71,7 +120,7 @@ system_config() {
   #export PASSWD_PLAIN=${2:-packer}
   export PASSWD_CRYPTED=${2:-\$6\$16CHARACTERSSALT\$A4i3yeafzCxgDj5imBx2ZdMWnr9LGzn3KihP9Dz0zTHbxw31jJGEuuJ6OB6Blkkw0VSUkQzSjE9n4iAAnl0RQ1}
 
-  cat << EOFchroot | LANG=en_US.UTF-8 LANGUAGE=en chroot /mnt /bin/sh
+  cat << EOFchroot | LANG=en_US.UTF-8 LANGUAGE=en ${CHROOT_CMD} /mnt /bin/sh
 set -x
 
 chmod 1777 /tmp ; chmod 1777 /var/tmp
@@ -91,21 +140,28 @@ else
 fi
 xbps-install -S ; xbps-query -L ; sleep 5
 
+services_enabled="dhcpcd sshd"
+pkg_list="void-repo-nonfree nano wget curl aria2 void-repo-multilib void-repo-multilib-nonfree mkpasswd python3 python3-urllib3"
+# xfce4
+
+# if socklog[-void] installed, remove
+test -e /var/log/socklog && rm -fr /var/log/socklog
+xbps-remove -y socklog socklog-void
+
 echo "Add software package selection(s)" ; sleep 3
 yes | xbps-install -Su xbps ; yes | xbps-install -u
-for pkgX in void-repo-nonfree python nano wget curl aria2 void-repo-multilib void-repo-multilib-nonfree ; do
-  yes | xbps-install -Sy \${pkgX}
+for pkgX in \${pkg_list} ; do
+  yes | xbps-install -y \${pkgX} ;
 done
-#yes | xbps-install -Sy xfce4
 xbps-query -Rs void-repo-nonfree ; sleep 10
 
 echo "Config keyboard ; localization" ; sleep 3
 kbd_mode -u ; loadkeys us
-sed -i -e '/en_US.UTF-8 UTF-8/ s|^# ||' /etc/locale.gen
+sed -ie '/en_US.UTF-8 UTF-8/ s|^# ||' /etc/locale.gen # ??
 echo 'LANG=en_US.UTF-8' > /etc/locale.conf
 echo "en_US.UTF-8 UTF-8" >> /etc/default/libc-locales
 xbps-reconfigure -f glibc-locales
-locale-gen
+locale-gen # ??
 
 
 echo "Config time zone & clock" ; sleep 3
@@ -117,17 +173,14 @@ echo "Config hostname ; network" ; sleep 3
 echo "${INIT_HOSTNAME}" > /etc/hostname
 #resolvconf -u   # generates /etc/resolv.conf
 cat /etc/resolv.conf ; sleep 5
-sed -i '/127.0.1.1/d' /etc/hosts
+sed -i '/^127.0.1.1/ s|127.0.1.1|#127.0.1.1|' /etc/hosts
 echo "127.0.1.1   ${INIT_HOSTNAME}.localdomain  ${INIT_HOSTNAME}" >> /etc/hosts
 
 ifdev=\$(ip -o link | grep 'link/ether' | grep 'LOWER_UP' | sed -n 's|\S*: \(\w*\):.*|\1|p')
 
 
-echo "Update services" ; sleep 3
-ln -s /etc/sv/dhcpcd /etc/runit/runsvdir/default/
-ln -s /etc/sv/sshd /etc/runit/runsvdir/default/
 sh -c 'cat >> /etc/rc.conf' << EOF
-HOSTNAME="${INIT_HOSTNAME}"
+#HOSTNAME="${INIT_HOSTNAME}"
 HARDWARECLOCK="UTC"
 TIMEZONE="Etc/UTC"
 KEYMAP="us"
@@ -135,6 +188,16 @@ KEYMAP="us"
 EOF
 
 cat /etc/rc.conf ; sleep 5
+
+echo "Config services" ; sleep 3
+
+echo "Enable|disable services" ; sleep 3
+for svc in \${services_enabled} ; do
+  ln -s /etc/sv/\${svc} /etc/runit/runsvdir/default/ ;
+done
+for svc in nanoklogd socklog-unix ; do
+  rm /etc/runit/runsvdir/default/\${svc} ;
+done
 
 
 echo "Set root passwd ; add user" ; sleep 3
@@ -145,21 +208,24 @@ echo -n 'root:${PASSWD_CRYPTED}' | chpasswd -e
 useradd -m -g users -G wheel -s /bin/bash -c 'Packer User' packer
 #echo -n "packer:${PASSWD_PLAIN}" | chpasswd
 echo -n 'packer:${PASSWD_CRYPTED}' | chpasswd -e
-chown -R packer:\$(id -gn packer) /home/packer
+mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 
-#sh -c 'cat > /etc/sudoers.d/99_packer' << EOF
-#Defaults:packer !requiretty
-#\$(id -un packer) ALL=(ALL) NOPASSWD: ALL
+#sh -c 'cat | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_packernopasswd' << EOF
+##Defaults:packer !requiretty
+#packer ALL=(ALL:ALL) NOPASSWD: ALL
 #
 #EOF
-#chmod 0440 /etc/sudoers.d/99_packer
+##chmod 0440 /etc/sudoers.d/99_packernopasswd
 
 
-sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
-sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
-sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
+#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
+#Defaults:%wheel !requiretty
+%wheel ALL=(ALL:ALL) NOPASSWD: ALL
 
-xbps-remove -O
+EOF
+
+xbps-remove -Oy
 
 exit
 
@@ -168,18 +234,33 @@ EOFchroot
 }
 
 kernel_bootloader() {
-  cat << EOFchroot | LANG=en_US.UTF-8 LANGUAGE=en chroot /mnt /bin/sh
+  cat << EOFchroot | LANG=en_US.UTF-8 LANGUAGE=en ${CHROOT_CMD} /mnt /bin/sh
 set -x
 
 . /etc/os-release
 
 echo "virtualpkg=linux-headers:linux-lts-headers" >> /etc/xbps.d/99-virtualpkg.conf
 
+pkg_list="linux-lts efibootmgr"
+
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  yes | xbps-install -Sy linux-lts linux-lts-headers efibootmgr grub-arm64-efi ;
+  pkg_list="\${pkg_list} grub-arm64-efi" ;
 else
-  yes | xbps-install -Sy linux-lts linux-lts-headers efibootmgr grub-x86_64-efi ;
+  pkg_list="\${pkg_list} grub-x86_64-efi" ;
 fi
+
+if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+  for pkgX in linux-firmware-amd linux-firmware-intel linux-firmware-network linux-firmware-nvidia ; do
+    echo "ignorepkg=\${pkgX}" >> /etc/xbps.d/99-ignorefirmware.conf ;
+    yes | xbps-remove -y \${pkgX} ;
+  done ;
+fi
+
+yes | xbps-install -Sy \${pkg_list}
+
+kver="\$(ls -A /usr/lib/modules/ | tail -1)" # ?? or uname -r
+echo \${kver} ; sleep 5
+
 modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
 
@@ -187,9 +268,11 @@ echo "Config dracut"
 echo 'hostonly="yes"' >> /etc/dracut.conf
 
 if [ "zfs" = "${VOL_MGR}" ] ; then
-  yes | xbps-install -Sy zfs-lts
-  mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf
-  modprobe zfs ; zfs version ; sleep 5 ;
+  yes | xbps-install -y linux-lts-headers dkms zfs-lts
+  mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ;
+  zfs_ver=\$(zfs version | head -n1 | sed 's|zfs-||') ;
+  dkms install --verbose zfs/\${zfs_ver} -k \${kver}.${UNAME_M} ;
+  dkms status ; modprobe zfs ; zfs version ; sleep 5 ;
 
   zgenhostid -f -o /etc/hostid ; sleep 5 ;
 
@@ -203,10 +286,10 @@ if [ "zfs" = "${VOL_MGR}" ] ; then
   xbps-pkgdb -m hold zfs-lts linux-lts linux-lts-headers \${linuxver} \${linuxver}-headers ;
   xbps-query --list-hold-pkgs ; sleep 3 ;
 elif [ "btrfs" = "${VOL_MGR}" ] ; then
-  yes | xbps-install -Sy btrfs-progs ;
+  yes | xbps-install -y btrfs-progs ;
   modprobe btrfs ; sleep 5 ;
 elif [ "lvm" = "${VOL_MGR}" ] ; then
-  yes | xbps-install -Sy lvm2 ;
+  yes | xbps-install -y lvm2 ;
   # cryptsetup
   modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
 fi
@@ -214,9 +297,9 @@ fi
 echo "Config Linux kernel"
 #xbps-reconfigure -f linux-lts
 kernel=\$(xbps-query --regex -s '^linux-lts-[[:digit:]]\.[-0-9\._]*$' | cut -f2 -d' ' | sort -V | tail -n1)
-kver="\$(ls -A /lib/modules/ | tail -1)" # ?? or uname -r
-#mkinitrd /boot/initrd-\${kver} \${kver}
-dracut --kver \${kver} --force
+
+#mkinitrd /boot/initrd-\${kver}.img \${kver}
+dracut --force --kver \${kver}
 xbps-reconfigure -f \${kernel}
 
 
@@ -226,19 +309,21 @@ echo "Bootloader installation & config" ; sleep 3
 mkdir -p /boot/efi/EFI/\${ID} /boot/efi/EFI/BOOT
 if [ "aarch64" = "${UNAME_M}" ] ; then
   grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
-  cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
+  #cp /boot/efi/EFI/\${ID}/grubaa64.efi /boot/efi/EFI/BOOT/BOOTAA64.EFI ;
 else
   grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=\${ID} --recheck --removable ;
   grub-install --target=i386-pc --recheck /dev/${DEVX} ;
-  cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
+  #cp /boot/efi/EFI/\${ID}/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI ;
 fi
+find / -ipath /boot/efi/*/*.efi ; sleep 5
 
-#sed -i -e "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
-sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rd.auto=1 text xdriver=vesa nomodeset rootdelay=5"|' /etc/default/grub
-#sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
+#sed -ie "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
+sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|^\(.*\)$|#\1\n\1|' /etc/default/grub
+sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rd.auto=1 xdriver=vesa rootdelay=5 nomodeset text"|' /etc/default/grub
+#sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
 
 if [ "zfs" = "${VOL_MGR}" ] ; then
-  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|nomodeset rootdelay|nomodeset root=ZFS=${ZPOOLNM}/ROOT/default rootdelay|' /etc/default/grub ;
+  sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s| nomodeset| root=ZFS=${ZPOOLNM}/ROOT/default nomodeset|' /etc/default/grub ;
   echo 'GRUB_PRELOAD_MODULES="zfs"' >> /etc/default/grub ;
 elif [ "btrfs" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="btrfs"' >> /etc/default/grub ;
@@ -247,45 +332,31 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
 fi
 
 if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
-  sed -i -e '/GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
+  sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubaa64.efi" -L "\${ID}#${GRP_NM}"
   efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTAA64.EFI" -L Default
 else
-  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L \${ID}
+  efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/\${ID}/grubx64.efi" -L "\${ID}#${GRP_NM}"
   efibootmgr -c -d /dev/${DEVX} -p \$(lsblk -nlpo name,label,partlabel | sed -n '/ESP/ s|.*[sv]da\([0-9]*\).*|\1|p') -l "/EFI/BOOT/BOOTX64.EFI" -L Default
 fi
 efibootmgr -v ; sleep 3
 
 mkpasswd -m help ; sleep 10
 
+xbps-remove -Ooy
+
 exit
 
 EOFchroot
 
-  . /mnt/etc/os-release
-  snapshot_name=${ID}_install-$(date -u "+%Y%m%d")
-
   if [ "zfs" = "${VOL_MGR}" ] ; then
-    zfs snapshot ${ZPOOLNM}/ROOT/default@${snapshot_name} ;
-    # example remove: zfs destroy ospool0/ROOT/default@snap1
-    zfs list -t snapshot ; sleep 5 ;
-
     zpool trim ${ZPOOLNM} ; zpool set autotrim=on ${ZPOOLNM} ;
   else
-    if [ "btrfs" = "${VOL_MGR}" ] ; then
-      btrfs subvolume snapshot /mnt /mnt/.snapshots/${snapshot_name} ;
-      # example remove: btrfs subvolume delete /.snapshots/snap1
-      btrfs subvolume list /mnt ;
-    elif [ "lvm" = "${VOL_MGR}" ] ; then
-      lvcreate --snapshot --size 2G --name ${snapshot_name} ${GRP_NM}/osRoot ;
-      # example remove: lvremove vg0/snap1
-      lvs ;
-    fi ;
-    sleep 5 ; fstrim -av ;
+    fstrim -av ;
   fi
   sync
 }

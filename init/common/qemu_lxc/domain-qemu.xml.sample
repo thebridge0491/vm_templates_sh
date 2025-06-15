@@ -5,8 +5,8 @@
   <currentMemory unit='KiB'>2097152</currentMemory>
   <vcpu placement='static'>2</vcpu>
   <cpu match='minimum'>
-    <!--<model fallback='allow'>SandyBridge</model>-->
-    <model>SandyBridge</model>
+    <!--<model fallback='allow'>Skylake-Client</model>-->
+    <model>Skylake-Client</model>
   </cpu>
   <os>
     <!--<type arch='x86_64' machine='pc-[i440fx|q35]-7.1'>hvm</type>-->

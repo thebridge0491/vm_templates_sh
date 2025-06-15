@@ -99,10 +99,11 @@ _sgdisk_part() {
     NEXTIDX=14 ;
   fi
   sgdisk --new ${NEXTIDX}:0:+4G --typecode ${NEXTIDX}:a502 \
-    --change-name ${NEXTIDX}:"bsd0-fsSwap" /dev/${DEVX}
+    --change-name ${NEXTIDX}:"fbsd0-fsSwap" /dev/${DEVX}
   NEXTIDX=$(( 1 + ${NEXTIDX} ))
-  sgdisk --new ${NEXTIDX}:0:+80G --typecode ${NEXTIDX}:a503 \
-    --change-name ${NEXTIDX}:"bsd0-fsPool" /dev/${DEVX}
+  # typecode: f/ FreeBSD ZFS a504 ; f/ FreeBSD UFS a503
+  sgdisk --new ${NEXTIDX}:0:+80G --typecode ${NEXTIDX}:a504 \
+    --change-name ${NEXTIDX}:"fbsd0-fsPool" /dev/${DEVX}
   NEXTIDX=$(( 1 + ${NEXTIDX} ))
 
   sgdisk --new ${NEXTIDX}:0:+120G --typecode ${NEXTIDX}:0700 \
@@ -130,20 +131,20 @@ _sfdisk_part() {
   echo -n size=512MiB,bootable,type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,name=ESP | sfdisk -N 2 \
     /dev/${DEVX}
 
-  echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM0}-osBoot" | sfdisk -N 3 /dev/${DEVX}
+  echo -n size=1GiB,type=0FC63DAF-8483-4772-8E79-3D69D8477DE4,name="${GRP_NM0}-osBoot" | sfdisk -N 3 /dev/${DEVX}
   echo -n size=4GiB,type=0657FD6D-A4AB-43C4-84E5-0933C84B4F4F,name="${GRP_NM0}-osSwap" | sfdisk -N 4 /dev/${DEVX}
 
   if [ "zfs" = "${VOL_MGR}" ] ; then
-    echo -n type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM0}-osPool" | sfdisk -N 5 /dev/${DEVX} ;
+    echo -n type=0FC63DAF-8483-4772-8E79-3D69D8477DE4,name="${GRP_NM0}-osPool" | sfdisk -N 5 /dev/${DEVX} ;
 
-    echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM1}-osBoot" | sfdisk -N 6 /dev/${DEVX} ;
-    echo -n size=80GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM1}-osPool" | sfdisk -N 7 /dev/${DEVX} ;
+    echo -n size=1GiB,type=0FC63DAF-8483-4772-8E79-3D69D8477DE4,name="${GRP_NM1}-osBoot" | sfdisk -N 6 /dev/${DEVX} ;
+    echo -n size=80GiB,type=510FC63DAF-8483-4772-8E79-3D69D8477DE4,name="${GRP_NM1}-osPool" | sfdisk -N 7 /dev/${DEVX} ;
     NEXTIDX=8 ;
   elif [ "lvm" = "${VOL_MGR}" ] || [ "btrfs" = "${VOL_MGR}" ] ; then
     echo -n size=84GiB,name="${PV_NM0}" | sfdisk -N 5 /dev/${DEVX} ;
 
-    echo -n size=1GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${GRP_NM1}-osBoot" | sfdisk -N 6 /dev/${DEVX} ;
-    echo -n size=80GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name="${PV_NM1}" | sfdisk -N 7 /dev/${DEVX} ;
+    echo -n size=1GiB,type=0FC63DAF-8483-4772-8E79-3D69D8477DE4,name="${GRP_NM1}-osBoot" | sfdisk -N 6 /dev/${DEVX} ;
+    echo -n size=80GiB,type=0FC63DAF-8483-4772-8E79-3D69D8477DE4,name="${PV_NM1}" | sfdisk -N 7 /dev/${DEVX} ;
   NEXTIDX=8 ;
   elif [ "std" = "${VOL_MGR}" ] ; then
     echo -n size=20GiB,name="${GRP_NM0}-osRoot" | sfdisk -N 5 /dev/${DEVX} ;
@@ -158,9 +159,12 @@ _sfdisk_part() {
     echo -n size=20GiB,name="${GRP_NM1}-free" | sfdisk -N 13 /dev/${DEVX} ;
   NEXTIDX=14 ;
   fi
-  echo -n size=4GiB,type=516E7CB5-6ECF-11D6-8FF8-00022D09712B,name=bsd0-fsSwap | sfdisk -N ${NEXTIDX} /dev/${DEVX}
+  #  FreeBSD swap |   | 516E7CB5-6ECF-11D6-8FF8-00022D09712B
+  #  FreeBSD UFS  |   | 516E7CB6-6ECF-11D6-8FF8-00022D09712B
+  #  FreeBSD ZFS  |   | 516E7CBA-6ECF-11D6-8FF8-00022D09712B
+  echo -n size=4GiB,type=516E7CB5-6ECF-11D6-8FF8-00022D09712B,name=fbsd0-fsSwap | sfdisk -N ${NEXTIDX} /dev/${DEVX}
   NEXTIDX=$(( 1 + ${NEXTIDX} ))
-  echo -n size=80GiB,type=516E7CB6-6ECF-11D6-8FF8-00022D09712B,name=bsd0-fsPool | sfdisk -N ${NEXTIDX} /dev/${DEVX}
+  echo -n size=80GiB,type=516E7CBA-6ECF-11D6-8FF8-00022D09712B,name=fbsd0-fsPool | sfdisk -N ${NEXTIDX} /dev/${DEVX}
   NEXTIDX=$(( 1 + ${NEXTIDX} ))
 
   echo -n size=120GiB,type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7,name=data0 | sfdisk -N ${NEXTIDX} /dev/${DEVX}
@@ -260,11 +264,11 @@ _parted_part() {
   fi
   DIFF=${END} ; END=$(( 4 * 1024 + ${DIFF} ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ${DIFF} ${END} name ${NEXTIDX} bsd0-fsSwap
+    mkpart primary ${DIFF} ${END} name ${NEXTIDX} fbsd0-fsSwap
   NEXTIDX=$(( 1 + ${NEXTIDX} ))
   DIFF=${END} ; END=$(( 80 * 1024 + ${DIFF} ))
   parted -s -a optimal /dev/${DEVX} unit MiB \
-    mkpart primary ${DIFF} ${END} name ${NEXTIDX} bsd0-fsPool
+    mkpart primary ${DIFF} ${END} name ${NEXTIDX} fbsd0-fsPool
   NEXTIDX=$(( 1 + ${NEXTIDX} ))
 
   DIFF=${END} ; END=$(( 120 * 1024 + ${DIFF} ))
@@ -311,20 +315,26 @@ zfspart_create() {
   zpool labelclear -f /dev/${DEVX}${idx} ; mkdir -p /mnt
 
   #zpool create -R /mnt -O mountpoint=none -o ashift=12 -O compress=lz4 \
-  zpool create -R /mnt -O mountpoint=/ -o ashift=12 -d \
-    -o feature@async_destroy=enabled -o feature@bookmarks=enabled \
-    -o feature@embedded_data=enabled -o feature@empty_bpobj=enabled \
-    -o feature@enabled_txg=enabled -o feature@extensible_dataset=enabled \
-    -o feature@filesystem_limits=enabled -o feature@hole_birth=enabled \
-    -o feature@large_blocks=enabled -o feature@lz4_compress=enabled \
-    -o feature@spacemap_histogram=enabled -o feature@zpool_checkpoint=enabled \
-    -O acltype=posixacl -O canmount=off -O compression=lz4 -O devices=off \
-    -O normalization=formD -O relatime=on -O xattr=sa ${zpoolnm} /dev/${DEVX}${idx}
+  #zpool create -R /mnt -O mountpoint=/ -o ashift=12 -d \
+  #  -o feature@async_destroy=enabled -o feature@bookmarks=enabled \
+  #  -o feature@embedded_data=enabled -o feature@empty_bpobj=enabled \
+  #  -o feature@enabled_txg=enabled -o feature@extensible_dataset=enabled \
+  #  -o feature@filesystem_limits=enabled -o feature@hole_birth=enabled \
+  #  -o feature@large_blocks=enabled -o feature@lz4_compress=enabled \
+  #  -o feature@spacemap_histogram=enabled -o feature@zpool_checkpoint=enabled \
+  #  -O acltype=posixacl -O canmount=off -O compression=lz4 -O devices=off \
+  #  -O normalization=formD -O relatime=on -O xattr=sa ${zpoolnm} /dev/${DEVX}${idx}
+  ## Note: see /usr/share/zfs/compatibility.d/* files
+  ## ex: compatibility=[openzfs-2.1-freebsd | grub2]
+  zpool create -R /mnt -O mountpoint=/ -o ashift=12 \
+    -o compatibility=openzfs-2.1-freebsd -O acltype=posixacl -O canmount=off \
+    -O compression=lz4 -O devices=off -O normalization=formD -O relatime=on \
+    -O xattr=sa ${zpoolnm} /dev/${DEVX}${idx}
   zfs create -o mountpoint=none -o canmount=off ${zpoolnm}/ROOT
   zfs create -o canmount=noauto -o mountpoint=/ ${zpoolnm}/ROOT/default
   zfs mount -o exec,dev ${zpoolnm}/ROOT/default
 
-  zfs create -o com.sun:auto-snapshot=false ${zpoolnm}/tmp
+  #zfs create -o com.sun:auto-snapshot=false ${zpoolnm}/tmp
   zfs create -o canmount=off ${zpoolnm}/usr
   zfs create ${zpoolnm}/usr/local
   zfs create ${zpoolnm}/home
@@ -341,7 +351,7 @@ zfspart_create() {
 
   zfs set quota=32G ${zpoolnm}/home
   zfs set quota=8G ${zpoolnm}/var
-  zfs set quota=2G ${zpoolnm}/tmp
+  #zfs set quota=2G ${zpoolnm}/tmp
 
   zpool set bootfs=${zpoolnm}/ROOT/default ${zpoolnm} # ??
   zpool set cachefile=/etc/zfs/zpool.cache ${zpoolnm} ; sync
@@ -392,18 +402,23 @@ btrfspart_create() {
   mkdir -p /mnt ; mount -t btrfs ${DEV_PV} /mnt ; sync
 
   btrfs quota enable /mnt
-  btrfs subvolume create /mnt/@
-  btrfs subvolume create /mnt/@/.snapshots
-  btrfs subvolume create /mnt/@/var
-  btrfs subvolume create /mnt/@/tmp
-  btrfs subvolume create /mnt/@/home
-  btrfs subvolume set-default 257 /mnt
+  btrfs subvolume create /mnt/@             # 256
+  btrfs subvolume create /mnt/@/home        # 257
+  btrfs subvolume create /mnt/@/var         # 258
+  chattr +C /mnt/@/var
+  #btrfs subvolume create /mnt/@/tmp
+
+  btrfs subvolume create /mnt/@/.snapshots  # 259
+  mkdir -p /mnt/@/.snapshots/1
+  btrfs subvolume create /mnt/@/.snapshots/1/snapshot  # 260
+  #btrfs subvolume set-default 260 /mnt
+  btrfs subvolume set-default $(btrfs subvolume list /mnt | grep "@/.snapshots/1/snapshot" | grep -oP '(?<=ID )[0-9]+') /mnt
 
   btrfs subvolume list /mnt | cut -d' ' -f2 | xargs -I{} -n1 btrfs qgroup create 0/{} /mnt
   sleep 3 ; btrfs quota rescan /mnt
   btrfs qgroup limit 32G /mnt/@/home
   btrfs qgroup limit 8G /mnt/@/var
-  btrfs qgroup limit 2G /mnt/@/tmp
+  #btrfs qgroup limit 2G /mnt/@/tmp
   btrfs qgroup show -re /mnt ; sleep 5
 
   btrfs device scan
@@ -456,11 +471,11 @@ part_format() {
   PARTS_NM_SZ0=${PARTS_NM_SZ0:-osRoot:20G osVar:8G osHome:32G}
   PARTS_NM_SZ1=${PARTS_NM_SZ1:-osRoot:20G osVar:8G osHome:32G}
 
-  part_disk ${TOOL} ${VOL_MGR} ${GRP_NM}0 ${GRP_NM}1 ${PV_NM}0 ${PV_NM}1
+  part_disk ${TOOL} ${VOL_MGR} ${GRP_NM0} ${GRP_NM1} ${PV_NM0} ${PV_NM1}
   PARTS_NM_SZ=${PARTS_NM_SZ0}
-  format_partitions ${VOL_MGR} ${GRP_NM}0 ${PV_NM}0
+  format_partitions ${VOL_MGR} ${GRP_NM0} ${PV_NM0}
   PARTS_NM_SZ=${PARTS_NM_SZ1}
-  format_partitions ${VOL_MGR} ${GRP_NM}1 ${PV_NM}1
+  format_partitions ${VOL_MGR} ${GRP_NM1} ${PV_NM1}
 }
 
 mount_filesystems() {
@@ -472,34 +487,36 @@ mount_filesystems() {
 
     mkdir -p /mnt/etc /mnt/media ;
   elif [ "btrfs" = "${VOL_MGR}" ] ; then
-    DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM} | cut -d' ' -f1) ;
-    mount -o noatime,compress=lzo,subvol=@ ${DEV_PV} /mnt ;
-    mkdir -p /mnt/.snapshots /mnt/var /mnt/tmp /mnt/home ;
+    DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
+    #mount -o noatime,compress=lzo,subvol=@ ${DEV_PV} /mnt ;
+    mount -o noatime,compress=lzo ${DEV_PV} /mnt ;
+    mkdir -p /mnt/var /mnt/home /mnt/.snapshots ; #/mnt/tmp ;
+    mount -o noatime,compress=lzo,subvol=@/var ${DEV_PV} /mnt/var ;
+    mount -o noatime,compress=lzo,subvol=@/home ${DEV_PV} /mnt/home ;
+    #mount -o noatime,compress=lzo,subvol=@/tmp ${DEV_PV} /mnt/tmp ;
     mount -o noatime,compress=lzo,subvol=@/.snapshots ${DEV_PV} \
       /mnt/.snapshots ;
-    mount -o noatime,compress=lzo,subvol=@/var ${DEV_PV} /mnt/var ;
-    mount -o noatime,compress=lzo,subvol=@/tmp ${DEV_PV} /mnt/tmp ;
-    mount -o noatime,compress=lzo,subvol=@/home ${DEV_PV} /mnt/home ;
 
     mkdir -p /mnt/etc /mnt/media ;
     sh -c 'cat > /mnt/etc/fstab' << EOF ;
-PARTLABEL=${PV_NM:-pvol0}  /          auto    noatime,compress=lzo,subvol=/@   0   0
-PARTLABEL=${PV_NM:-pvol0}  /.snapshots  auto    noatime,compress=lzo,subvol=/@/.snapshots   0   0
-PARTLABEL=${PV_NM:-pvol0}  /var  auto    noatime,compress=lzo,subvol=/@/var   0   0
-PARTLABEL=${PV_NM:-pvol0}  /tmp  auto    noatime,compress=lzo,subvol=/@/tmp   0   0
-PARTLABEL=${PV_NM:-pvol0}  /home  auto    noatime,compress=lzo,subvol=/@/home   0   0
+PARTLABEL=${PV_NM:-pvol0}  /          auto    noatime,compress=lzo   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var  auto    noatime,compress=lzo,subvol=@/var   0   0
+PARTLABEL=${PV_NM:-pvol0}  /home  auto    noatime,compress=lzo,subvol=@/home   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /tmp  auto    noatime,compress=lzo,subvol=@/tmp   0   0
+PARTLABEL=${PV_NM:-pvol0}  /.snapshots  auto    noatime,compress=lzo,subvol=@/.snapshots   0   0
 EOF
   else
     DEV_ROOT=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osRoot" | cut -d' ' -f1) ;
     DEV_VAR=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osVar" | cut -d' ' -f1) ;
     DEV_HOME=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osHome" | cut -d' ' -f1) ;
     mkdir -p /mnt ; mount ${DEV_ROOT} /mnt ;
-    mkdir -p /mnt/root /mnt/var /mnt/home ;
+    mkdir -p /mnt/var /mnt/home /mnt/root ;
     mount ${DEV_VAR} /mnt/var ; mount ${DEV_HOME} /mnt/home ;
 
     mkdir -p /mnt/etc /mnt/media ;
 
     if [ "lvm" = "${VOL_MGR}" ] ; then
+      TAGOPT=LABEL ;
       sh -c 'cat > /mnt/etc/fstab' << EOF ;
 LABEL=${GRP_NM}-osRoot   /           auto    errors=remount-ro   0   1
 LABEL=${GRP_NM}-osVar    /var        auto    defaults    0   2
@@ -513,12 +530,14 @@ PARTLABEL=${GRP_NM}-osHome   /home       auto    defaults    0   2
 EOF
     fi ;
   fi
+
   chmod 0755 / ; chmod 0755 /mnt/media
   sh -c 'cat >> /mnt/etc/fstab' << EOF ;
 PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
 PARTLABEL=${GRP_NM}-osSwap   none        swap    sw          0   0
 
+tmpfs                           /tmp        tmpfs   defaults,nosuid,nodev,mode=1777   0   0
 proc                            /proc       proc    defaults    0   0
 sysfs                           /sys        sysfs   defaults    0   0
 
@@ -528,6 +547,7 @@ sysfs                           /sys        sysfs   defaults    0   0
 #PARTLABEL=data0    /mnt/Data0   exfat   auto,failok,rw,dmask=0000,fmask=0111   0    0
 
 EOF
+
   DEV_SWAP=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osSwap" | cut -d' ' -f1)
   swapon ${DEV_SWAP}
 
@@ -537,6 +557,13 @@ EOF
   DEV_ESP=$(lsblk -nlpo name,partlabel | grep -e "/dev/${DEVX}" | grep -e ESP | cut -d' ' -f1)
   mkdir -p /mnt/boot/efi ; mount ${DEV_ESP} /mnt/boot/efi
   sync ; lsblk -l ; sleep 3
+  if command -v xgenfstab > /dev/null ; then # void: xtools
+    xgenfstab -P -t ${TAGOPT:-PARTLABEL} /mnt > /mnt/etc/fstab.xgenfstab ;
+  elif command -v genfstab > /dev/null ; then # arch: arch-install-scripts
+    genfstab -P -t ${TAGOPT:-PARTLABEL} /mnt > /mnt/etc/fstab.genfstab ;
+  elif command -v fstabgen > /dev/null ; then # artix: artools-base
+    fstabgen -P -t ${TAGOPT:-PARTLABEL} /mnt > /mnt/etc/fstab.fstabgen ;
+  fi
 }
 
 #----------------------------------------

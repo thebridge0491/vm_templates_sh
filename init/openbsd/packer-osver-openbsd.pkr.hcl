@@ -5,11 +5,6 @@ variable "variant" {
   default = "openbsd"
 }
 
-variable "osver" {
-  type    = string
-  default = "7.5"
-}
-
 variable "vol_mgr" {
   type    = string
   default = "std"

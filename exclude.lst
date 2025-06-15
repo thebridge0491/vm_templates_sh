@@ -24,6 +24,7 @@
 */.DS_Store
 *.so
 temp/*
+tmp/*
 build/*
 dist/*
 
@@ -60,5 +61,6 @@ etc/ansible/**/*.retry
 #etc/ansible/**/vault
 
 #etc/salt/roster
+etc/salt/pki/*
 var/*
 #srv/pillar/*

@@ -1,0 +1,13 @@
+# /usr/local/etc/anacrontab: configuration file for anacron
+#
+# See anacron(8) and anacrontab(5) for details.
+SHELL=/bin/sh
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+MAILTO=root
+
+# days      make sure the command is executed at least every 'days' days
+# delay     delay in minutes, before a command starts
+# id        unique id of a command
+
+# days  delay   id      command
+

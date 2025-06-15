@@ -136,7 +136,7 @@ locals {
     var.qemu_nvram_x64)
   qemuargs         = "aarch64" == var.MACHINE ? [
     ["-global", "PIIX4_PM.disable_s3=1"], ["-global", "PIIX4_PM.disable_s4=1"],
-    ["-cpu", "cortex-a57"], ["-machine", "virt,gic-version=3,acpi=off"],
+    ["-cpu", "cortex-a72"], ["-machine", "virt,gic-version=3,acpi=off"],
     ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -147,7 +147,7 @@ locals {
     #, ["-virtfs", "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough"]
     ] : [
     ["-global", "PIIX4_PM.disable_s3=1"], ["-global", "PIIX4_PM.disable_s4=1"],
-    ["-cpu", "SandyBridge"], ["-machine", "q35,accel=kvm:hvf:tcg"],
+    ["-cpu", "Skylake-Client"], ["-machine", "q35,accel=kvm:hvf:tcg"],
     ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
     ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
@@ -163,7 +163,7 @@ locals {
     ("aarch64" == var.MACHINE ? "qemu-system-aarch64" : "qemu-system-x86_64"))
 
   # Source common local vars
-  vm_base          = "${var.variant}-${var.MACHINE}-${var.vol_mgr}"
+  vm_base          = "${var.variant}${var.REL}-${var.MACHINE}-${var.vol_mgr}"
   output_directory = "output-vms/${local.vm_base}"
 
   boot_command_aa64_chroot = ["<spacebar><wait10>1<enter><wait1m>",
@@ -229,7 +229,8 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
+      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.REL}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -248,11 +249,29 @@ build {
     execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
     scripts          = ["init/${var.variant}/vagrantuser.sh"]
   }
+  #provisioner "shell" {
+  #  environment_vars = ["HOME_DIR=/home/packer"]
+  #  execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
+  #  except           = ["qemu.guest_vm"]
+  #  scripts          = ["init/common/zerofill_freebsd.sh"]
+  #}
   provisioner "shell" {
     environment_vars = ["HOME_DIR=/home/packer"]
     execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
-    except           = ["qemu.guest_vm"]
-    scripts          = ["init/common/bsd/zerofill.sh"]
+    inline           = ["cd /tmp",
+      "sh init/common/collect_osinfo.sh collect_all"]
+    only             = ["qemu.guest_vm"]
+  }
+  provisioner "file" {
+    destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
+    direction   = "download"
+    generated   = true
+    only        = ["qemu.guest_vm"]
+    source      = "/tmp/info.tar"
+  }
+  provisioner "shell-local" {
+    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
+      "tar -xf info.tar -C ${local.build_timestamp}#${var.REL} && rm info.tar"]
   }
 
   post-processor "checksum" {

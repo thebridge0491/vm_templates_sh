@@ -1,107 +1,163 @@
 #!/bin/sh -eux
 
 export SHAREDNODE=${1:-localhost.local} ; export PRINTNAME=${2:-printer1}
+set +e
 
-set +e ; set +u
-zypper --non-interactive refresh ; zypper --non-interactive update
-zypper --non-interactive remove netcat-openbsd
-. /root/init/suse/distro_pkgs.ini
+snapshot_name=pre_cmdlntools-$(date -u "+%Y%m%d") \
+  sh $(dirname ${0})/upgradepkgs.sh snapshot
+
 sed -i 's|.*solver.onlyRequires.*=.*|solver.onlyRequires = true|' \
   /etc/zypp/zypp.conf
 sed -i 's|.*installRecommends.*=.*|installRecommends = no|' \
   /etc/zypp/zypper.conf
-zypper --non-interactive install --no-recommends ${pkgs_cmdln_tools}
+zypper --no-refresh --non-interactive remove netcat-openbsd
 
-zypper search --type pattern ; sleep 5
-for pat in enhanced_base apparmor sw_management ; do
-    zypper --non-interactive install --no-recommends -t pattern ${pat} ;
-done
+zypper --non-interactive refresh
 
-if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
-  echo "export JAVA_HOME=${default_java_home}" >> /etc/bash.bashrc ;
+. /root/scripts/distro_pkgs.ini ; echo ${pkgs_cmdln_tools}
+
+read -p "Enter 'y' to continue [nY]: " response
+#if [ "n" = "${response}" ] || [ "N" = "${response}" ] ; then
+if [ -n "$(echo ${response} | grep -e '^[Nn].*')" ] ; then
+  exit ;
 fi
-mkdir -p ${default_java_home}
-if [ -z "$(grep '^JAVA_VERSION' ${default_java_home}/release)" ] ; then
-  echo JAVA_VERSION="${default_java_version}" >> ${default_java_home}/release ;
+#zypper --no-refresh search --type pattern ; sleep 5
+##zypper --no-refresh --ignore-unknown --non-interactive install \
+##  -t pattern apparmor sw_management
+#zypper --no-refresh --ignore-unknown [--download-only] --non-interactive install pkg0 .. pkgN # OK, skips missing
+zypper --no-refresh --ignore-unknown --non-interactive install ${pkgs_cmdln_tools}
+
+#dbus-uuidgen --ensure[=/etc/machine-id]
+#systemd-machine-id-setup --commit
+if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
+  #idsuffix=$(cat /etc/machine-id | cut -b29-32) ;
+  idsuffix=$(cat /var/lib/dbus/machine-id | cut -b29-32) ;
+  for fileX in /etc/hosts /etc/hostname /etc/sysconfig/network ; do
+    sed -i "/box.0000/ s|\(box.\)0000|\1${idsuffix:-0000}|g" ${fileX} ;
+  done ;
+  hostname -F /etc/hostname || hostname $(cat /etc/hostname) ;
+fi
+
+if [ -n "$(java -version)" ] ; then
+  #java_home=$(dirname $(dirname $(realpath $(which java)))) ;
+  java_home=$(realpath $(which java) | sed "s:/bin/java::") ;
+  #if [ -z "$(grep '^export JAVA_HOME' /etc/bash.bashrc)" ] ; then
+  if [ -z "$(grep '^export JAVA_HOME' /etc/profile.d/jdk.sh)" ] ; then
+    echo 'export JAVA_HOME=${java_home}' >> /etc/profile.d/jdk.sh ;
+  fi ;
+  #mkdir -p ${java_home} ;
+  #java_version=$(java -version | head -n1 | sed 's|.*"\([0-9]*\.[0-9*]\)".*|\1|') ;
+  #if [ -z "$(grep '^JAVA_VERSION' ${java_home}/release)" ] ; then
+  #  echo JAVA_VERSION="${java_version}" >> ${java_home}/release ;
+  #fi ;
 fi
 #update-alternatives --get-selections
 #update-alternatives --config [java | javac | jar | javadoc | javap | jdb | keytool]
 
-#dbus-uuidgen --ensure[=/etc/machine-id]
-if [ ! -z "$(grep 0000 /etc/hostname)" ] ; then
-	#last4=$(cat /etc/machine-id | cut -b29-32) ;
-	last4=$(cat /var/lib/dbus/machine-id | cut -b29-32) ;
-	init_hostname=$(cat /etc/hostname) ;
-	NAME=$(echo ${init_hostname} | sed "s|0000|${last4}|") ;
-	echo "${NAME}" > /etc/hostname ;
-	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|g" /etc/hosts ;
-	sed -i "/${init_hostname}/ s|${init_hostname}|${NAME}|" \
-		/etc/sysconfig/network ;
+#chgrp [mail | postfix] /var/mail ; chmod [g+ws,+t | 3775] /var/mail
+chgrp mail /var/mail ; chmod g+ws,+t /var/mail
+
+(cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
+(cd /root/init/common ; cp -a skel/_gnupg/* /etc/skel/.gnupg/ ; \
+  cp -a skel/_ssh/* /etc/skel/.ssh/ ; cp -a skel/_pki/* /etc/skel/.pki/ ; \
+  cp -a skel/_gitconfig.sample /etc/skel/.gitconfig ; \
+  cp -a skel/_hgrc.sample /etc/skel/.hgrc)
+
+
+set +e ; set +u
+#mkdir -p /var/lib/clamav ; chown -R clamav:clamav /var/lib/clamav
+#touch /var/lib/clamav/clamd.sock
+
+# Only add the secure path line if it is not already present
+#grep -q 'secure_path' /etc/sudoers \
+#  || sed -i '/Defaults\s\+env_reset/a Defaults\tsecure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' /etc/sudoers
+
+if [ -n "$(lspci | grep -ie wireless)" ] ; then
+  psk=`wpa_passphrase ${SSID:-HOME24-WIFI} ${passphrase:-abcd0123} | sed -n 's|^[[:space:]]*psk=\(.*\)|\1|p'`
+  nmcli device wifi list ; sleep 3
+  nmcli device wifi connect ${SSID:-HOME24-WIFI} password ${psk}
+  #nmcli device connection up ${SSID:-HOME24-WIFI}
+  # see /etc/NetworkManager/system-connections/*
 fi
-if [ ! -e /etc/systemd/system/machineid-save.service ] ; then
-  cat << EOF > /etc/systemd/system/machineid-save.service ;
-[Unit]
-Before=network.target
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/dbus-uuidgen --ensure
-RemainAfterExit=yes
-[Install]
-WantedBy=multi-user.target
 
-EOF
+sh /root/init/common/cron/linux/config_cron.sh
+
+smtp_daemon=${smtp_daemon:-postfix}
+# config postfix -- maildir format vice mbox
+systemctl enable postfix || true ; systemctl restart postfix || true
+# [home_mailbox=Maildir/ | mail_spool_directory=/var/spool/mail/]
+#echo "mail_spool_directory = /var/spool/mail/" >> /etc/postfix/main.cf
+postconf mail_spool_directory=/var/spool/mail/
+postfix reload
+for userX in root packer vagrant ; do
+  [ ! -e /var/mail/${userX}.old ] && \
+    mv /var/mail/${userX} /var/mail/${userX}.old ;
+done
+#mkdir -p /var/mail/postfix ; chown postfix:postfix /var/mail/postfix
+#(cd /var/mail ; ln -s postfix root)
+
+firewall_tool=${firewall_tool:-firewalld}
+#sh /root/init/common/firewall/linux/config_nftables.sh #config_nftables allow
+##diff -s /etc/nftables.conf /etc/nftables.conf.new
+##(sleep 120 && nft flush ruleset)& && nft -f /etc/nftables.conf
+#nft -f /etc/nftables.conf
+sh /root/init/common/firewall/linux/config_firewalld.sh #cmds_firewalld allow
+#(sleep 120 && firewall-offline-cmd --disabled)& && \
+#  (firewall-offline-cmd --enabled ; firewall-cmd --reload)
+firewall-offline-cmd --enabled ; firewall-cmd --reload
+
+#if [ -z "$(grep -e 'domain.*mdns' /etc/nftables.conf /etc/nftables/out*_nftables.conf)" ] ; then
+#  #nft add rule inet filter in_allow udp port { domain, mdns } accept ;
+#  sed -i 's|domain|domain, mdns|g' /etc/nftables.conf \
+#    /etc/nftables/out*_nftables.conf ;
+#fi
+#nft list tables ; sleep 5 ; nft list ruleset ; sleep 5
+if [ $(firewall-cmd --zone=public --query-service=mdns) ] ; then
+  #yast firewall services add zone=EXT service=service:avahi ; # openSUSE
+  firewall-cmd --permanent --zone=public --add-service=mdns ;
 fi
-systemctl enable machineid-save.service ;
+firewall-cmd --get-active-zones ; sleep 5
+#ipset list ; sleep 5
+firewall-cmd --state ; sleep 5 ; firewall-cmd --zone=public --list-all ; sleep 5
 
 
-ntpd -u ntp:ntp ; ntpq -p ; sleep 3
-systemctl enable ntpd.service
-
-#sh /tmp/firewall/SuSEfirewall2/config_SuSEfirewall2.sh cmds_SuSEfirewall2
-#systemctl enable SuSEfirewall2.service
-sh /root/init/common/linux/firewall/firewalld/config_firewalld.sh cmds_firewalld allow
-systemctl unmask firewalld.service ; systemctl enable firewalld.service
-
-#sh /root/init/common/misc_config.sh check_clamav
-#systemctl enable freshclam.service ; systemctl enable clamd.service
-
-
-#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
-sh /root/init/common/misc_config.sh cfg_printer_pdf \
-    /usr/share/cups/model/CUPS-PDF_opt.ppd /etc/cups/cups-pdf.conf
-#yast firewall services add zone=EXT service=service:avahi
-firewall-cmd --zone=public --permanent --add-service=mdns
 set -e ; set -u
-
-sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
-sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
-if [ -z "$(grep '^%wheel ALL=(ALL) NOPASSWD: ALL' /etc/sudoers)" ] ; then
-	echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers ;
-fi
-sed -i "s|^[^#].*requiretty|# Defaults requiretty|" /etc/sudoers
-
+sh /root/init/common/misc_config.sh cfg_nsswitch_mdns
+sh /root/init/common/misc_config.sh cfg_sudo_nopasswd /etc/sudoers.d
+sh /root/init/common/misc_config.sh cfg_inputrc_histsearch
+#sh /root/init/common/misc_config.sh check_clamav
 sh /root/init/common/misc_config.sh cfg_sshd
 sh /root/init/common/misc_config.sh cfg_shell_keychain
 sh /root/init/common/misc_config.sh share_nfs_data0 ${SHAREDNODE}
+#sh /root/init/common/misc_config.sh cfg_printer_pdf
+#sh /root/init/common/misc_config.sh cfg_printer_default ${SHAREDNODE} ${PRINTNAME}
+lpstat -t || true ; sleep 5
 
-(cd /etc/skel ; mkdir -p .gnupg .ssh .pki)
-cp -R /root/init/common/skel/_gnupg/* /etc/skel/.gnupg/
-cp -R /root/init/common/skel/_ssh/* /etc/skel/.ssh/
-cp -R /root/init/common/skel/_pki/* /etc/skel/.pki/
-cp /root/init/common/skel/_gitconfig.sample /etc/skel/.gitconfig
-cp /root/init/common/skel/_hgrc.sample /etc/skel/.hgrc
-
-sshca_pubkey="/etc/skel/.ssh/publish_krls/sshca-id_ed25519.pub"
-sshca_krl="/etc/skel/.ssh/publish_krls/krl.krl"
-if [ -e ${sshca_pubkey} ] ; then
-	echo "@cert-authority 192.168.* $(cat ${sshca_pubkey})" >> \
-		/etc/skel/.ssh/known_hosts ;
-	cp ${sshca_krl} ${sshca_pubkey} /etc/ssh/ ;
-fi
+set +e ; set +u
+echo "Enable|disable services" ; sleep 3
+for svc in ${services_enabled} ; do
+  systemctl unmask ${svc} ; systemctl enable ${svc} ;
+done
+for svc in ${services_disabled} ; do
+  systemctl disable ${svc} ; systemctl mask ${svc} ;
+done
 
 
+cat << EOF | sendmail -t root
+To: packer
+Subject: Subject sample
+
+Email sample
+EOF
+mail_cmd=$(basename $(which nail s-nail mailx | head -n1))
+echo Sample email | ${mail_cmd:-mail} -r vagrant@$(hostname -s || hostname) \
+  -s "Sample subject" root packer
+set -e ; set -u
+
+
+set +e
 ## scripts/cleanup.sh
-zypper --non-interactive clean ;
+zypper --non-interactive clean
 
 ## scripts/zypper-locks.sh
 # remove zypper locks on removed packages to avoid later dependency problems

@@ -25,15 +25,15 @@ to build virtual machine using auto install methods or chroot scripts:
 
         # NOTE, relevant comments -- transfer file(s) ; run manual commands
 
-        [VOL_MGR=std] sh vminstall_auto.sh [<oshost_machine> [<guest>]]
+        [MACHINE=x86_64 VOL_MGR=std] sh vminstall_auto.sh [<oshost_func> [<guest>]]
 
-        [PROVIDER=libvirt] [variant=<oshost>] sh vminstall_chroot.sh [<oshost_machine> [<guest>]]
+        [PROVIDER=libvirt MACHINE=x86_64 variant=<oshost>] sh vminstall_chroot.sh [<oshost_func> [<guest>]]
 
 build examples:
 
-        [VOL_MGR=std] sh vminstall_auto.sh [freebsd_x86_64 [freebsd-x86_64-std]]
+        [VOL_MGR=std] sh vminstall_auto.sh [freebsd_guestvm [freebsd-x86_64-std]]
 
-        [PROVIDER=libvirt] [variant=freebsd] sh vminstall_chroot.sh [freebsd_x86_64 [freebsd-x86_64-std]]
+        [PROVIDER=libvirt variant=freebsd] sh vminstall_chroot.sh [freebsd_guestvm [freebsd-x86_64-std]]
 
 [optional] Vagrant option - (in running VM) add vagrant user:
 
@@ -43,37 +43,55 @@ build examples:
 
         cd build/<guest> ; [PROVIDER=libvirt] sh vmrun.sh box_vagrant <guest>
 
-to transfer scripts and execute shell provisioning on running virtual machine:
+to create updated scripts tarball:
 
-        tar -c init/common init/<variant> -C scripts <variant> | \
+        cp -a ${HOME}/.ssh/publish_krls init/common/skel/_ssh/
 
-          ssh <user>@<ipaddr> "cat - > /tmp/scripts.tar"
+        cp -a ${HOME}/.pki/publish_crls init/common/skel/_pki/
 
-        ssh <user>@<ipaddr> <<-EOF
+        tar -cf /tmp/scripts_<variant>.tar init/{common,<variant>} -C scripts <variant>
+
+(shell) transfer /tmp/scripts.tar files to /root/:
+
+        sudo rm -r /tmp/{init,scripts} /root/{init,scripts}
 
         tar -xf /tmp/scripts.tar -C /tmp ; mv /tmp/<variant> /tmp/scripts
 
-        sudo cp -r /tmp/init /tmp/scripts /root/
+        chown -R $(id -un):$(id -gn) /tmp/{init,scripts}
 
-        sudo sh /root/scripts/<script>.sh
+        sudo cp -fa /tmp/{init,scripts} /root/
 
-        EOF
+(vagrant) transfer /tmp/scripts.tar files to /root/:
 
-provision example:
+        vagrant provision --provision-with xferscripts
 
-        tar -c init/common init/freebsd -C scripts freebsd | \
+(salt) transfer /tmp/scripts.tar files to /root/:
 
-          ssh packer@10.0.2.15 "cat - > /tmp/scripts.tar"
+        salt-ssh --sudo --user=packer [--list 'guest#01,' | --roster=scan '10.0.2.10'] \
 
-        ssh packer@10.0.2.15 <<-EOF
+          state.[test | apply] xferscripts
 
-        tar -xf /tmp/scripts.tar -C /tmp ; mv /tmp/freebsd /tmp/scripts
+(ansible) transfer /tmp/scripts.tar files to /root/:
 
-        sudo cp -r /tmp/init /tmp/scripts /root/
+        ansible-playbook -bu packer [--limit 'guest#01,' | --inventory '10.0.2.10,'] \
+
+          etc/ansible/playbook.yml [--check] -t xferscripts
+
+(shell) provisioning example:
 
         sudo sh /root/scripts/upgradepkgs.sh
 
-        EOF
+(vagrant) provisioning example:
+
+        RUNSCRIPT_ARGS="upgradepkgs.sh" vagrant provision --provision-with runscript
+
+(salt) provisioning example:
+
+        salt-ssh --sudo --user=packer -L 'guest#01,' state.apply upgradepkgs
+
+(ansible) provisioning example:
+
+        ansible-playbook -bu packer -l 'guest#01,' etc/ansible/playbook.yml -t upgradepkgs
 
 Author/Copyright
 ----------------

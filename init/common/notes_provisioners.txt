@@ -36,26 +36,20 @@ Vagrant
 Ansible
 -------
 
-# provision with ansible (run tagged play) [custom additional variables]
+# provision with ansible ([check | run] tagged play) [custom additional variables]
 # usage:
-#   ansible-playbook [-u usernm -b] etc/ansible/playbook.yml \
-#     -t tag1 [--extra-vars "var1=bsd1"]
-#   ansible-playbook [-u usernm -b] -i '10.0.2.10,' etc/ansible/playbook.yml \
-#     -t tag1 [--extra-vars "var1=bsd1"]
-#   ansible-playbook [-u usernm -b] -l 'guest,' etc/ansible/playbook.yml \
-#     -t tag1 [--extra-vars "var1=bsd1"]
+#   ansible-playbook [-b][-k][-u usernm] [-i '10.0.2.10,' | -l 'guest#01,'] \
+#     etc/ansible/playbook.yml [--check] -t tag1 [--extra-vars "var1=bsd1"]
 # example:
-#   ansible-playbook [-u packer -b] -l 'guest01,' \
+#   ansible-playbook [-b][-k][-u packer] -l 'guest#01,' \
 #     etc/ansible/playbook.yml -t upgradepkgs [--extra-vars "var1=bsd1"]
 
 # ad-hoc module execution ; ad-hoc shell cmd
-# ansible [-u packer -b] -l 'guest01,' all \
-#   -e 'ansible_python_interpreter="/usr/bin/env python"' -m ping
-# ansible [-u packer -b] -l 'guest01,' all \
-#   -e 'ansible_python_interpreter="/usr/bin/env python"' -m package \
+# ansible [-b][-k][-u packer] -l 'guest#01,' all -m ping \
+#   [-e 'ansible_python_interpreter="/usr/bin/env python"']
+# ansible [-b][-k][-u packer] -l 'guest#01,' all -m package \
 #   -a 'name="*" state=latest'
-# ansible [-u packer -b] -l 'guest01,' all \
-#   -e 'ansible_python_interpreter="/usr/bin/env python"' -m shell \
+# ansible [-b][-k][-u packer] -l 'guest#01,' all -m shell \
 #   -a 'pkg update ; pkg upgrade'
 
 # edit/create ansible.cfg & etc/ansible/hosts
@@ -64,78 +58,83 @@ Ansible
 # [defaults]
 # inventory = etc/ansible/hosts
 # #roles_path = etc/ansible/roles
+# ##(note) interpreter_python = [auto[_silent] | '/usr/bin/env python']
+# #interpreter_python = auto_silent
 # display_skipped_hosts = False
 # nocows = 1
+# callback_result_format = yaml
 
+# #(note) ansible_python_interpreter: [auto[_silent] | '/usr/bin/env python']
 # etc/ansible/hosts (yaml format)      etc/ansible/hosts (ini format)
 # -----------------------------------  ------------------------------
 # targets:                             [targets]
-#   hosts:                             guest01 \
-#     guest01:                           ansible_host=10.0.2.10 \
-#       ansible_host: 10.0.2.10          ansible_python_interpreter='
-#       ansible_python_interpreter: \      /usr/bin/env python'
-#         '/usr/bin/env python'        [targets:vars]
+#   hosts:                             guest#01 \
+#     guest#01:                          ansible_host=10.0.2.10 \
+#       ansible_host: 10.0.2.10          ansible_python_interpreter=
+#       ansible_python_interpreter: \      auto_silent
+#         auto_silent                  [targets:vars]
 #   vars:                              ansible_user=packer
 #     ansible_user: packer             ansible_become=yes
 #     ansible_become: yes
 
 # how to bootstrap ansible role directory structure
 # cd etc/ansible/roles ; ansible-galaxy init role1
+# ansible-galaxy collection install [ansible.posix | community.general | l3d.avahi]
 
 # show available tags
-# ansible-playbook [-u packer -b] -l 'guest01,' \
+# ansible-playbook [-b][-k][-u packer] -l 'guest#01,' \
 #   etc/ansible/playbook.yml --list-tags --tags never,all
 
 # show specified guest facts
-# ansible [-u packer -b] -l 'guest01,' all \
-#   -e 'ansible_python_interpreter="/usr/bin/env python"' -m setup \
-#   -a 'gather_subset=!all,!min,os_family,lsb,distribution'
+# ansible [-b][-k][-u packer] -l 'guest#01,' all -m setup -a \
+#   'gather_subset=!all,!min,kernel,os_family,lsb,distribution,service_mgr,pkg_mgr'
 
 
 Saltstack
 ---------
 
-# provision with salt (apply salt state) [custom pillar values]
+# provision with salt ([test | apply] salt state) [custom pillar values]
 # usage:
-#   salt-ssh [--user=usernm --sudo] '*' state.apply state1 \
-#     [pillar='{"state1": {"var1": "bsd1"}}']
-#   salt-ssh [--user=usernm --sudo] --roster-scan '10.0.2.10' state.apply state1 \
-#     [pillar='{"state1": {"var1": "bsd1"}}']
-#   salt-ssh [--user=usernm --sudo] -L 'guest,' state.apply state1 \
-#     [pillar='{"state1": {"var1": "bsd1"}}']
+#   salt-ssh [--sudo][--askpass][--user=usernm] \
+#     ['*' | --roster=scan '10.0.2.10' | -L 'guest,'] state.[test | apply] \
+#     state1 [pillar='{"state1": {"var1": "bsd1"}}']
 # example:
-#   salt-ssh [--user=packer --sudo] -L 'guest01,' state.apply \
+#   salt-ssh [--sudo][--askpass][--user=packer] -L 'guest#01,' state.apply \
 #     upgradepkgs [pillar='{"state1": {"var1": "bsd1"}}']
 
 # ad-hoc apply state ; ad-hoc shell cmd
-# salt-ssh [--user=packer --sudo] -L 'guest01,' test.ping
-# salt-ssh [--user=packer --sudo] -L 'guest01,' state.high \
-#   '{"upgrade guest": {"pkg": ["uptodate"]}}'
-# salt-ssh [--user=packer --sudo] -L 'guest01,' cmd.run \
+# salt-ssh [--sudo][--askpass][--user=packer] -L 'guest#01,' test.ping
+## salt-ssh [--sudo][--askpass][--user=packer] -L 'guest#01,' state.high \
+##   '{"upgrade pkgs": {"pkg": ["uptodate"]}}'
+# salt-ssh [--sudo][--askpass][--user=packer] -L 'guest#01,' state.single \
+#   pkg.uptodate name='upgrade pkgs' [test=False] [refresh=False]
+# salt-ssh [--sudo][--askpass][--user=packer] -L 'guest#01,' cmd.run \
 #   'pkg update ; pkg upgrade'
 
 # edit/create Saltfile & etc/salt/{master,roster}
 # Saltfile                etc/salt/master        etc/salt/roster
 # ----------------------  --------------------   --------------------
-# salt-ssh:               root_dir: .            guest01:
+# salt-ssh:               root_dir: .            guest#01:
 #   config_dir: etc/salt  file_roots:              host: 10.0.2.10
-#   max_procs: 30           base:                #  user: packer
-#   wipe_ssh: True            - srv/salt         #  sudo: True
+#   max_procs: 30           base:                #    user: packer
+#   wipe_ssh: True            - srv/salt         #    sudo: True
 #                         pillar_roots:            minion_opts:
 #                           base:                    providers:
 #                             - srv/pillar             pkg: pkgng
-#                         roster_defaults:       # grains:
-#                         # grains:              #   variant: freebsd
-#                         #   variant: freebsd
+#                         roster_defaults:       #  grains:
+#                         #  grains:             #    variant: freebsd
+#                         #    variant: freebsd  #    osrelease: rolling
+#                         #    osrelease: rolling
 #                           user: packer
 #                           sudo: True
 
 # show available salts (sls)
-# salt-ssh [--user=packer --sudo] -L 'guest01,' state.show_sls '*' \
+# salt-ssh [--sudo][--askpass][--user=packer] -L 'guest#01,' state.show_sls '*' \
 #   | grep -A1 -e __sls__ | sort | uniq
 # or
-# (cd (srv/salt ; find * -type f -name '*.sls' | cut -d'.' -f1 | tr '/' '.')
+# (cd srv/salt ; find * -type f -name '*.sls' | cut -d'.' -f1 | tr '/' '.')
 
 # show specified guest grains
-# salt-ssh [--user=packer --sudo] -L 'guest01,' grains.item \
-#   kernel{,release,version} os_family lsb_distrib_id
+# salt-ssh [--sudo][--askpass][--user=packer] -L 'guest#01,' grains.item \
+#   kernel{,release,version} os_family osrelease lsb_distrib_id \
+#   lsb_distrib_codename cpuarch nodename init pythonversion saltversion

@@ -1,0 +1,49 @@
+# #Note: config postfix -- maildir format vice mbox
+# /etc/postfix/main.cf
+# --------------------
+# ...
+# #home_mailbox = Maildir/
+# mail_spool_directory = /var/spool/mail/
+
+# sample cmds:
+#   # [home_mailbox=Maildir/ | mail_spool_directory=/var/spool/mail/]
+#   #echo "mail_spool_directory = /var/spool/mail/" >> /etc/postfix/main.cf
+#   postconf mail_spool_directory=/var/spool/mail/
+#   postfix reload
+
+
+# #Note: config exim -- maildir format vice mbox
+# /etc/[mail|exim]/exim.conf
+# --------------------------
+# ...
+# local_delivery:
+#   driver = appendfile
+#   #file = /var/mail/$local_part_data
+#   #group = mail
+#   #mode = 0600
+#   directory = /var/mail/$local_part_data
+#   maildir_format
+#   maildir_use_size_file
+#   create_directory
+#   directory_mode = 0700
+# ...
+
+
+# #Note: config opensmtpd -- maildir format vice mbox
+# /etc[/smtpd]/smtpd.conf
+# --------------------
+# ...
+# #table domains { debian-boxv0000, localhost }
+# ...
+# action "local_maildir" maildir "/var/spool/mail/%{rcpt.user}" alias <aliases>
+# match for local ! rcpt-to "root" action "local_maildir"
+# ...
+
+# sample cmds:
+#   sed -i "/^table aliases/i\#table domains { $(hostname -s), localhost }" \
+#     /etc/smtpd/smtpd.conf
+#   sed -i '/^action "local.*mbox/i\
+#action "local_maildir" maildir "/var/spool/mail/%{rcpt.user}" alias <aliases>\
+#match for local ! rcpt-to "root" action "local_maildir"\
+#' \
+#    /etc/smtpd/smtpd.conf

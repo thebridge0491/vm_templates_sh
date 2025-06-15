@@ -79,10 +79,10 @@ fw load         nft -f /etc/nftables.conf         ip[6]tables-restore \
 fw messages     cat /var/log/messages | grep FW   cat /var/log/messages | grep FW
 ########################################################################################
 ########################################################################################
-                ufw (Debian)                      shorewall (Mageia,PCLinuxOS)
+                ufw (Debian)
                 ------------------------------    ------------------------------
-fw status       ufw status verbose                shorewall[6] status
-fw rules        ufw show user-rules               shorewall[6] show [-bxl] net-fw
-fw flush        ufw disable                       shorewall[6] clear
-fw load         ufw enable                        shorewall[6] start
-fw messages     less /var/log/ufw.log             cat /var/log/messages | grep FW
+fw status       ufw status verbose
+fw rules        ufw show user-rules
+fw flush        ufw disable
+fw load         ufw enable
+fw messages     less /var/log/ufw.log
