@@ -1,18 +1,12 @@
-{% from tpldir ~ "/map.jinja" import varsdict with context %}
+/etc/X11/xorg.conf.d:
+  file.directory
 
-Fix text mode only grub config:
+{% for confX in ['10-evdev.conf', '40-libinput.conf'] %}
+'Copy orig Xorg config files ({{confX}})':
   cmd.run:
-    - name: |
-        sed -i 's|nomodeset | |' /etc/default/grub
-        sed -i 's|text | |' /etc/default/grub
-        grub-mkconfig -o /boot/grub/grub.cfg
-
-{% if grains['os_family']|lower in ['artix'] %}
-{% for item in ['displaymanager'] %}
-'{{item}}-{{grains["init"]}} package (variant: {{grains["os_family"]|lower}})':
-  cmd.run:
-    - name: 'pacman -Sy --noconfirm --needed {{item}}-{{grains["init"]}}'
-{% endfor%}
+    #- shell: /bin/sh
+    - name: cp -an /usr/share/X11/xorg.conf.d/{{confX}} /etc/X11/xorg.conf.d/
+{% endfor %}
 
 {% if varsdict.desktop in ['lxqt'] %}
 /etc/conf.d/xdm:
@@ -25,6 +19,18 @@ Fix text mode only grub config:
 /etc/conf.d/xdm:
   file.replace:
     - pattern: '^DISPLAYMANAGER=.*'
-    - repl: 'DISPLAYMANAGER="lightdm"'
+    - repl: 'DISPLAYMANAGER="gdm"'
 {% endif %}
-{% endif %}
+
+{% for item in ['nomodeset ', 'text ', 'xdriver=vesa '] %}
+'Fix text mode only default grub config "{{item}}"':
+  file.replace:
+    - name: /etc/default/grub
+    - pattern: '{{item}}'
+    - repl: ''
+{% endfor %}
+
+Run grub-mkconfig:
+  cmd.run:
+    - name: |
+        grub-mkconfig -o /boot/grub/grub.cfg

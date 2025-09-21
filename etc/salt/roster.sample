@@ -1,9 +1,10 @@
-guest01:
+guest#01:
   host: 10.0.2.10
-#  user: packer
-#  sudo: True
+#    user: packer
+#    sudo: True
   minion_opts:
     providers:
       pkg: pkgng
-#  grains:
-#    variant: freebsd
+#    grains:
+#      variant: freebsd
+#      osrelease: rolling

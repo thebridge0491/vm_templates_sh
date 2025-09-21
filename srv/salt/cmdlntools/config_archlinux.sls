@@ -1,38 +1,54 @@
-{% from tpldir ~ "/map.jinja" import varsdict with context %}
+/etc/avahi/services/:
+  file.copy:
+    - source: /usr/share/doc/avahi/ssh.service
 
-{% if grains['os_family']|lower in ['artix'] %}
-{% for item in ['ntp', 'nftables', 'avahi', 'nfs-utils', 'cups'] %}
-'{{item}}-{{grains["init"]}} package (variant: {{grains["os_family"]|lower}})':
-  cmd.run:
-    - name: 'pacman -Sy --noconfirm --needed {{item}}-{{grains["init"]}}'
-{% endfor%}
+Change use-ipv6 to no in /etc/avahi/avahi-daemon.conf:
+  file.replace:
+    - name: /etc/avahi/avahi-daemon.conf
+    - pattern: 'use-ipv6=yes'
+    - repl: 'use-ipv6=no'
+
+# for runit service ops w/ Ansible,Saltstack
+{% if 'runit' == grains['init'] %}
+  {% for item in {srcX: '/etc/runit/sv', destX: '/etc/sv'}
+     , {srcX: '/run/runit/service', destX: '/var/service'} %}
+     #, {srcX: '/etc/runit/runsvdir/default', destX: '/var/service'}
+'Symlink {{item.srcX}} to {{item.destX}}':
+  file.symlink:
+    - name: {{item.destX}}
+    - target: {{item.srcX}}
+  {% endfor %}
 {% endif %}
 
-Touch /etc/bash.bashrc:
-  file.touch:
-    - name: /etc/bash.bashrc
+# Undo syslog-ng default logging disabled (comments: filter,destination)
+/etc/syslog-ng/syslog-ng.conf.orig:
+  file.copy:
+    - source: /etc/syslog-ng/syslog-ng.conf
+    - force: False
 
-/etc/bash.bashrc:
+{% for item in ['filter', 'destination'] %}
+'({{item}}) Undo syslog-ng default logging disabled in /etc/syslog-ng/syslog-ng.conf':
   file.replace:
-    - pattern: '^export JAVA_HOME.*'
-    - repl: 'export JAVA_HOME={{varsdict.distro_pkgs.default_java_home}}'
-    - append_if_not_found: True
+    - name: /etc/syslog-ng/syslog-ng.conf
+    - pattern: '^(.*)(#\s*)({{item}}.*)$'
+    - repl: '\1\2\3\n\1\3'
+{% endfor %}
 
-{{varsdict.distro_pkgs.default_java_home}}:
-  file.directory
+{#
+/var/lib/clamav:
+  file.directory:
+    - user: clamav
+    - group: clamav
+    - recurse:
+      - user
+      - group
 
-{{varsdict.distro_pkgs.default_java_home.replace('"', '')+'/release'}}:
-  file.replace:
-    - pattern: '^JAVA_VERSION.*'
-    - repl: 'JAVA_VERSION={{varsdict.distro_pkgs.default_java_version}}'
-    - append_if_not_found: True
-
-Config misc services(ntp, firewall):
-  cmd.run:
-    #- shell: /bin/sh
-    - name: |
-        ntpd -u ntp:ntp ; ntpq -p ; sleep 3
-        sh /root/init/common/linux/firewall/nftables/config_nftables.sh config_nftables allow
+/var/lib/clamav/clamd.sock:
+  file.managed:
+    - user: clamav
+    - group: clamav
+    - create: True
+#}
 
 #/etc/sudoers:
 #  file.line:

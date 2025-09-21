@@ -1,8 +1,22 @@
-{% from tpldir ~ "/map.jinja" import varsdict with context %}
+/etc/X11/xorg.conf.d:
+  file.directory
 
-Fix text mode only grub config:
+{% for confX in ['10-evdev.conf', '40-libinput.conf'] %}
+'Copy orig Xorg config files ({{confX}})':
+  cmd.run:
+    #- shell: /bin/sh
+    - name: cp -an /usr/share/X11/xorg.conf.d/{{confX}} /etc/X11/xorg.conf.d/
+{% endfor %}
+
+{% for item in ['nomodeset ', 'text ', 'xdriver=vesa '] %}
+'Fix text mode only default grub config "{{item}}"':
+  file.replace:
+    - name: /etc/default/grub
+    - pattern: '{{item}}'
+    - repl: ''
+{% endfor %}
+
+Run grub-mkconfig:
   cmd.run:
     - name: |
-        sed -i 's|nomodeset | |' /etc/default/grub
-        sed -i 's|text | |' /etc/default/grub
         grub-mkconfig -o /boot/grub/grub.cfg

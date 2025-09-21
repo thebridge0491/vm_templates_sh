@@ -1,15 +1,31 @@
-{% from tpldir ~ "/map.jinja" import varsdict with context %}
+/etc/X11/xorg.conf.d:
+  file.directory
 
-Config apt-get no install recommends:
+{% for confX in ['10-evdev.conf', '40-libinput.conf'] %}
+'Copy orig Xorg config files ({{confX}})':
   cmd.run:
     #- shell: /bin/sh
-    - name: |
-        apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
-          tee /etc/apt/apt.conf.d/999norecommends
+    - name: cp -an /usr/share/X11/xorg.conf.d/{{confX}} /etc/X11/xorg.conf.d/
+{% endfor %}
 
-Fix text mode only grub config:
+{% if grains.get('init', '')|lower != 'systemd' %}
+Run update-alternatives x-session-manager (non-systemd):
   cmd.run:
     - name: |
-        sed -i 's|nomodeset | |' /etc/default/grub
-        sed -i 's|text | |' /etc/default/grub
+        # Note, ex: dpkg-reconfigure lightdm
+        # [/usr/[s]bin/[startxfce4 | startlxqt | lightdm | sddm | gdm3]
+        update-alternatives --set x-session-manager $(cat /etc/X11/default-display-manager)
+{% endif %}
+
+{% for item in ['nomodeset ', 'text ', 'xdriver=vesa '] %}
+'Fix text mode only default grub config "{{item}}"':
+  file.replace:
+    - name: /etc/default/grub
+    - pattern: '{{item}}'
+    - repl: ''
+{% endfor %}
+
+Run grub-mkconfig:
+  cmd.run:
+    - name: |
         grub-mkconfig -o /boot/grub/grub.cfg

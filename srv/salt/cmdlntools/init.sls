@@ -1,227 +1,319 @@
 {% from tpldir ~ "/map.jinja" import varsdict with context %}
-{% set variant = {'artix': 'archlinux', 'arch': 'archlinux',
-     'centos stream': 'redhat'}.get(grains['os_family']|lower,
-     grains['os_family'])|lower %}
+{% set variant = {'artix': 'archlinux', 'arch': 'archlinux'}.get(
+     grains['os_family']|lower, grains['os_family'])|lower %}
 
-'Cmdline-tools packages (variant: {{variant}})':
+{% set dateutc = salt['system.get_system_date']('+0000')|strftime('%Y%m%d') %}
+{% set snapshot_name = salt['pillar.get']('state1', {}).get('snapshot_name', 'pre_cmdlntools-'+dateutc) %}
+{% include 'upgradepkgs/snapshot.sls' %}
+
+{% if variant in ['archlinux'] %}
+Service pamac stopped & path /var/lib/pacman/db.lck absent:
+  service.disabled:
+    - names: [pamac]
+  file.absent:
+    - name: /var/lib/pacman/db.lck
+{% endif %}
+
+{% if variant in ['debian', 'pclinuxos'] %}
+Config apt no install recommends:
+  cmd.run:
+    #- shell: /bin/sh
+    - name: |
+        apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
+          tee /etc/apt/apt.conf.d/999norecommends
+
+/etc/apt/apt.conf.d/99force-ipv4:
+  file.replace:
+    - pattern: 'Acquire::ForceIPv4.*'
+    - repl: '#Acquire::ForceIPv4 "true";'
+    - append_if_not_found: True
+
+/etc/apt/apt.conf.d/99retries03:
+  file.replace:
+    - pattern: '^Acquire::Retries.*;'
+    - repl: 'Acquire::Retries "3";'
+    - append_if_not_found: True
+{% endif %}
+
+{% if variant in ['suse'] %}
+Config zypper solver only requires:
+  file.replace:
+    - name: /etc/zypp/zypp.conf
+    - pattern: '.*solver.onlyRequires.*=.*'
+    - repl: 'solver.onlyRequires = true'
+    - append_if_not_found: True
+
+Config zypper no install recommends:
+  file.replace:
+    - name: /etc/zypp/zypp.conf
+    - pattern: '.*installRecommends.*=.*'
+    - repl: 'installRecommends = no'
+    - append_if_not_found: True
+
+Ensure packages netcat-openbsd removed:
+  pkg.removed:
+    - pkgs: ['netcat-openbsd']
+{% endif %}
+
+{% if variant in ['redhat', 'mageia'] %}
+Config dnf no install weak depns:
+  cmd.run:
+    #- shell: /bin/sh
+    - name: |
+        dnf --setopt=install_weak_deps=False config-manager --save
+        dnf config-manager --dump | grep -we install_weak_deps
+{% endif %}
+
+Refresh pkg db:
+  {% if not salt['sys.list_functions']('pkg.refresh_db') %}
+    {% if variant == 'pclinuxos' %}
+  cmd.run:
+    #- shell: /bin/sh
+    - name: apt-get -y update
+    {% endif %}
+  {% else %}
+  module.run:
+    - pkg.refresh_db:
+  {% endif %}
+
+Display cmdline-tools packages:
   {#cmd.run:
     #- shell: /bin/sh
     - name: echo {{varsdict.distro_pkgs.pkgs_cmdln_tools}}#}
   test.show_notification:
-    - text: {{varsdict.distro_pkgs.pkgs_cmdln_tools}}
-  {% if grains['os_family']|lower in ['artix'] %}
+    - text: '{{varsdict.distro_pkgs.pkgs_cmdln_tools}}'
+
+{% set autoconfirm = salt['pillar.get']('state1', {}).get('autoconfirm', 'YES') %}
+{% if not (autoconfirm|to_bool) %}
+Check autoconfirm is "yes":
+  test.fail_without_changes:
+    - name: "Stopping execution pillar={'state1': {'autoconfirm': '{{autoconfirm}}'}}"
+    - failhard: True
+{% endif %}
+
+{% if grains['os_family']|lower in ['pclinuxos'] %}
+Install cmdline-tools packages:
   cmd.run:
-    - name: pacman -Sy --noconfirm --needed {{varsdict.distro_pkgs.pkgs_cmdln_tools.replace('"', '')}}
-  {% elif grains['os_family']|lower in ['pclinuxos'] %}
-  cmd.run:
-    - name: apt-get -y --fix-broken install {{varsdict.distro_pkgs.pkgs_cmdln_tools.replace('"', '')}}
-  {% elif grains['os_family']|lower in ['centos stream', 'mageia'] %}
-  cmd.run:
-    - name: dnf -y install {{varsdict.distro_pkgs.pkgs_cmdln_tools.replace('"', '')}}
-  {% elif grains['os_family']|lower in ['openbsd'] %}
-  cmd.run:
-    - name: pkg_add -zIU {{varsdict.distro_pkgs.pkgs_cmdln_tools.replace('"', '')}}
-  {% else %}
+    #- shell: /bin/sh
+    - name: |
+        for pkgX in {{varsdict.distro_pkgs.pkgs_cmdln_tools}} ; do
+          apt-get --fix-broken -y install ${pkgX} ;
+        done
+{% elif grains['os_family']|lower in ['suse', 'redhat', 'mageia', 'netbsd', 'openbsd'] %}
+Install cmdline-tools packages:
   pkg.installed:
-    - pkgs: {{varsdict.distro_pkgs.pkgs_cmdln_tools.replace('"', '').split(' ')}}
-  {% endif %}
+    - pkgs: {{varsdict.distro_pkgs.pkgs_cmdln_tools.split(' ')}}
+    - kwargs:
+      # suse zypper .. --ignore-unknown ; redhat dnf .. --skip-broken
+      ignore_unknown: True
+      #get_extra_options: True
+      skip_broken: True
+{% else %}
+Install cmdline-tools packages:
+  pkg.installed:
+    - pkgs: {{varsdict.distro_pkgs.pkgs_cmdln_tools.split(' ')}}
 
-{# {% set hostname_0000_if = salt['cmd.shell']('hostname | sed -n "s|\(.*box.\)0000|\1|p"') %} #}
-{% set hostname_0000_if = grains.host|regex_match('(.*box.)0000') %}
+  {% for pkgX in varsdict.distro_pkgs.pkgs_cmdln_tools.split(' ') %}
+'retry failed Install cmdline-tools packages ({{pkgX}})':
+  pkg.installed:
+    - name: {{pkgX}}
+    - onfail:
+      - pkg: 'Install cmdline-tools packages'
+  {% endfor %}
+{% endif %}
+
+{% set idsuffix = salt['cmd.shell'](varsdict.idsuffix_cmd, shell='/bin/sh') %}
+{% set hostname_0000_if = (grains.nodename|regex_match('(.*box.)0000'))[0] %}
 {% if hostname_0000_if %}
-
-{% for item in varsdict.hostname_chgfiles %}
+  {% for item in varsdict.hostname_chgfiles %}
 {{item}}:
   file.replace:
-    - pattern: '{{hostname_0000_if[0]}}0000'
-    - repl: '{{hostname_0000_if[0]}}{{varsdict.hostname_last4}}'
-{% endfor %}
+    - pattern: '{{hostname_0000_if}}0000'
+    - repl: '{{hostname_0000_if}}{{idsuffix}}'
+  {% endfor %}
 
 Fix hostname regexp box.0000:
   cmd.run:
-    - name: hostname '{{hostname_0000_if[0]}}{{varsdict.hostname_last4}}'
+    #- shell: /bin/sh
+    - name: hostname '{{hostname_0000_if}}{{idsuffix}}'
 {% endif %}
 
-# conditionally(exists if count > 0) include file
-{% if salt['cp.list_master'](prefix=tpldir ~ '/config_' ~ variant ~ '.sls')|count %}
-include:
-  - {{tpldot}}.config_{{variant}}
+{#{% set out_java = salt['cmd.shell']('java -version || echo ""', shell='/bin/sh') %}
+{% if '' != out_java %}#}
+{% set found_java = salt['file.find']('/', name='java') %}
+{% if [] != found_java %}
+  {#{% set out_javahome = salt['cmd.shell']('dirname $(dirname $(realpath $(which java)))', shell='/bin/sh') %}#}
+  {% set out_javahome = salt['cmd.shell']('realpath $(which java) | sed "s:/bin/java::"', shell='/bin/sh') %}
+  {#
+  {% if 'csh' in salt['environ.get']('SHELL') %}
+/etc/csh.cshrc:
+  file.replace:
+    - pattern: '^setenv JAVA_HOME.*'
+    - repl: 'setenv JAVA_HOME {{out_javahome}}'
+    - append_if_not_found: True
+  {% endif %}
+  {% if 'bash' in salt['environ.get']('SHELL') %}
+/etc/bash.bashrc:
+  file.replace:
+    - pattern: '^export JAVA_HOME.*'
+    - repl: 'export JAVA_HOME={{out_javahome}}'
+    - append_if_not_found: True
+  {% endif %}
+  {% if 'ksh' in salt['environ.get']('SHELL') %}
+/etc/ksh.kshrc:
+  file.replace:
+    - pattern: '^export JAVA_HOME.*'
+    - repl: 'export JAVA_HOME={{out_javahome}}'
+    - append_if_not_found: True
+  {% endif %}
+  #}
+/etc/profile.d/jdk.sh:
+  file.replace:
+    - pattern: '^export JAVA_HOME.*'
+    - repl: 'export JAVA_HOME={{out_javahome}}'
+    - append_if_not_found: True
+  {% if grains['kernel']|lower not in ['linux'] %}
+/etc/fstab:
+  file.replace:
+    - pattern: '^fdesc.*'
+    - repl: 'fdesc  /dev/fd  fdescfs  rw  0  0'
+    - append_if_not_found: True
+  {% endif %}
 {% endif %}
 
-Enable service(s):
-  service.enabled:
-    - names: {{varsdict.services_enabled}}
-
-Disable service(s):
-  service.disabled:
-    - names: {{varsdict.services_disabled}}
-
-/etc/nsswitch.conf:
-  file.replace:
-    - pattern: 'files dns'
-    - repl: 'files mdns_minimal [NOTFOUND=return] dns'
-
-{% for item in varsdict.firewall_chgfiles %}
-{{item}}:
-  file.replace:
-    - pattern: 'domain'
-    - repl: 'domain, mdns'
-{% endfor %}
-
-#Check clamav:
-#  cmd.run:
-#    - shell: /bin/sh
-#    - name: |
-#        if command -v wget > /dev/null ; then
-#          (cd /tmp ; wget --no-check-certificate https://secure.eicar.org/eicar.com.txt)
-#        elif command -v curl > /dev/null ; then
-#          (cd /tmp ; curl --insecure --location https://secure.eicar.org/eicar.com.txt)
-#        elif command -v aria2c > /dev/null ; then
-#          (cd /tmp ; aria2c --check-certificate=false -d . https://secure.eicar.org/eicar.com.txt)
-#        elif command -v fetch > /dev/null ; then
-#          (cd /tmp ; fetch --retry --mirror --no-verify-peer https://secure.eicar.org/eicar.com.txt)
-#        elif command -v ftp > /dev/null ; then
-#          (cd /tmp ; ftp -S dont https://secure.eicar.org/eicar.com.txt || ftp https://secure.eicar.org/eicar.com.txt)
-#        else
-#          echo "Cannot download clamav eicar.com.txt" ;
-#          exit 1 ;
-#        fi
-#        freshclam --verbose ; freshclam --list-mirrors
-#        clamscan --verbose /tmp/eicar.com.txt
-#        clamscan --recursive /tmp ; rm /tmp/eicar.com.txt
+Set group and permissions on /var/mail:
+{#{% if variant in ['netbsd', 'openbsd'] %}
+  file.directory:
+    - name: /var/mail
+    - follow_symlinks: True
+    - group: wheel
+    # mode: 'g+ws,+t' | 3775
+    - mode: 3775#}
+{% if variant in ['mageia', 'pclinuxos'] %}
+  file.directory:
+    - name: /var/mail
+    - follow_symlinks: True
+    - group: postfix
+    # mode: 'g+ws,+t' | 3775
+    - mode: 3775
+{% else %}
+  file.directory:
+    - name: /var/mail
+    - follow_symlinks: True
+    - group: mail
+    # mode: 'g+ws,+t' | 3775
+    - mode: 3775
+{% endif %}
 
 Setup skeleton paths:
   file.directory:
     - names: {{varsdict.skel_dirs}}
 
 {% for item in varsdict.skelmaps_srcdest %}
-Xfer {{item.srcskel}} to {{item.destskel}}:
+'Xfer {{item.srcskel}} to {{item.destskel}}':
   cmd.run:
-    - name: cp -R /root/init/common/skel/{{item.srcskel}} {{varsdict.skeldir_par}}/{{item.destskel}}
+    #- shell: /bin/sh
+    - name: cp -a /root/init/common/skel/{{item.srcskel}} {{varsdict.skeldir_par}}/{{item.destskel}}
 {% endfor %}
 
-{% for item in {'rexp': '^.*%' ~ varsdict.sudoers_group ~ '.*ALL.*NOPASSWD.*',
-     'line': '%' ~ varsdict.sudoers_group ~ ' ALL=(ALL) NOPASSWD: ALL'},
-   {'rexp': '^[^#].*requiretty', 'line': '# Defaults requiretty'} %}
-'Change {{item.rexp}} to {{item.line}}':
-  file.replace:
-    - name: {{varsdict.sudoers_file}}
-    - pattern: '{{item.rexp}}'
-    - repl: '{{item.line}}'
-{% endfor %}
 
-{% for item in {'rexp': '^.*PermitRootLogin.*', 'line': 'PermitRootLogin no'},
-   {'rexp': '^.*UseDNS.*', 'line': 'UseDNS no'},
-   {'rexp': '^.*GSSAPIAuthentication.*', 'line': 'GSSAPIAuthentication no'} %}
-'Change {{item.rexp}} to {{item.line}}':
-  file.replace:
-    - name: /etc/ssh/sshd_config
-    - pattern: '{{item.rexp}}'
-    - repl: '{{item.line}}'
-{% endfor %}
-
-{% if salt['file.file_exists'](varsdict.skeldir_ssh ~ '/publish_krls/sshca-id_rsa.pub') %}
-{% set sshca_pubkey = salt['file.read'](varsdict.skeldir_ssh ~ '/publish_krls/sshca-id_rsa.pub') %}
-
-{#{% for item in [{'rexp': '^@cert-authority 192.168.* ',
-   'linepfx': '@cert-authority 192.168.0.0/16'},
-   {'rexp': '^@cert-authority 172.16.* ',
-   'linepfx': '@cert-authority 172.16.0.0/12'},
-   {'rexp': '^@cert-authority 10.0.* ',
-   'linepfx': '@cert-authority 10.0.0.0/8'},
-   {'rexp': '^@cert-authority fd00.* ', 'linepfx': '@cert-authority fd00::/8'}
-   ] %}#}
-{% for item in [{'rexp': '^@cert-authority 192.168.* ',
-   'linepfx': '@cert-authority 192.168.0.0/16'}
-   ] %}
-'Edit {{item.rexp}} to {{item.linepfx}}':
-  file.replace:
-    - name: {{varsdict.skeldir_ssh}}/known_hosts
-    - pattern: '{{item.rexp}}'
-    - repl: '{{item.linepfx}} {{sshca_pubkey}}'
-    - append_if_not_found: True
-{% endfor %}
-
-Copy SSH CA pubkey & krl to /etc/ssh/:
-  cmd.run:
-    - name: cp {{varsdict.skeldir_ssh}}/publish_krls/krl.krl {{varsdict.skeldir_ssh}}/publish_krls/sshca-id_rsa.pub /etc/ssh/
+# conditionally(exists if count > 0) include file
+{% if salt['cp.list_master'](prefix=tpldir ~ '/config_' ~ variant ~ '.sls')|count %}
+{#include:
+  - {{tpldot}}.config_{{variant}}#}
+{% include tpldir ~ '/config_' ~ variant ~ '.sls' %}
 {% endif %}
 
-/etc/ssh/sshd_config:
-  file.blockreplace:
-    - content: |
-        HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
-        PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+{% include 'common/config_cron.sls' %}
 
-        HostKey /etc/ssh/ssh_host_ed25519_key
-        HostKey /etc/ssh/ssh_host_rsa_key
+{% include 'common/config_smtp.sls' %}
 
-        TrustedUserCAKeys /etc/ssh/sshca-id_rsa.pub
-        RevokedKeys /etc/ssh/krl.krl
-        #HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
-        #HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+{% include 'common/config_firewall.sls' %}
 
-        #Match User packer,user2
-        Match User packer
-            X11Forwarding yes
-            AllowTcpForwarding yes
-            X11UseLocalHost yes
-            X11DisplayOffset 10
-    - append_if_not_found: True
+#include:
+#  - common.misc_config
+{% include 'common/misc_config.sls' %}
 
-{{varsdict.skel_shellrc}}:
-  file.blockreplace:
-    - content: |
-        {#-{% if grains['shell'].count('csh') %}#}
-        {%- if 'csh' in grains['shell'] %}
-        eval `keychain --agents gpg,ssh --eval`
-        unsetenv SSH_AGENT_PID
-        setenv GPG_TTY `tty`
-        gpg-connect-agent updatestartuptty /bye > /dev/null
-        setenv SSH_AUTH_SOCK `gpgconf --list-dirs agent-ssh-socket`
-        {%- else %}
-        eval `keychain --agents gpg,ssh --eval`
-        unset SSH_AGENT_PID
-        export GPG_TTY=`tty`
-        gpg-connect-agent updatestartuptty /bye > /dev/null
-        export SSH_AUTH_SOCK=`gpgconf --list-dirs agent-ssh-socket`
-        {%- endif %}
-    - append_if_not_found: True
-
-Add NFS share /etc/fstab:
-  file.replace:
-  {% if variant in ['freebsd'] %}
-    - name: '/etc/fstab'
-    - pattern: '^.*:/mnt/Data0.*'
-    - repl: '#{{varsdict.sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto  0  0'
-  {% else %}
-    - name: '/etc/fstab'
-    - pattern: '^.*:/mnt/Data0.*'
-    - repl: '#{{varsdict.sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0'
-  {% endif %}
-    - append_if_not_found: True
-
-/media/nfs_Data0:
-  file.directory
-
-#{{varsdict.etcdir_cups}}/cups-pdf.conf:
-#  file.replace:
-#    - pattern: '^Out .*'
-#    - repl: 'Out ${HOME}/Documents/PDF'
-#    - append_if_not_found: True
-
-cups lpadmin:
+Display printer (cups) status:
   cmd.run:
+    #- shell: /bin/sh
+    - name: lpstat -t || true
+
+{% if grains.get('init', '')|lower in ['openrc'] %}
+'Enable service(s) ({{grains.get("init", "")}})':
+  service.enabled:
+    - names: {{(varsdict.distro_pkgs.services_enabled|replace('rsyslog ', '')).split(' ')}}
+
+'Enable service rsyslog runlevel boot ({{grains.get("init", "")}})':
+  service.enabled:
+    - names: [rsyslog]
+    - runlevels: [boot]
+{% else %}
+'Enable service(s) ({{grains.get("init", "")}})':
+  service.enabled:
+    - names: {{varsdict.distro_pkgs.services_enabled.split(' ')}}
+{% endif %}
+
+{% if grains.get('init', '')|lower in ['systemd'] %}
+'Unmask service(s) ({{grains.get("init", "")}})':
+  service.unmasked:
+    - names: {{varsdict.distro_pkgs.services_enabled.split(' ')}}
+{% endif %}
+
+{% if grains.get('init', '')|lower in ['openrc'] %}
+'Disable service(s) ({{grains.get("init", "")}})':
+  service.disabled:
+    - names: {{(varsdict.distro_pkgs.services_disabled|replace('syslog ', '')).split(' ')}}
+
+'Disable service syslog runlevel boot ({{grains.get("init", "")}})':
+  service.disabled:
+    - names: [syslog]
+    - runlevels: [boot]
+{% else %}
+'Disable service(s) ({{grains.get("init", "")}})':
+  service.disabled:
+    - names: {{varsdict.distro_pkgs.services_disabled.split(' ')}}
+{% endif %}
+
+{% if grains.get('init', '')|lower in ['systemd'] %}
+'Mask service(s) ({{grains.get("init", "")}})':
+  service.masked:
+    - names: {{varsdict.distro_pkgs.services_disabled.split(' ')}}
+{% endif %}
+
+Send email sample using sendmail:
+  cmd.run:
+    #- shell: /bin/sh
     - name: |
-        lpadmin -E -U root -p CUPS_PDF -v "cups-pdf:/" -i {{varsdict.cupsdir_ppd}}/CUPS-PDF_opt.ppd
-        lpadmin -E -U root -d CUPS_PDF
+        cat << EOF | sendmail -t root
+        To: packer
+        Subject: Subject sample
 
-        ## Configure printer using CUPS web interface
-        # w3m http://localhost:631
+        Email sample
+        EOF
 
-        ##lpadmin -E -U root -p {{varsdict.printname}} -D "{{varsdict.printname}}" -L localhost -v "ipp://{{varsdict.sharednode}}/printers/{{varsdict.printname}}"
-        ##lpadmin -E -U root -d {{varsdict.printname}}
-        #lpadmin -E -U root -p {{varsdict.printname}} -v "ipp://{{varsdict.sharednode}}/printers/{{varsdict.printname}}"
-        #lpadmin -E -U root -d {{varsdict.printname}}
+{% if grains['kernel']|lower in ['freebsd'] %}
+Send sample email using mail:
+  cmd.run:
+    #- shell: /bin/sh
+    - name: echo Sample email | mail -u vagrant -s "Sample subject" root packer
+{% else %}
+  {% set found_mailcmds = salt['file.find']('/', name='nail|s-nail|mailx') %}
+  {% set mail_cmd = salt['file.basename'](found_mailcmds[0] | default("mail")) %}
+'Send sample email using {{mail_cmd}}':
+  cmd.run:
+    #- shell: /bin/sh
+    - name: echo Sample email | {{mail_cmd}} -r vagrant@{{grains["nodename"]}} \
+        -s "Sample subject" root packer
+{% endif %}
 
-        lpstat -t
+Clean pkg cache:
+  {% if not salt['sys.list_functions']('pkg.clean') %}
+  cmd.run:
+    #- shell: /bin/sh
+    - name: {{varsdict.pkgclean_cmd}}
+  {% else %}
+  module.run:
+    - pkg.clean:
+      #- clean_all: True
+  {% endif %}

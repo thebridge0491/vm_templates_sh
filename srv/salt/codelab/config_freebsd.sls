@@ -1,17 +1,7 @@
-{% from tpldir ~ "/map.jinja" import varsdict with context %}
+/compat/linux/etc/pki/tls/certs:
+  file.directory
 
-/etc/csh.cshrc:
-  file.replace:
-    - pattern: '^setenv JAVA_HOME.*'
-    - repl: 'setenv JAVA_HOME {{varsdict.distro_pkgs.default_java_home}}'
-    - append_if_not_found: True
-
-/etc/fstab:
-  file.replace:
-    - pattern: '^fdesc.*'
-    - repl: 'fdesc  /dev/fd  fdescfs  rw  0  0'
-    - append_if_not_found: True
-
-'(variant: {{grains['os_family']|lower}}) Install xterm,Xauth pkgs for X11 forwarding over SSH':
-  pkg.installed:
-    - pkgs: ['xauth', 'xterm']
+Fix .NET access problem SSL CA cert path:
+  file.symlink:
+    - name: /compat/linux/etc/pki/tls/certs/ca-bundle.crt
+    - target: /usr/local/share/certs/ca-root-nss.crt

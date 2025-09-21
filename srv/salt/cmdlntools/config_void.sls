@@ -1,30 +1,33 @@
-{% from tpldir ~ "/map.jinja" import varsdict with context %}
+'Packages socklog & socklog-void removed (variant: {{grains["os_family"]|lower}})':
+  pkg.removed:
+    - pkgs: ['socklog', 'socklog-void']
 
-Touch /etc/bash.bashrc:
-  file.touch:
-    - name: /etc/bash.bashrc
+/var/log/socklog:
+  file.absent
 
-/etc/bash.bashrc:
+Ensure run dbus-uuidgen in /etc/rc.local:
   file.replace:
-    - pattern: '^export JAVA_HOME.*'
-    - repl: 'export JAVA_HOME={{varsdict.distro_pkgs.default_java_home}}'
+    - name: /etc/rc.local
+    - pattern: '.*dbus-uuidgen.*'
+    #- repl: '/usr/bin/dbus-uuidgen --ensure=/etc/machine-id'
+    - repl: '/usr/bin/dbus-uuidgen --ensure'
     - append_if_not_found: True
 
-{{varsdict.distro_pkgs.default_java_home}}:
-  file.directory
+{#
+/var/lib/clamav:
+  file.directory:
+    - user: clamav
+    - group: clamav
+    - recurse:
+      - user
+      - group
 
-{{varsdict.distro_pkgs.default_java_home.replace('"', '')+'/release'}}:
-  file.replace:
-    - pattern: '^JAVA_VERSION.*'
-    - repl: 'JAVA_VERSION={{varsdict.distro_pkgs.default_java_version}}'
-    - append_if_not_found: True
-
-Config misc services(firewall):
-  cmd.run:
-    #- shell: /bin/sh
-    - name: |
-        ntpd -u ntp:ntp ; ntpq -p ; sleep 3
-        sh /root/init/common/linux/firewall/nftables/config_nftables.sh config_nftables allow
+/var/lib/clamav/clamd.sock:
+  file.managed:
+    - user: clamav
+    - group: clamav
+    - create: True
+#}
 
 #/etc/sudoers:
 #  file.replace:

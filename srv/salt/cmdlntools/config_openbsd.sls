@@ -1,50 +1,119 @@
-{% from tpldir ~ "/map.jinja" import varsdict with context %}
+{% set autoconfirm = salt['pillar.get']('state1', {}).get('autoconfirm', 'NO') %}
+{% if (autoconfirm|to_bool) %}
+  {% set arch_s = grains.cpuarch %}
+  {% set rel = grains.osrelease %}
+  {% set setVer = grains.osrelease|replace('.', '') %}
+  {% for setX in ['xbase'] %}
+{#'Fetch & extract missing distribution sets like: {{setX}}*.tgz':
+  archive.extracted:
+    - name: /
+    - source: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
+    - skip_verify: True
+    - options: pz#}
 
-Fetch missing distribution sets (xbase*) & sysmerge updates:
+'Fetch, then extract missing distribution sets like: {{setX}}*.tgz':
+  file.managed:
+    - name: '/tmp/{{setX}}{{setVer}}.tgz'
+    - source: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
+    - skip_verify: True
+  {#archive.extracted:
+    - name: /
+    - source: '/tmp/{{setX}}{{setVer}}.tgz'
+    - options: pz#}
+	{% endfor %}
+
+{#sysmerge updates:
   cmd.run:
-    - shell: /bin/sh
-    - name: |
-        arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
-        setVer=$(echo ${rel} | tr '.' '\0')
-        cd /tmp
-        for setX in xbase ; do
-          ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/${setX}${setVer}.tgz ;
-          tar -C / -xpzf ${setX}${setVer}.tgz ;
-        done
-        sysmerge
+    #- shell: /bin/sh
+    - name: sysmerge#}
+{% endif %}
 
-/etc/ksh.kshrc:
+{% for item in ['daily', 'weekly', 'monthly'] %}
+'/etc/{{item}}.orig':
+  file.copy:
+    - source: '/etc/{{item}}'
+    - force: False
+{% endfor %}
+
+disable mail output from /etc/daily:
   file.replace:
-    - pattern: '^export JAVA_HOME.*'
-    - repl: 'export JAVA_HOME={{varsdict.distro_pkgs.default_java_home}}'
+    - name: /etc/daily
+    - pattern: '^([^#].*mail .*daily insecurity output.*)$'
+    - repl: '#\1'
+  file.replace:
+    - name: /etc/daily
+    - pattern: '^([^#].*)mail .*daily output.*$'
+    - repl: '\1cat > /tmp/daily.out ; mv /tmp/daily.out $MAINOUT'
+
+disable mail output from /etc/weekly:
+  file.replace:
+    - name: /etc/weekly
+    - pattern: '^([^#].*mail .*weekly output.*)$'
+    - repl: '#\1'
+
+disable mail output from /etc/monthly:
+  file.replace:
+    - name: /etc/monthly
+    - pattern: '^([^#].*mail .*monthly output.*)$'
+    - repl: '#\1'
+
+Ensure run dbus-uuidgen in /etc/rc.local:
+  file.replace:
+    - name: /etc/rc.local
+    - pattern: '.*dbus-uuidgen.*'
+    #- repl: '/usr/local/bin/dbus-uuidgen --ensure=/etc/machine-id'
+    - repl: '/usr/local/bin/dbus-uuidgen --ensure'
     - append_if_not_found: True
 
-/etc/fstab:
+config mdns daemon flags:
+  cmd.run:
+    #- shell: /bin/sh
+    - name: |
+        ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n1)
+        # /etc/rc.conf.local: mdnsd_flags=vio0
+        rcctl set mdnsd flags ${ifdev}
+
+'Ensure mdnsctl publish {hostname} in /etc/rc.local':
   file.replace:
-    - pattern: '^fdesc.*'
-    - repl: 'fdesc  /dev/fd  fdescfs  rw  0  0'
+    - name: /etc/rc.local
+    - pattern: '.*mdnsctl publish.*'
+    - repl: '/usr/local/bin/mdnsctl publish $(hostname -s || hostname) ssh tcp 22 "" &'
     - append_if_not_found: True
 
-Config misc services(ntp, firewall):
-  cmd.run:
-    - shell: /bin/sh
-    - name: |
-        #ntpd -u ntp:ntp ; ntpq -p
-        ntpdate -v -u -b us.pool.ntp.org
+{#
+group cups:
+  group.present:
+    - name: cups
+    - gid: 193
+    - system: True
 
-        pfctl -d
-        env sed_inplace="sed -i" sh /root/init/common/bsd/firewall/pf/pfconf.sh config_pf allow > /etc/pf.conf.new
-        if [ ! -e /etc/pf.conf ] ; then cp /etc/pf.conf.new /etc/pf.conf ; fi
-        pfctl -vf /etc/pf.conf ; pfctl -s info ; pfctl -s rules -a '*'
+root groupadd cups:
+  group.present:
+    - gid: 193
+    - system: True
+    - addusers: [root]
 
-        #cd /usr/bin
-        #for file1 in lp lpq lpr lprm ; do
-        #  if [ -e ${file1} ] ; then
-        #    mv ${file1} ${file1}.old ;
-        #  fi ;
-        #  ln -s /usr/local/bin/${file1} ${file1} ;
-        #done
+{% for item in ['lp', 'lpq', 'lpr', 'lprm'] %}
+'Move original /usr/bin/{{item}} -> /usr/bin/{{item}}.orig':
+  file.copy:
+    - name: /usr/bin/{{item}}.orig
+    - source: /usr/bin/{{item}}
+    - force: False
 
-#cups:
-#  group.present:
-#    - addusers: [root]
+'Remove original /usr/bin/{{item}}':
+  file.absent:
+    - name: /usr/bin/{{item}}
+
+  {% if grains['kernel']|lower =='netbsd' %}
+'Symlink lp* cmds (printing) [/usr/pkg/bin/{{item}} to /usr/bin/{{item}}]':
+  file.symlink:
+    - name: /usr/bin/{{item}}
+    - target: /usr/pkg/bin/{{item}}
+  {% elif grains['kernel']|lower in ['freebsd', 'netbsd'] %}
+'Symlink lp* cmds (printing) [/usr/local/bin/{{item}} to /usr/bin/{{item}}]':
+  file.symlink:
+    - name: /usr/bin/{{item}}
+    - target: /usr/local/bin/{{item}}
+  {% endif %}
+{% endfor %}
+#}

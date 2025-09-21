@@ -1,43 +1,53 @@
 
 # OS family based variables dictionary
-{% set variant = {'artix': 'archlinux', 'arch': 'archlinux',
-     'centos stream': 'redhat'}.get(grains['os_family']|lower,
-     grains['os_family'])|lower %}
+{% set variant = {'artix': 'archlinux', 'arch': 'archlinux'}.get(
+     grains['os_family']|lower, grains['os_family'])|lower %}
+{% set dict_distropkgs = {} %}
+{% for keyX, valX in salt['ini.get_ini']('/root/scripts/distro_pkgs.ini').items() %}
+  {#{% set _ = dict_distropkgs.update({keyX: valX|replace('"', '')|regex_replace('\\${service_mgr:-[a-z]*}', grains['init'])}) %}#}
+  {% do dict_distropkgs.update({keyX: valX|replace('"', '')|regex_replace('\\${service_mgr:-[a-z]*}', grains['init'])}) %}
+{% endfor %}
 {% set desktop = pillar.get(tpldot, {}).get('desktop', 'xfce') %}
 {% load_yaml as defaultdict %}
-  default: # Debian
-    #pkgs_displaysvr_xorg = {{salt['cmd.shell']('. /root/init/'+variant+'/distro_pkgs.ini ; echo ${pkgs_displaysvr_xorg}', shell='/bin/sh')}}
-    distro_pkgs: {{salt['ini.get_ini']('/root/init/'+variant+'/distro_pkgs.ini')}}
+  default:
+    #pkgs_displaysvr = {{salt['cmd.shell']('. /root/scripts/distro_pkgs.ini ; echo ${pkgs_displaysvr}', shell='/bin/sh')}}
+    {#distro_pkgs: {{salt['ini.get_ini']('/root/scripts/distro_pkgs.ini')}}#}
+    distro_pkgs: {{dict_distropkgs}}
     desktop: xfce
-    xdguserdirs_file: /etc/xdg/user-dirs.defaults
-    uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
+    xorgconfd_dir: /etc/X11/xorg.conf.d
+    etcdir_xdg: /etc/xdg
   FreeBSD:
-    xdguserdirs_file: /usr/local/etc/xdg/user-dirs.defaults
-    uiservices_enabled: [dbus, hald, moused, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
+    pkgclean_cmd: ASSUME_ALWAYS_YES=yes pkg clean -y
+    xorgconfd_dir: /usr/local/etc/X11/xorg.conf.d
+    etcdir_xdg: /usr/local/etc/xdg
   Void:
-    uiservices_enabled: [dbus, polkitd, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
+    pkgclean_cmd: xbps-remove -Ooy
   Artix:
-    uiservices_enabled: [dbus, xdm]
+    pkgclean_cmd: pacman -Sc --noconfirm
   Archlinux:
-    uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]
+    pkgclean_cmd: pacman -Sc --noconfirm
   Alpine:
-    uiservices_enabled: [dbus, polkit, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
+    pkgclean_cmd: apk -v cache clean
+  Debian:
+    pkgclean_cmd: apt-get -y clean
   Suse:
-    uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]
+    pkgclean_cmd: zypper --no-refresh --non-interactive clean --all
   RedHat:
-    uiservices_enabled: [dbus, display-manager]
+    pkgclean_cmd: dnf -C -y clean all
   'CentOS Stream':
-    uiservices_enabled: [dbus, display-manager]
-  PCLinuxOS:
-    uiservices_enabled: [messagebus, dm]
+    pkgclean_cmd: dnf -C -y clean all
   Mageia:
-    uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]
+    pkgclean_cmd: dnf -C -y clean all
   NetBSD:
-    #xdguserdirs_file: /etc/xdg/user-dirs.defaults
-    uiservices_enabled: [dbus, wsmoused, xdm]
+    pkgclean_cmd: pkgin -y clean
+    xorgconfd_dir: /usr/pkg/etc/X11/xorg.conf.d
+  #  etcdir_xdg: /usr/pkg/etc/xdg
   OpenBSD:
-    #xdguserdirs_file: /etc/xdg/user-dirs.defaults
-    uiservices_enabled: [messagebus, xenodm]
+    pkgclean_cmd: true
+  #  xorgconfd_dir: /usr/local/etc/X11/xorg.conf.d
+  #  etcdir_xdg: /usr/local/etc/xdg
+  PCLinuxOS:
+    pkgclean_cmd: apt-get -y clean
 {% endload %}
 
 {#{% set varsdict = salt['grains.filter_by'](defaultdict, base='default',

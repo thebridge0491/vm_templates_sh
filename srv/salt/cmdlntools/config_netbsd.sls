@@ -1,28 +1,106 @@
-{% from tpldir ~ "/map.jinja" import varsdict with context %}
+{% set autoconfirm = salt['pillar.get']('state1', {}).get('autoconfirm', 'NO') %}
+{% if (autoconfirm|to_bool) %}
+  {% set uname_m = grains.cpuarch %}
+  {% set rel = grains.osrelease %}
+  {% for setX in ['xbase'] %}
+{#'Fetch & extract missing distribution sets like: {{setX}}.tar.xz':
+  archive.extracted:
+    - name: /
+    - source: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
+    - skip_verify: True
+    - options: pJ#}
 
-Fetch missing distribution sets (xbase):
-  cmd.run:
-    - shell: /bin/sh
-    - name: |
-        arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
-        cd /tmp
-        for setX in xbase ; do
-          ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/${setX}.tar.xz ;
-          tar -C / -xpJf ${setX}.tar.xz ;
-        done
+'Fetch, then extract missing distribution sets like: {{setX}}.tar.xz':
+  file.managed:
+    - name: '/tmp/{{setX}}.tar.xz'
+    - source: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
+    - skip_verify: True
+  {#archive.extracted:
+    - name: /
+    - source: '/tmp/{{setX}}.tar.xz'
+    - options: pJ#}
+	{% endfor %}
+{% endif %}
 
-{% for item in ['ntpd', 'dbus', 'freshclamd', 'clamd', 'avahidaemon', 'cupsd'] %}
-Xfer /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}:
-  cmd.run:
-    - name: cp -R /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}
+{% for item in ['/var/run/dbus', '/var/db/dbus'] %}
+{{item}}:
+  file.directory
 {% endfor %}
 
-/var/run/dbus:
-  file.directory
+# freshclamd, clamd
+{% for item in ['dbus', 'avahidaemon', 'cupsd'] %}
+Xfer /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}:
+  cmd.run:
+    #- shell: /bin/sh
+    - name: cp -a /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}
+{% endfor %}
 
-{% for item in ['ntpd', 'pf', 'pflogd', 'dbus', 'avahidaemon', 'rpcbind',
-     'nfsd', 'mountd', 'cupsd', 'lpd'] %}
-'Change {{item}}=.* to {{item}}=YES':
+group dbus:
+  group.present:
+    - name: dbus
+    - gid: 81
+    - system: True
+
+user dbus:
+  user.present:
+    - name: dbus
+    - uid: 81
+    - groups: [dbus]
+    - fullname: System message bus
+    - home: /
+    - shell: /usr/bin/false
+
+/etc/daily.orig:
+  file.copy:
+    - source: /etc/daily
+    - force: False
+
+change daily security mail output to log file:
+  file.replace:
+    - name: /etc/daily
+    - pattern: '^(.*)(mail .*daily insecurity output.*)$'
+    - repl: '\1#\2\n\1cat $SECOUT > /var/log/security.out'
+
+{#
+group cups:
+  group.present:
+    - name: cups
+    - gid: 193
+    - system: True
+
+root groupadd cups:
+  group.present:
+    - gid: 193
+    - system: True
+    - addusers: [root]
+
+{% for item in ['lp', 'lpq', 'lpr', 'lprm'] %}
+'Move original /usr/bin/{{item}} -> /usr/bin/{{item}}.orig':
+  file.copy:
+    - name: /usr/bin/{{item}}.orig
+    - source: /usr/bin/{{item}}
+    - force: False
+
+'Remove original /usr/bin/{{item}}':
+  file.absent:
+    - name: /usr/bin/{{item}}
+
+  {% if grains['kernel']|lower =='netbsd' %}
+'Symlink lp* cmds (printing) [/usr/pkg/bin/{{item}} to /usr/bin/{{item}}]':
+  file.symlink:
+    - name: /usr/bin/{{item}}
+    - target: /usr/pkg/bin/{{item}}
+  {% elif grains['kernel']|lower in ['freebsd', 'netbsd'] %}
+'Symlink lp* cmds (printing) [/usr/local/bin/{{item}} to /usr/bin/{{item}}]':
+  file.symlink:
+    - name: /usr/bin/{{item}}
+    - target: /usr/local/bin/{{item}}
+  {% endif %}
+{% endfor %}
+#}
+{#
+{% for item in varsdict.distro_pkgs.services_enabled.split(' ') %}
+'Enable service {{item}}':
   file.replace:
     - name: /etc/rc.conf
     - pattern: '^{{item}}=.*'
@@ -30,40 +108,12 @@ Xfer /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}:
     - append_if_not_found: True
 {% endfor %}
 
-/etc/csh.cshrc:
+{% for item in varsdict.distro_pkgs.services_disabled.split(' ') %}
+'Disable service {{item}}':
   file.replace:
-    - pattern: '^export JAVA_HOME.*'
-    - repl: 'export JAVA_HOME={{varsdict.distro_pkgs.default_java_home}}'
+    - name: /etc/rc.conf
+    - pattern: '^{{item}}=.*'
+    - repl: '{{item}}=NO'
     - append_if_not_found: True
-
-/etc/fstab:
-  file.replace:
-    - pattern: '^fdesc.*'
-    - repl: 'fdesc  /dev/fd  fdescfs  rw  0  0'
-    - append_if_not_found: True
-
-Config misc services(ntp, firewall):
-  cmd.run:
-    - shell: /bin/sh
-    - name: |
-        #/usr/sbin/ntpd -u ntp:ntp ; /usr/sbin/ntpq -p
-        /usr/sbin/ntpdate -v -u -b us.pool.ntp.org
-
-        /sbin/pfctl -d
-        env sed_inplace="sed -i" sh /root/init/common/bsd/firewall/pf/pfconf.sh config_pf allow > /etc/pf.conf.new
-        if [ ! -e /etc/pf.conf ] ; then cp /etc/pf.conf.new /etc/pf.conf ; fi
-        sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outallow_in_allow.rules
-        sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outdeny_out_allow.rules
-        /sbin/pfctl -vf /etc/pf.conf ; /sbin/pfctl -s info ; /sbin/pfctl -s rules -a '*'
-
-        #cd /usr/bin
-        #for file1 in lp lpq lpr lprm ; do
-        #  if [ -e ${file1} ] ; then
-        #    mv ${file1} ${file1}.old ;
-        #  fi ;
-        #  ln -s /usr/local/bin/${file1} ${file1} ;
-        #done
-
-#cups:
-#  group.present:
-#    - addusers: [root]
+{% endfor %}
+#}

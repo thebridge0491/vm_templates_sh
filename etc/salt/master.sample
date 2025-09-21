@@ -1,0 +1,13 @@
+root_dir: .
+file_roots:
+  base:
+    - srv/salt
+pillar_roots:
+  base:
+    - srv/pillar
+roster_defaults:
+#  grains:
+#    variant: freebsd
+#    osrelease: rolling
+  user: packer
+  sudo: True

@@ -1,18 +1,87 @@
 
 # OS family based variables dictionary
-{% set variant = {'artix': 'archlinux', 'arch': 'archlinux',
-     'centos stream': 'redhat'}.get(grains['os_family']|lower,
-     grains['os_family'])|lower %}
+{% set variant = {'artix': 'archlinux', 'arch': 'archlinux'}.get(
+     grains['os_family']|lower, grains['os_family'])|lower %}
+{% set dict_distropkgs = {} %}
+{% for keyX, valX in salt['ini.get_ini']('/root/scripts/distro_pkgs.ini').items() %}
+  {#{% set _ = dict_distropkgs.update({keyX: valX|replace('"', '')|regex_replace('\\${service_mgr:-[a-z]*}', grains['init'])}) %}#}
+  {% do dict_distropkgs.update({keyX: valX|replace('"', '')|regex_replace('\\${service_mgr:-[a-z]*}', grains['init'])}) %}
+{% endfor %}
 {% load_yaml as defaultdict %}
   default:
-    #pkgs_cmdln_tools = {{salt['cmd.shell']('. /root/init/'+variant+'/distro_pkgs.ini ; echo ${pkgs_cmdln_tools}', shell='/bin/sh')}}
-    distro_pkgs: {{salt['ini.get_ini']('/root/init/'+variant+'/distro_pkgs.ini')}}
+    {#pkgs_cmdln_tools = {{salt['cmd.shell']('. /root/scripts/distro_pkgs.ini ; echo ${pkgs_cmdln_tools}', shell='/bin/sh')}}#}
+    {#distro_pkgs: {{salt['ini.get_ini']('/root/scripts/distro_pkgs.ini')}}#}
+    distro_pkgs: {{dict_distropkgs}}
     var1: nix1
     var2: nix2
   FreeBSD:
     var1: bsd1
     var2: bsd2
-{% endload %}
+    pkgclean_cmd: ASSUME_ALWAYS_YES=yes pkg clean -y
+    pkgrepos_cmd: pkg -vv | sed -n "/Repositories:/,/^$/p"
+    pkgoutdated_cmd: pkg upgrade --dry-run -y
+    pkglocks_cmd: pkg lock -lq || true
+  Void:
+    pkgclean_cmd: xbps-remove -Ooy
+    pkgrepos_cmd: xbps-query -L
+    pkgoutdated_cmd: xbps-install --dry-run -u
+    pkglocks_cmd: xbps-query --list-hold-pkgs || true
+  Artix:
+    pkgclean_cmd: pacman -Sc --noconfirm
+    pkgrepos_cmd: tail -vn+1 /etc/pacman.conf | grep -ve "^#" -ve "^\s*$" ; tail -vn+1 /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist-arch | grep -ve "^#" | head -n10
+    pkgoutdated_cmd: pacman -Qqu
+    pkglocks_cmd: grep -e '^IgnorePkg' /etc/pacman.conf || true
+  Archlinux:
+    pkgclean_cmd: pacman -Sc --noconfirm
+    pkgrepos_cmd: tail -vn+1 /etc/pacman.conf | grep -ve "^#" -ve "^\s*$" ; tail -vn+1 /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist-arch | grep -ve "^#" | head -n10
+    pkgoutdated_cmd: pacman -Qqu
+    pkglocks_cmd: grep -e '^IgnorePkg' /etc/pacman.conf || true
+  Alpine:
+    pkgclean_cmd: apk -v cache clean
+    pkgrepos_cmd: tail -vn+1 /etc/apk/repositories | grep -ve "^#"
+    pkgoutdated_cmd: apk upgrade --simulate
+    pkglocks_cmd: true
+  Debian:
+    pkgclean_cmd: apt-get -y clean
+    pkgrepos_cmd: tail -vn+1 /etc/apt/sources.list /etc/apt/sources.list.d/*.list | grep -ve "^#"
+    pkgoutdated_cmd: apt-get --simulate -y upgrade
+    pkglocks_cmd: apt-mark showhold || true
+  Suse:
+    pkgclean_cmd: zypper --no-refresh --non-interactive clean --all
+    pkgrepos_cmd: zypper --no-refresh repos -u
+    pkgoutdated_cmd: zypper --no-refresh --non-interactive list-updates --all
+    pkglocks_cmd: zypper locks || true
+  RedHat:
+    pkgclean_cmd: dnf -C -y clean all
+    pkgrepos_cmd: dnf -C repolist -v --enabled | grep -e "Repo-id" -e "Repo-name" -e "Repo-mirrors" -e "Repo-baseurl"
+    pkgoutdated_cmd: dnf -C -y check-update
+    pkglocks_cmd: dnf -C -y versionlock list || true
+  'CentOS Stream':
+    pkgclean_cmd: dnf -C -y clean all
+    pkgrepos_cmd: dnf -C repolist -v --enabled | grep -e "Repo-id" -e "Repo-name" -e "Repo-mirrors" -e "Repo-baseurl"
+    pkgoutdated_cmd: dnf -C -y check-update
+    pkglocks_cmd: dnf -C -y versionlock list || true
+  Mageia:
+    pkgclean_cmd: dnf -C -y clean all
+    pkgrepos_cmd: dnf -C repolist -v --enabled | grep -e "Repo-id" -e "Repo-name" -e "Repo-mirrors" -e "Repo-baseurl"
+    pkgoutdated_cmd: dnf -C -y check-update
+    pkglocks_cmd: dnf -C -y versionlock list || true
+  NetBSD:
+    pkgclean_cmd: pkgin -y clean
+    pkgrepos_cmd: tail -vn+1 /usr/pkg/etc/pkgin/repositories.conf | grep -ve "^#"
+    pkgoutdated_cmd: pkgin -l\< list
+    #pkglocks_cmd:
+  OpenBSD:
+    pkgclean_cmd: true
+    pkgrepos_cmd: tail -n+1 . /etc/installurl | grep -ve "^#"
+    pkgoutdated_cmd: pkg_add -n -u
+    #pkglocks_cmd:
+  PCLinuxOS:
+    pkgclean_cmd: apt-get -y clean
+    pkgrepos_cmd: tail -vn+1 /etc/apt/sources.list /etc/apt/sources.list.d/*.list | grep -ve "^#"
+    pkgoutdated_cmd: apt-get --simulate -y dist-upgrade
+    pkglocks_cmd: grep -e '^Hold' /etc/apt/apt.conf || true
+ {% endload %}
 
 {#{% set varsdict = salt['grains.filter_by'](defaultdict, base='default',
   merge=pillar.get(tpldot ~ ':lookup', pillar.get(tpldot))) %}#}

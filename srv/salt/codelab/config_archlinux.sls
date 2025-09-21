@@ -1,24 +1,11 @@
-{% from tpldir ~ "/map.jinja" import varsdict with context %}
-
-Touch /etc/bash.bashrc:
-  file.touch:
-    - name: /etc/bash.bashrc
-
-/etc/bash.bashrc:
-  file.replace:
-    - pattern: '^export JAVA_HOME.*'
-    - repl: 'export JAVA_HOME={{varsdict.distro_pkgs.default_java_home}}'
-    - append_if_not_found: True
-
-{{varsdict.distro_pkgs.default_java_home}}:
-  file.directory
-
-{{varsdict.distro_pkgs.default_java_home.replace('"', '')+'/release'}}:
-  file.replace:
-    - pattern: '^JAVA_VERSION.*'
-    - repl: 'JAVA_VERSION={{varsdict.distro_pkgs.default_java_version}}'
-    - append_if_not_found: True
-
-'(variant: {{grains['os_family']|lower}}) Install xterm,Xauth pkgs for X11 forwarding over SSH':
-  cmd.run:
-    - name: pacman -Sy --noconfirm --needed xorg-auth xorg-xhost xterm
+# for runit service ops w/ Ansible,Saltstack
+{% if 'runit' == grains['init'] %}
+  {% for item in {srcX: '/etc/runit/sv', destX: '/etc/sv'}
+     , {srcX: '/run/runit/service', destX: '/var/service'} %}
+     #, {srcX: '/etc/runit/runsvdir/default', destX: '/var/service'}
+'Symlink {{item.srcX}} to {{item.destX}}':
+  file.symlink:
+    - name: {{item.destX}}
+    - target: {{item.srcX}}
+  {% endfor %}
+{% endif %}
