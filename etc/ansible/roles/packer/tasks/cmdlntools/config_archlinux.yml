@@ -1,40 +1,52 @@
 ---
 
-- package:
-    use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
-    name: '{{item}}-{{ansible_facts.get("service_mgr") or "openrc"}}'
-    state: present
-  loop: ['ntp', 'nftables', 'avahi', 'nfs-utils', 'cups']
-  when: ansible_facts.get('lsb', {}).get('id', None)|lower in ['artix']
+- block:
+  - copy:
+      src: /usr/share/doc/avahi/ssh.service
+      dest: /etc/avahi/services/
+      remote_src: true
+    ignore_errors: true
 
-- lineinfile:
-    path: /etc/bash.bashrc
-    state: present
-    regexp: '^export JAVA_HOME.*'
-    line: 'export JAVA_HOME={{distro_pkgs.default_java_home}}'
+  - replace:
+      path: /etc/avahi/avahi-daemon.conf
+      regexp: 'use-ipv6=yes'
+      replace: 'use-ipv6=no'
+    ignore_errors: true
+
+# for runit service ops w/ Ansible,Saltstack
+- file: src={{item.srcX}} dest={{item.destX}} state=link
   ignore_errors: true
+  loop: [{srcX: '/etc/runit/sv', destX: '/etc/sv'}
+        #, {srcX: '/etc/runit/runsvdir/default', destX: '/var/service'}
+        , {srcX: '/run/runit/service', destX: '/var/service'}
+        ]
+  when: service_mgr == 'runit'
 
-- file:
-    path: '{{distro_pkgs.default_java_home}}'
-    state: directory
+# Undo syslog-ng default logging disabled (comments: filter,destination)
+- block:
+  - copy:
+      src: /etc/syslog-ng/syslog-ng.conf
+      dest: /etc/syslog-ng/syslog-ng.conf.orig
+      remote_src: true
+      force: false
+    ignore_errors: true
 
-- lineinfile:
-    path: '{{distro_pkgs.default_java_home}}/release'
-    state: present
-    regexp: '^JAVA_VERSION.*'
-    line: 'JAVA_VERSION={{distro_pkgs.default_java_version}}'
-  ignore_errors: true
+  - replace:
+      path: /etc/syslog-ng/syslog-ng.conf
+      regexp: '^(.*)(#\s*)({{item}}.*)$'
+      replace: '\1\2\3\n\1\3'
+    ignore_errors: true
+    loop: [filter, destination]
 
-- name: "Config misc services(ntp, firewall)"
-  shell: |
-    ntpd -u ntp:ntp ; ntpq -p ; sleep 3
-    sh /root/init/common/linux/firewall/nftables/config_nftables.sh cmds_nftables allow
-  ignore_errors: true
+#- file: path=/var/lib/clamav state=directory recurse=true owner=clamav group=clamav
+#  ignore_errors: true
+
+#- file: path=/var/lib/clamav/clamd.sock state=touch owner=clamav group=clamav
+#  ignore_errors: true
 
 #- lineinfile:
 #    path: /etc/sudoers
 #    state: present
-#    insertafter: 'Defaults.*env_reset.*'
 #    regexp: 'Defaults.*secure_path=.*'
 #    line: 'Defaults    secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
 #  ignore_errors: true

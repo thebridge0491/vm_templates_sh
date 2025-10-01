@@ -1,15 +1,13 @@
 ---
 # Non-default OS based (using family, distribution, ...) vars file
 
-pkgupgd_params: {"update_cache": yes, "state": "dist-upgrade", "name": "*"}
+service_mgr: "{{ansible_facts.get('service_mgr') or 'systemd'}}"
+pkg_mgr: "{{ansible_facts.get('pkg_mgr') or 'zypper'}}"
+pkgclean_cmd: zypper --no-refresh --non-interactive clean --all
+pkgrepos_cmd: zypper --no-refresh repos -u
+pkgoutdated_cmd: zypper --no-refresh --non-interactive list-updates --all
+pkglocks_cmd: zypper locks
 
-idsuffix_cmd: cat /var/lib/dbus/machine-id | cut -b29-32
-services_enabled: [ntpd, firewalld, dbus, avahi-daemon, cups, cups-browsed]
-services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
-
+firewall_tool: firewalld
+smtp_daemon: postfix
 hostname_chgfiles: [/etc/hosts, /etc/hostname, /etc/sysconfig/network]
-firewall_chgfiles: []
-sudoers_group: wheel
-cupsdir_ppd: /usr/share/cups/model
-
-uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]

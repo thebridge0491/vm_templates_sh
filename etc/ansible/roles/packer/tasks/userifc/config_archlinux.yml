@@ -1,18 +1,13 @@
 ---
 
-- name: "Fix text mode only grub config"
-  shell: |
-    sed -i 's|nomodeset | |' /etc/default/grub
-    sed -i 's|text | |' /etc/default/grub
-    grub-mkconfig -o /boot/grub/grub.cfg
-  ignore_errors: true
-
 - block:
-  - package:
-      use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
-      name: '{{item}}-{{ansible_facts.get("service_mgr") or "openrc"}}'
-      state: present
-    loop: ['displaymanager']
+  - file: path=/etc/X11/xorg.conf.d state=directory
+    ignore_errors: true
+
+  - shell: "cp -an /usr/share/X11/xorg.conf.d/{{confX}} /etc/X11/xorg.conf.d/"
+    ignore_errors: true
+    loop: [10-evdev.conf, 40-libinput.conf]
+    loop_control: {"loop_var": "confX"}
 
   - lineinfile:
       path: /etc/conf.d/xdm
@@ -20,13 +15,26 @@
       regexp: '^DISPLAYMANAGER=.*'
       line: 'DISPLAYMANAGER="sddm"'
     ignore_errors: true
-    when: desktop in ['lxqt']
+    #when: ansible_facts.get('lsb', {}).get('id', None)|lower in ['artix'] and 'lxqt' == desktop
+    when: service_mgr != 'systemd' and 'lxqt' == desktop
 
   - lineinfile:
       path: /etc/conf.d/xdm
       state: present
       regexp: '^DISPLAYMANAGER=.*'
-      line: 'DISPLAYMANAGER="lightdm"'
+      line: 'DISPLAYMANAGER="gdm"'
     ignore_errors: true
-    when: not desktop in ['lxqt']
-  when: ansible_facts.get('lsb', {}).get('id', None)|lower in ['artix']
+    #when: ansible_facts.get('lsb', {}).get('id', None)|lower in ['artix'] and 'lxqt' != desktop
+    when: service_mgr != 'systemd' and 'lxqt' != desktop
+
+  - name: "Fix text mode only default grub config"
+    replace:
+      path: /etc/default/grub
+      regexp: '{{item}}'
+      replace: ''
+    ignore_errors: true
+    loop: ['nomodeset ', 'text ', 'xdriver=vesa ']
+
+  - name: "Run grub-mkconfig"
+    shell: grub-mkconfig -o /boot/grub/grub.cfg
+    ignore_errors: true

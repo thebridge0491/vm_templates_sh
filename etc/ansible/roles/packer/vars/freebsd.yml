@@ -1,27 +1,34 @@
 ---
 # Non-default OS based (using family, distribution, ...) vars file
 
-#pkgupgd_params: {"state": 'latest'}
+service_mgr: "{{ansible_facts.get('service_mgr') or 'bsdinit'}}"
+pkg_mgr: "{{ansible_facts.get('pkg_mgr') or 'pkgng'}}"
+pkgclean_cmd: ASSUME_ALWAYS_YES=yes pkg clean -y
+pkgrepos_cmd: pkg -vv | sed -n "/Repositories:/,/^$/p"
+pkgoutdated_cmd: pkg upgrade --dry-run -y
+pkglocks_cmd: pkg lock -lq
 
-idsuffix_cmd: sysctl -n kern.hostuuid | cut -b33-36
-services_enabled: [pf, pflog, devd, dbus, avahi-daemon, nfsclient, cupsd]
-services_disabled: [clamav-freshclam, clamav-clamd, lpd]
+#idsuffix_cmd: (sysctl -n kern.hostuuid || printf '0%.0s' {1..36}) | cut -b33-36
+idsuffix_cmd: test -n "`sysctl -n kern.hostuuid`" && sysctl -n kern.hostuuid | cut -b33-36 || echo 0000
 
+firewall_tool: pf
+smtp_daemon: sendmail
+#hostname_chgfiles: [/etc/hosts, /etc/rc.conf, /etc/rc.conf.local]
 hostname_chgfiles: [/etc/hosts, /etc/rc.conf]
-firewall_chgfiles: [/etc/pf/outallow_in_allow.rules]
 skeldir_par: /usr/share/skel
-skel_dirs: [/usr/share/skel/dot.gnupg, /usr/share/skel/dot.pki, /usr/share/skel/dot.ssh]
+skel_dirs: [/usr/share/skel/dot.gnupg, /usr/share/skel/dot.pki,
+  /usr/share/skel/dot.ssh]
 skelmaps_srcdest: [{'srcskel': '_gnupg/*', 'destskel': 'dot.gnupg/'},
   {'srcskel': '_pki/*', 'destskel': 'dot.pki/'},
   {'srcskel': '_ssh/*', 'destskel': 'dot.ssh/'},
   {'srcskel': '_gitconfig.sample', 'destskel': 'dot.gitconfig'},
   {'srcskel': '_hgrc.sample', 'destskel': 'dot.hgrc'}]
-sudoers_file: /usr/local/etc/sudoers
-sudoers_group: wheel
+sudoersd_dir: /usr/local/etc/sudoers.d
 skeldir_ssh: /usr/share/skel/dot.ssh
-skel_shellrc: /usr/share/skel/dot.cshrc
+#skel_shellrc: /usr/share/skel/dot.cshrc
+skel_shellrc: /usr/share/skel/dot.shrc
 etcdir_cups: /usr/local/etc/cups
 cupsdir_ppd: /usr/local/share/cups/model
 
-xdguserdirs_file: /usr/local/etc/xdg/user-dirs.defaults
-uiservices_enabled: [dbus, hald, moused, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
+xorgconfd_dir: /usr/local/etc/X11/xorg.conf.d
+etcdir_xdg: /usr/local/etc/xdg

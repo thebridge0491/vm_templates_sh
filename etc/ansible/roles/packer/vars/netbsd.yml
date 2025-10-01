@@ -1,20 +1,24 @@
 ---
 # Non-default OS based (using family, distribution, ...) vars file
 
-pkgupgd_params: {"update_cache": yes, "upgrade": yes, "full_upgrade": yes, "clean": yes}
+service_mgr: "{{ansible_facts.get('service_mgr') or 'bsdinit'}}"
+pkg_mgr: "{{ansible_facts.get('pkg_mgr') or 'pkgin'}}"
+pkgclean_cmd: pkgin -y clean
+pkgrepos_cmd: tail -vn+1 /usr/pkg/etc/pkgin/repositories.conf | grep -ve "^#"
+pkgoutdated_cmd: pkgin -l\< list
+#pkglocks_cmd:
 
-idsuffix_cmd: /sbin/sysctl -n machdep.dmi.system-uuid | cut -b33-36
-services_enabled: [pf, pflogd, dbus, avahidaemon, nfsd, rpcbind, mountd,
-  cupsd]
-services_disabled: [freshclamd, clamd, lpd]
+#idsuffix_cmd: (/sbin/sysctl -n machdep.dmi.system-uuid || printf '0%.0s' {1..36}) | cut -b33-36
+idsuffix_cmd: test -n "`/sbin/sysctl -n machdep.dmi.system-uuid`" && /sbin/sysctl -n machdep.dmi.system-uuid | cut -b33-36 || echo 0000
 
+firewall_tool: pf
+smtp_daemon: postfix
 hostname_chgfiles: [/etc/hosts, /etc/rc.conf]
-firewall_chgfiles: [/etc/pf/outallow_in_allow.rules]
-sudoers_file: /usr/pkg/etc/sudoers
-sudoers_group: wheel
-skel_shellrc: /etc/skel/.cshrc
+sudoersd_dir: /usr/pkg/etc/sudoers.d
+#skel_shellrc: /etc/skel/.cshrc
+skel_shellrc: /etc/skel/.shrc
 etcdir_cups: /usr/pkg/etc/cups
 cupsdir_ppd: /usr/pkg/share/cups/model
 
-#xdguserdirs_file: /usr/pkg/etc/xdg/user-dirs.defaults
-uiservices_enabled: [dbus, wsmoused, xdm]
+xorgconfd_dir: /usr/pk/etc/X11/xorg.conf.d
+#etcdir_xdg: /usr/pkg/etc/xdg

@@ -1,16 +1,14 @@
 ---
 # Non-default OS based (using family, distribution, ...) vars file
 
+service_mgr: "{{ansible_facts.get('service_mgr') or 'systemd'}}"
+#pkg_mgr: "{{ansible_facts.get('pkg_mgr') or 'urpmi'}}"
 pkg_mgr: "dnf"
-pkgupgd_params: {"update_cache": yes, "state": "latest", "use": "{{pkg_mgr}}"}
+pkgclean_cmd: dnf -C -y clean all
+pkgrepos_cmd: dnf -C repolist -v --enabled | grep -e "Repo-id" -e "Repo-name" -e "Repo-mirrors" -e "Repo-baseurl"
+pkgoutdated_cmd: dnf -C -y check-update
+pkglocks_cmd: dnf -C -y versionlock list
 
-idsuffix_cmd: cat /var/lib/dbus/machine-id | cut -b29-32
-services_enabled: [ntpd, shorewall, shorewall6, dbus, avahi-daemon, nfs-utils, cups, cups-browsed]
-services_disabled: [ipset, ip6tables, iptables, clamav-freshclam, clamav-daemon]
-
-hostname_chgfiles: [/etc/hostname, /etc/hosts, /etc/sysconfig/network]
-firewall_chgfiles: []
-sudoers_group: wheel
-cupsdir_ppd: /usr/share/cups/model
-
-uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}", display-manager]
+firewall_tool: firewalld
+smtp_daemon: postfix
+hostname_chgfiles: [/etc/hosts, /etc/hostname, /etc/sysconfig/network]

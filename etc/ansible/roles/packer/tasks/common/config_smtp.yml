@@ -1,0 +1,161 @@
+---
+
+- block:
+  - service: name={{smtp_daemon}} enabled=true state=restarted
+    ignore_errors: true
+
+  - shell: |
+      for userX in root packer vagrant ; do
+        [ ! -e /var/mail/${userX}.old ] && \
+          mv /var/mail/${userX} /var/mail/${userX}.old ;
+      done
+    ignore_errors: true
+  when: smtp_daemon == 'sendmail'
+
+# config [open]smtpd -- maildir format vice mbox
+- block:
+  - systemd_service: name={{smtp_daemon}} enabled=true state=restarted masked=false
+    ignore_errors: true
+    when: service_mgr == 'systemd'
+
+  - service: name={{smtp_daemon}} enabled=true state=restarted
+    ignore_errors: true
+    when: service_mgr != 'systemd'
+
+  #- shell: sh /root/init/common/smtp/bsd/config_opensmtpd.sh
+  #  ignore_errors: true
+  #  when: ansible_facts.get('system')|lower in ['freebsd', 'netbsd', 'openbsd']
+
+  #- shell: sh /root/init/common/smtp/linux/config_opensmtpd.sh
+  #  ignore_errors: true
+  #  when: ansible_facts.get('system')|lower == 'linux'
+
+  # smtpd.conf location varies:
+  #  /etc/mail/smtpd.conf: OpenBSD, Alpine Linux
+  #  /etc/smtpd/smtpd.conf: Void Linux, Arch Linux
+  #  /etc/smtpd.conf: Debian
+  - find:
+      paths: /etc
+      patterns: 'smtpd.conf'
+      recurse: true
+    register: found_confs
+
+  - shell: find /etc -name smtpd.conf | head -n1
+    ignore_errors: true
+    register: out_conf
+
+  - block:
+    - copy:
+        src: '{{path_conf}}'
+        dest: '{{path_conf}}.orig'
+        remote_src: true
+        force: false
+      ignore_errors: true
+
+    - lineinfile:
+        path: '{{path_conf}}'
+        state: present
+        backrefs: true
+        regexp: '^(table aliases.*)$'
+        line: '#table domains { {{ansible_facts.get("nodename")}}, localhost }\n\1'
+      ignore_errors: true
+
+    - replace:
+        path: '{{path_conf}}'
+        regexp: '^action "local" maildir(.*)$'
+        replace: 'action "local" mbox\1'
+      ignore_errors: true
+
+    - blockinfile:
+        path: '{{path_conf}}'
+        state: present
+        marker: '#-- {mark} managed zone --'
+        marker_begin: 'start'
+        marker_end: 'end'
+        insertbefore: '^action "local" mbox'
+        block: |
+          action "local_maildir" maildir "/var/mail/%{rcpt.user}" alias <aliases>
+          match from local for local ! rcpt-to "root" action "local_maildir"
+
+      ignore_errors: true
+      when: ansible_facts.get('system')|lower == 'openbsd'
+
+    - blockinfile:
+        path: '{{path_conf}}'
+        state: present
+        marker: '#-- {mark} managed zone --'
+        marker_begin: 'start'
+        marker_end: 'end'
+        insertbefore: '^action "local" mbox'
+        block: |
+          action "local_maildir" maildir "/var/spool/mail/%{rcpt.user}" alias <aliases>
+          match for local ! rcpt-to "root" action "local_maildir"
+
+      ignore_errors: true
+      when: ansible_facts.get('system')|lower != 'openbsd'
+    vars:
+      #path_conf: '{{(found_confs.files | json_query("[*].path"))[0]}}'
+      path_conf: '{{out_conf.stdout_lines[0] | default("/etc/mail/smtpd.conf")}}'
+
+  - shell: |
+      for userX in packer vagrant ; do
+        [ ! -e /var/mail/${userX}.old ] && \
+          mv /var/mail/${userX} /var/mail/${userX}.old ;
+      done
+    ignore_errors: true
+
+  - file: path=/var/mail/packer state=directory owner=packer group=wheel
+    ignore_errors: true
+    when: ansible_facts.get('system')|lower != 'linux'
+
+  - file: path=/var/mail/packer/{{item}} state=directory owner=packer group=mail
+    ignore_errors: true
+    loop: [cur, new, tmp]
+    when: ansible_facts.get('system')|lower == 'linux'
+  when: smtp_daemon in ['smtpd', 'opensmtpd']
+
+# config postfix -- maildir format vice mbox
+- block:
+  - systemd_service: name={{smtp_daemon}} enabled=true state=restarted masked=false
+    ignore_errors: true
+    when: service_mgr == 'systemd'
+
+  - service: name={{smtp_daemon}} enabled=true state=restarted
+    ignore_errors: true
+    when: service_mgr != 'systemd'
+
+  - shell: |
+      # [home_mailbox=Maildir/ | mail_spool_directory=/var/mail/]
+      #echo "mail_spool_directory = /var/mail/" >> /etc/postfix/main.cf
+      postconf mail_spool_directory=/var/mail/
+      postfix reload
+    ignore_errors: true
+    when: ansible_facts.get('system')|lower != 'linux'
+
+  - shell: |
+      # [home_mailbox=Maildir/ | mail_spool_directory=/var/spool/mail/]
+      #echo "mail_spool_directory = /var/spool/mail/" >> /etc/postfix/main.cf
+      postconf mail_spool_directory=/var/spool/mail/
+      postfix reload
+    ignore_errors: true
+    when: ansible_facts.get('system')|lower == 'linux'
+
+  - shell: |
+      for userX in root packer vagrant ; do
+        [ ! -e /var/mail/${userX}.old ] && \
+          mv /var/mail/${userX} /var/mail/${userX}.old ;
+      done
+    ignore_errors: true
+
+  #- file: path=/var/mail/packer state=directory owner=packer group=wheel
+  #  ignore_errors: true
+  #  when: ansible_facts.get('system')|lower != 'linux'
+
+  - file: path=/var/spool/mail/postfix state=directory owner=postfix group=postfix
+    ignore_errors: true
+    when: ansible_facts.get('system')|lower == 'linux'
+
+  - file: src=/var/spool/mail/postfix dest=/var/spool/mail/root state=link
+    ignore_errors: true
+    when: ansible_facts.get('os_family')|lower in ['mageia', 'pclinuxos']
+  when: smtp_daemon == 'postfix'

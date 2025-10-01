@@ -1,22 +1,133 @@
 ---
 
-- name: Fetch missing distribution sets (xbase, xserver, xfont, xetc)
-  shell: |
-    arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
-    cd /tmp
-    for setX in xbase xserver xfont xetc ; do
-      ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/${setX}.tar.xz ;
-      tar -C / -xpJf ${setX}.tar.xz ;
-    done
+- name: "Fetch missing distribution sets? Enter 'yes' to continue [yesNO]:"
+  pause:
+    prompt: |
+      Do you want to fetch missing distribution sets?
+      Enter 'yes' to continue, else stop playbook [yesNO]:
+  register: response_fetch
+  when: not (autoconfirm | default(false))|bool
 
-- shell: "cp -R /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}"
+- block:
+#  - name: 'Fetch & extract missing distribution sets like: xbase.tar.xz'
+#    unarchive:
+#      remote_src: true
+#      src: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
+#      dest: /
+#      extra_opts: [-p, -J]
+#    ignore_errors: true
+#    loop: [xbase, xserver, xfont, xetc]
+#    loop_control: {"loop_var": "setX"}
+
+  - block:
+    - name: 'Fetch, then extract missing distribution sets like: xbase.tar.xz'
+      get_url:
+        url: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
+        dest: '/tmp/{{setX}}.tar.xz'
+      ignore_errors: true
+      loop: [xbase, xserver, xfont, xetc]
+      loop_control: {"loop_var": "setX"}
+    - unarchive:
+        remote_src: true
+        src: '/tmp/{{setX}}.tar.xz'
+        dest: /
+        extra_opts: [-p, -J]
+      ignore_errors: true
+      loop: [xbase, xserver, xfont, xetc]
+      loop_control: {"loop_var": "setX"}
+  when: (autoconfirm | default(false) or response_fetch.user_input | default(false))|bool
+  vars:
+    uname_m: '{{ansible_facts.get("machine")}}'
+    rel: '{{ansible_facts.get("distribution_version")}}'
+
+- block:
+  - file: path={{item}} state=directory
+    ignore_errors: true
+    loop: [/var/run/dbus, /var/db/dbus, /var/run/xdm, /var/lib/xdm
+          , /usr/pkg/etc/xdm, /usr/pkg/etc/xdg, /usr/pkg/etc/X11/xorg.conf.d]
+
+  - shell: "cp -an /usr/pkg/share/X11/xorg.conf.d/{{confX}} /usr/pkg/etc/X11/xorg.conf.d/"
+    ignore_errors: true
+    loop: [10-evdev.conf, 40-libinput.conf]
+    loop_control: {"loop_var": "confX"}
+
+  - shell: "cp -a /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}"
+    ignore_errors: true
+    loop: [dbus, xdm]
+
+  - copy:
+      src: /usr/pkg/share/examples/xdm
+      dest: /usr/pkg/etc/
+      mode: 'ugo+x'
+    ignore_errors: true
+
+  - copy:
+      src: '/usr/pkg/share/examples/{{item}}'
+      dest: /usr/pkg/etc/xdg/
+      mode: 'ugo+x'
+    ignore_errors: true
+    loop: [xfce4, lxqt]
+
+  - group: name=dbus gid=81 system=true state=present
+    ignore_errors: true
+
+  - user: name=dbus uid=81 groups=dbus comment='System message bus' home=/ shell=/usr/bin/false
+    ignore_errors: true
+
+  - name: "set video resolution ? gop 6: 1024x768x32"
+    replace:
+      path: /boot.cfg
+      regexp: ';boot'
+      replace: ';gop 6;boot'
+    ignore_errors: true
+
+- block:
+  - lineinfile:
+      path: /root/.xinitrc
+      state: present
+      regexp: '{{item.rexp}}'
+      line: '{{item.line}}'
+      create: yes
+    ignore_errors: true
+    loop: [{rexp: '^export XDG_DATA_DIRS=.*', line: 'export XDG_DATA_DIRS=/usr/pkg/share'},
+      {rexp: '^export XDG_CONFIG_DIRS=.*', line: 'export XDG_CONFIG_DIRS=/usr/pkg/etc/xdg'}]
+
+  - lineinfile:
+      path: /root/.xinitrc
+      state: present
+      regexp: '^ck-launch-session.*'
+      line: 'ck-launch-session dbus-launch --exit-with-session startlxqt'
+    ignore_errors: true
+    when: desktop in ['lxqt']
+
+  - lineinfile:
+      path: /root/.xinitrc
+      state: present
+      regexp: '^ck-launch-session.*'
+      line: 'ck-launch-session dbus-launch --exit-with-session startxfce4'
+    ignore_errors: true
+    when: desktop in ['xfce']
+
+  - copy: src=/root/.xinitrc dest=/home/packer/.xinitrc owner=packer
+    ignore_errors: true
+
+  - file: src={{item}}/.xinitrc dest={{item}}/.xsession state=link
+    ignore_errors: true
+    loop: [/root, /home/packer]
+
+# /usr/pkg/etc/X11/xorg.conf.d/20-[wsfb|intel|radeon].conf
+- copy:
+    dest: /usr/pkg/etc/X11/xorg.conf.d/20-wsfb.conf
+    #mode: 'ugo+x'
+    force: false
+    content: |
+      Section "Device"
+        Identifier "Card0"
+        Driver "wsfb" # wsfb | intel | radeon
+        #BusID "PCI:0:2:0"
+      EndSection
+
   ignore_errors: true
-  loop: [dbus, xdm]
-
-- file:
-    path: '/var/run/{{item}}'
-    state: directory
-  loop: [dbus, xdm]
 
 #- lineinfile:
 #    path: /etc/rc.conf
@@ -24,61 +135,12 @@
 #    regexp: '^{{item}}=.*'
 #    line: '{{item}}=YES'
 #  ignore_errors: true
-#  loop: [dbus, wsmoused, xdm]
+#  loop: '{{distro_pkgs.get("uiservices_enabled_"+desktop, "").split(" ")}}'
 
-- blockinfile:
-    path: /etc/X11/xorg.conf
-    state: present
-    create: yes
-    marker: '#-- {mark} managed zone --'
-    marker_begin: 'start'
-    marker_end: 'end'
-    block: |
-      Section "Device"
-        Identifier "Card0"
-        Driver "wsfb"
-      EndSection
-  ignore_errors: true
-
-- lineinfile:
-    path: /root/.xinitrc
-    state: present
-    regexp: '{{item.rexp}}'
-    line: '{{item.line}}'
-    create: yes
-  ignore_errors: true
-  loop: [{rexp: '^export XDG_DATA_DIRS=.*', line: 'export XDG_DATA_DIRS=/usr/pkg/share'},
-    {rexp: '^export XDG_CONFIG_DIRS=.*', line: 'export XDG_CONFIG_DIRS=/usr/pkg/etc/xdg'}]
-
-- lineinfile:
-    path: /root/.xinitrc
-    state: present
-    regexp: '^ck-launch-session.*'
-    line: 'ck-launch-session dbus-launch --exit-with-session startxfce4'
-  ignore_errors: true
-  when: desktop in ['xfce']
-
-- lineinfile:
-    path: /root/.xinitrc
-    state: present
-    regexp: '^ck-launch-session.*'
-    line: 'ck-launch-session dbus-launch --exit-with-session startlxqt'
-  ignore_errors: true
-  when: desktop in ['lxqt']
-
-- shell: |
-    /usr/sbin/groupadd -g 81 dbus || true
-    /usr/sbin/useradd -c 'System message bus' -u 81 -g dbus -d '/' -s /usr/bin/false dbus || true
-    mkdir -p /var/db/dbus /var/lib/xdm /usr/pkg/etc/xdm /usr/pkg/etc/xdg
-    cp -R /usr/pkg/share/examples/xdm /usr/pkg/etc/
-    cp -R /usr/pkg/share/examples/xfce4 /usr/pkg/etc/xdg/ || true
-    cp -R /usr/pkg/share/examples/lxqt /usr/pkg/etc/xdg/ || true
-
-    ln -s /root/.xinitrc /root/.xsession
-    cp /root/.xinitrc /home/packer/.xinitrc
-    chown packer:$(id -gn packer) /home/packer/.xinitrc
-    (cd /home/packer ; ln -s /home/packer/.xinitrc .xsession)
-
-    # set video resolution ? gop 6: 1024x768x32
-    sed -i 's|;boot|;gop 6;boot|g' /boot.cfg
-  ignore_errors: true
+#- lineinfile:
+#    path: /etc/rc.conf
+#    state: present
+#    regexp: '^{{item}}=.*'
+#    line: '{{item}}=NO'
+#  ignore_errors: true
+#  loop: '{{distro_pkgs.get("uiservices_disabled_"+desktop, "").split(" ")}}'

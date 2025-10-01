@@ -1,49 +1,131 @@
 ---
 
-- name: Fetch missing distribution sets (xbase*) & sysmerge updates
-  shell: |
-    arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
-    setVer=$(echo ${rel} | tr '.' '\0')
-    cd /tmp
-    for setX in xbase ; do
-      ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/${setX}${setVer}.tgz ;
-      tar -C / -xpzf ${setX}${setVer}.tgz ;
-    done
-    sysmerge
+- name: "Fetch missing distribution sets? Enter 'yes' to continue [yesNO]:"
+  pause:
+    prompt: |
+      Do you want to fetch missing distribution sets?
+      Enter 'yes' to continue, else stop playbook [yesNO]:
+  register: response_fetch
+  when: not (autoconfirm | default(false))|bool
+
+- block:
+#  - name: 'Fetch & extract missing distribution sets like: xbase*.tgz'
+#    unarchive:
+#      remote_src: true
+#      src: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
+#      dest: /
+#      extra_opts: [-p, -z]
+#    ignore_errors: true
+#    loop: [xbase]
+#    loop_control: {"loop_var": "setX"}
+
+  - block:
+    - name: 'Fetch, then extract missing distribution sets like: xbase*.tgz'
+      get_url:
+        url: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
+        dest: '/tmp/{{setX}}{{setVer}}.tgz'
+      ignore_errors: true
+      loop: [xbase]
+      loop_control: {"loop_var": "setX"}
+    #- unarchive:
+    #    remote_src: true
+    #    src: '/tmp/{{setX}}{{setVer}}.tgz'
+    #    dest: /
+    #    extra_opts: [-p, -z]
+    #  ignore_errors: true
+    #  loop: [xbase]
+    #  loop_control: {"loop_var": "setX"}
+
+  #- name: sysmerge updates
+  #  shell: sysmerge
+  #  ignore_errors: true
+  when: (autoconfirm | default(false) or response_fetch.user_input | default(false))|bool
+  vars:
+    arch_s: '{{ansible_facts.get("machine")}}'
+    rel: '{{ansible_facts.get("distribution_version")}}'
+    setVer: '{{ansible_facts.get("distribution_version")|replace(".", "")}}'
+
+- block:
+  - copy:
+      src: '/etc/{{item}}'
+      dest: '/etc/{{item}}.orig'
+      remote_src: true
+      force: false
+    ignore_errors: true
+    loop: [daily, weekly, monthly]
+
+  # disable mail output from /etc/{daily,weekly,monthly} scripts
+  - replace:
+      path: /etc/daily
+      regexp: '^([^#].*mail .*daily insecurity output.*)$'
+      replace: '#\1'
+    ignore_errors: true
+
+  - replace:
+      path: /etc/daily
+      regexp: '^([^#].*)mail .*daily output.*$'
+      replace: '\1cat > /tmp/daily.out ; mv /tmp/daily.out $MAINOUT'
+    ignore_errors: true
+
+  - replace:
+      path: /etc/weekly
+      regexp: '^([^#].*mail .*weekly output.*)$'
+      replace: '#\1'
+    ignore_errors: true
+
+  - replace:
+      path: /etc/monthly
+      regexp: '^([^#].*mail .*monthly output.*)$'
+      replace: '#\1'
+    ignore_errors: true
 
 - lineinfile:
-    path: /etc/ksh.kshrc
+    path: /etc/rc.local
     state: present
-    regexp: '^export JAVA_HOME.*'
-    line: 'export JAVA_HOME={{distro_pkgs.default_java_home}}'
+    mode: 'ugo+x'
+    regexp: '.*dbus-uuidgen.*'
+    #line: '/usr/local/bin/dbus-uuidgen --ensure=/etc/machine-id'
+    line: '/usr/local/bin/dbus-uuidgen --ensure'
+  ignore_errors: true
+
+- name: config mdns daemon flags
+  shell: |
+    ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n1)
+    # /etc/rc.conf.local: mdnsd_flags=vio0
+    rcctl set mdnsd flags ${ifdev}
   ignore_errors: true
 
 - lineinfile:
-    path: /etc/fstab
+    path: /etc/rc.local
     state: present
-    regexp: '^fdesc.*'
-    line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
+    mode: 'ugo+x'
+    regexp: '.*mdnsctl publish.*'
+    line: '/usr/local/bin/mdnsctl publish $(hostname -s || hostname) ssh tcp 22 "" &'
   ignore_errors: true
 
-- name: "Config misc services(ntp, firewall)"
-  shell: |
-    #ntpd -u ntp:ntp ; ntpq -p
-    ntpdate -v -u -b us.pool.ntp.org
-
-    pfctl -d
-    env sed_inplace="sed -i" sh /root/init/common/bsd/firewall/pf/pfconf.sh config_pf allow > /etc/pf.conf.new
-    if [ ! -e /etc/pf.conf ] ; then cp /etc/pf.conf.new /etc/pf.conf ; fi
-    pfctl -vf /etc/pf.conf ; pfctl -s info ; pfctl -s rules -a '*'
-
-    #cd /usr/bin
-    #for file1 in lp lpq lpr lprm ; do
-    #  if [ -e ${file1} ] ; then
-    #    mv ${file1} ${file1}.old ;
-    #  fi ;
-    #  ln -s /usr/local/bin/${file1} ${file1} ;
-    #done
-  ignore_errors: true
-
-#- user: name={{item}} groups=cups append=yes
-#  ignore_errors: true
-#  loop: [root]
+#- block:
+#  - group: name=cups gid=193 system=true state=present
+#    ignore_errors: true
+#
+#  - user: name={{item}} groups=cups append=true
+#    ignore_errors: true
+#    loop: [root]
+#
+#  - copy: remote_src=true src=/usr/bin/{{item}} dest=/usr/bin/{{item}}.old
+#    ignore_errors: true
+#    loop: [lp, lpq, lpr, lprm]
+#
+#  - file: path=/usr/bin/{{item}} state=absent
+#    ignore_errors: true
+#    loop: [lp, lpq, lpr, lprm]
+#
+#  - file: src=/usr/pkg/bin/{{item}} dest=/usr/bin/{{item}} state=link
+#    ignore_errors: true
+#    loop: [lp, lpq, lpr, lprm]
+#    when: ansible_facts.get('system')|lower == 'netbsd'
+#
+#  - file: src=/usr/local/bin/{{item}} dest=/usr/bin/{{item}} state=link
+#    ignore_errors: true
+#    loop: [lp, lpq, lpr, lprm]
+#    when: ansible_facts.get('system')|lower in ['freebsd', 'openbsd']
+##  when: ansible_facts.get('system')|lower in ['freebsd', 'netbsd', 'openbsd']

@@ -2,16 +2,29 @@
 
 - block:
   - name: install nano
-    package: use={{ansible_facts.get("pkg_mgr") or pkg_mgr}} name=nano state=present
-    register: out
-    when: not variant in ['redhat', 'pclinuxos', 'mageia']
+    package: use='{{pkg_mgr}}' name='{{pkgs_commasep}}' state=present skip_broken=true
+    ignore_errors: true
+    when: pkg_mgr == 'dnf'
+
   - name: install nano
-    package: use={{pkg_mgr}} name=nano state=present
-    register: out
-    when: variant in ['pclinuxos', 'mageia']
-  - name: install nano
-    shell: dnf -y install nano
-    register: out
-    when: variant in ['redhat']
-  - debug: var=out
-  tags: never, nanopkg
+    package: use='{{pkg_mgr}}' name='{{pkgs_commasep}}' state=present extra_args_precommand='--ignore-unknown'
+    ignore_errors: true
+    when: pkg_mgr == 'zypper'
+
+  - block:
+    - name: install nano
+      package: use='{{pkg_mgr}}' name='{{pkgs_commasep}}' state=present
+      ignore_errors: true
+      register: out
+    #- debug: var=out
+
+    - name: retry failed install nano
+      package: use='{{pkg_mgr}}' name='{{item}}' state=present
+      ignore_errors: true
+      loop: '{{pkgs_list}}'
+      when: out.get('failed', false)
+    when: pkg_mgr not in ['zypper', 'dnf']
+  vars:
+    pkgs_commasep: '{{"pkgUnknown nano pkgMissing zip".replace(" ", ",")}}'
+    #pkgs_list: [pkgUnknown, nano, pkgMissing, zip]
+    pkgs_list: '{{"pkgUnknown nano pkgMissing zip".split(" ")}}'

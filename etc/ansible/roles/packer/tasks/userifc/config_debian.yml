@@ -1,13 +1,29 @@
 ---
 
-- shell: |
-    apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
-      tee /etc/apt/apt.conf.d/999norecommends
-  ignore_errors: true
+- block:
+  - file: path=/etc/X11/xorg.conf.d state=directory
+    ignore_errors: true
 
-- name: "Fix text mode only grub config"
-  shell: |
-    sed -i 's|nomodeset | |' /etc/default/grub
-    sed -i 's|text | |' /etc/default/grub
-    grub-mkconfig -o /boot/grub/grub.cfg
-  ignore_errors: true
+  - shell: "cp -an /usr/share/X11/xorg.conf.d/{{confX}} /etc/X11/xorg.conf.d/"
+    ignore_errors: true
+    loop: [10-evdev.conf, 40-libinput.conf]
+    loop_control: {"loop_var": "confX"}
+
+  - shell: |
+      # Note, ex: dpkg-reconfigure lightdm
+      # [/usr/[s]bin/[startxfce4 | startlxqt | lightdm | sddm | gdm3]
+      update-alternatives --set x-session-manager $(cat /etc/X11/default-display-manager)
+    ignore_errors: true
+    when: service_mgr != 'systemd'
+
+  - name: "Fix text mode only default grub config"
+    replace:
+      path: /etc/default/grub
+      regexp: '{{item}}'
+      replace: ''
+    ignore_errors: true
+    loop: ['nomodeset ', 'text ', 'xdriver=vesa ']
+
+  - name: "Run grub-mkconfig"
+    shell: grub-mkconfig -o /boot/grub/grub.cfg
+    ignore_errors: true

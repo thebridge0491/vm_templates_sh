@@ -1,0 +1,140 @@
+---
+
+- block:
+  - name: "Config firewall pf"
+    shell: |
+      sh /root/init/common/firewall/bsd/config_pf.sh #config_pf allow
+      #diff -s /etc/pf.conf /etc/pf.conf.new ; sleep 5
+    ignore_errors: true
+
+  - shell: |
+      #(sleep 120 && /sbin/pfctl -d)& && /sbin/pfctl -e
+      /sbin/pfctl -e
+    ignore_errors: true
+
+  - lineinfile:
+      path: /etc/pf/outallow_in_allow.rules
+      state: present
+      regexp: '^(.*)domain(.*)mdns(.*)$'
+      line: '\1domain\2, mdns\3'
+    ignore_errors: true
+
+  - shell: |
+      /sbin/pfctl -s info ; sleep 5 #; /sbin/pfctl -s rules -a '*' ; sleep 5
+    ignore_errors: true
+  when: firewall_tool == 'pf' and ansible_facts.get('system')|lower in ['freebsd', 'netbsd', 'openbsd']
+
+- block:
+  - name: "Config firewall ufw"
+    shell: |
+      sh /root/init/common/firewall/linux/config_ufw.sh #cmds_ufw allow
+    ignore_errors: true
+
+  - shell: |
+      #(sleep 120 && ufw disable)& && ufw enable
+      ufw enable
+      ufw allow in svc MDNS
+    ignore_errors: true
+
+  - shell: ufw status ; sleep 5 ; ufw show user-rules ; sleep 5
+    ignore_errors: true
+  when: firewall_tool == 'ufw' and ansible_facts.get('system')|lower == 'linux'
+
+- block:
+  - name: "Config firewall iptables[-nft]"
+    shell: |
+      #drakfirewall ; sleep 600
+      sh /root/init/common/firewall/linux/config_iptables.sh #config_iptables allow
+      #for ruleset in iptables.rules ip6tables.rules ; do
+      #  diff -s /etc/iptables/${ruleset} /etc/iptables/${ruleset}.new ;
+      #done
+    ignore_errors: true
+
+  - shell: |
+      #(sleep 120 && (iptables-nft -F ; iptables-nft -X ; ip6tables-nft -F ; \
+      #  ip6tables-nft -X))& && \
+      #  (iptables-nft-restore /etc/iptables/iptables.rules ; \
+      #  ip6tables-nft-restore /etc/iptables/ip6tables.rules)
+      (iptables-nft-restore /etc/iptables/iptables.rules ;
+        ip6tables-nft-restore /etc/iptables/ip6tables.rules)
+    ignore_errors: true
+
+  - lineinfile:
+      path: /etc/ipset.conf
+      state: present
+      regexp: '^(.*)domain(.*)mdns(.*)$'
+      line: '\1domain\2,mdns\3'
+    ignore_errors: true
+
+  - shell: |
+      #ipset list ; sleep 5
+      iptables-nft -L ; sleep 5 ; ip6tables-nft -L ; sleep 5
+    ignore_errors: true
+  when: firewall_tool in ['iptables', 'iptables-nft'] and ansible_facts.get('system')|lower == 'linux'
+
+- block:
+  - name: "Config firewall nftables"
+    shell: |
+      sh /root/init/common/firewall/linux/config_nftables.sh #config_nftables allow
+      #diff -s /etc/nftables.conf /etc/nftables.conf.new
+    ignore_errors: true
+
+  - shell: |
+      #(sleep 120 && nft flush ruleset)& && nft -f /etc/nftables.conf
+      nft -f /etc/nftables.conf
+    ignore_errors: true
+
+  - find:
+      paths: /etc
+      patterns: 'nftables.conf,out.*_nftables.conf'
+      recurse: true
+    register: found_confs
+
+  - shell: find /etc -name "[outalwdeny_]*nftables.conf"
+    ignore_errors: true
+    register: out_confs
+
+  - lineinfile:
+      path: '{{item}}'
+      state: present
+      regexp: '^(.*)domain(.*)mdns(.*)$'
+      line: '\1domain\2, mdns\3'
+    ignore_errors: true
+    #loop: '{{(found_confs.files | json_query("[*].path"))}}'
+    loop: '{{out_confs.stdout_lines | default(["/etc/nftables.conf"])}}'
+
+  - shell: nft list tables ; sleep 5 ; nft list ruleset ; sleep 5
+    ignore_errors: true
+  when: firewall_tool == 'nftables' and ansible_facts.get('system')|lower == 'linux'
+
+- block:
+  - name: "Config firewall firewalld"
+    shell: |
+      sh /root/init/common/firewall/linux/config_firewalld.sh #cmds_firewalld allow
+    ignore_errors: true
+
+  - shell: |
+      #(sleep 120 && firewall-offline-cmd --disabled)& && \
+      #  (firewall-offline-cmd --enabled ; firewall-cmd --reload)
+      firewall-offline-cmd --enabled ; firewall-cmd --reload
+    ignore_errors: true
+
+  - ansible.posix.firewalld:
+      permanent: true
+      zone: public
+      service: mdns
+      state: enabled
+    ignore_errors: true
+
+  #- shell: |
+  #    firewall-cmd --get-active-zones ; sleep 5
+  #    #ipset list ; sleep 5
+  #    firewall-cmd --state ; sleep 5 ; firewall-cmd --zone=public --list-all ; sleep 5
+  #  ignore_errors: true
+
+  - ansible.posix.firewalld_info:
+      zones: [public]
+    register: out_fwinfo
+    ignore_errors: true
+  - debug: var=out_fwinfo.firewalld_info
+  when: firewall_tool == 'firewalld' and ansible_facts.get('system')|lower == 'linux'

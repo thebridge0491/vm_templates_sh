@@ -1,20 +1,50 @@
 ---
 
-- lineinfile:
-    path: /boot/loader.conf
-    state: present
-    regexp: '{{item.rexp}}'
-    line: '{{item.line}}'
-  ignore_errors: true
-  loop: [{rexp: '^kern.vty=.*', line: 'kern.vty=vt'},
-    {rexp: '^hw.psm.synaptics_support=.*', line: 'hw.psm.synaptics_support="1"'}]
+- block:
+  - file: path=/usr/local/etc/X11/xorg.conf.d state=directory
+    ignore_errors: true
 
-- lineinfile:
-    path: /etc/profile.conf
-    state: present
-    create: yes
-    regexp: '{{item.rexp}}'
-    line: '{{item.line}}'
-  ignore_errors: true
-  loop: [{rexp: '^LANG=.*', line: 'LANG=en_US.UTF-8 ; export LANG'},
-    {rexp: '^CHARSET=.*', line: 'CHARSET=UTF-8 ; export CHARSET'}]
+  - shell: "cp -an /usr/local/share/X11/xorg.conf.d/{{confX}} /usr/local/etc/X11/xorg.conf.d/"
+    ignore_errors: true
+    loop: [10-evdev.conf, 40-libinput.conf]
+    loop_control: {"loop_var": "confX"}
+
+  - community.general.sysrc: name={{item.flagX}} value='{{item.valX}}' state={{item.stateX}}
+    ignore_errors: true
+    loop: [{'flagX': 'wpa_supplicant_progam', 'valX': '/usr/local/sbin/wpa_supplicant', 'stateX': 'present'}
+          # kld_list+=i915kms # i915kms | amdgpu
+          , {'flagX': 'kld_list', 'valX': 'i915kms', 'stateX': 'value_present'}
+          ]
+
+  - lineinfile:
+      path: /boot/loader.conf
+      state: present
+      regexp: '{{item.rexp}}'
+      line: '{{item.line}}'
+    ignore_errors: true
+    loop: [{rexp: '^kern.vty=.*', line: 'kern.vty=vt'},
+      {rexp: '^hw.psm.synaptics_support=.*', line: 'hw.psm.synaptics_support="1"'}]
+
+  - lineinfile:
+      path: /etc/profile.conf
+      state: present
+      create: true
+      regexp: '{{item.rexp}}'
+      line: '{{item.line}}'
+    ignore_errors: true
+    loop: [{rexp: '^LANG=.*', line: 'LANG=en_US.UTF-8 ; export LANG'},
+      {rexp: '^CHARSET=.*', line: 'CHARSET=UTF-8 ; export CHARSET'}]
+
+## /usr/local/etc/X11/xorg.conf.d/20-[intel|radeon|scfb].conf
+#- copy:
+#    dest: /usr/local/etc/X11/xorg.conf.d/20-intel.conf
+#    #mode: 'ugo+x'
+#    force: false
+#    content: |
+#      Section "Device"
+#        Identifier "Card0"
+#        Driver "intel" # intel | radeon | scfb
+#        #BusID "PCI:0:2:0"
+#      EndSection
+#
+#  ignore_errors: true

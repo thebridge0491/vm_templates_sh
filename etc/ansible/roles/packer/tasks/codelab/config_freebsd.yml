@@ -1,27 +1,13 @@
 ---
 
-- lineinfile:
-    path: /etc/csh.cshrc
-    state: present
-    regexp: '^setenv JAVA_HOME.*'
-    line: 'setenv JAVA_HOME {{distro_pkgs.default_java_home}}'
-  ignore_errors: true
-
-- lineinfile:
-    path: /etc/fstab
-    state: present
-    regexp: '^fdesc'
-    line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
-  ignore_errors: true
-
 - block:
-  - name: "(variant: {{variant}}) Install xterm,Xauth pkgs for X11 forwarding over SSH"
-    #shell: echo xauth xterm
-    #ignore_errors: true
-    debug: var='xauth xterm'
+  - name: "Fix .NET access problem SSL CA cert path"
+    file:
+      path: /compat/linux/etc/pki/tls/certs
+      state: directory
 
-  - package:
-      use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
-      name: {{item}}
-      state: present
-    loop: ['xauth', 'xterm']
+  - file:
+      src: /usr/local/share/certs/ca-root-nss.crt
+      dest: /compat/linux/etc/pki/tls/certs/ca-bundle.crt
+      state: link
+    ignore_errors: true

@@ -1,0 +1,284 @@
+---
+
+- block:
+  #- shell: sh /root/init/common/misc_config.sh cfg_nsswitch_mdns
+  #  ignore_errors: true
+
+  - stat: path='/etc/nsswitch.conf'
+    ignore_errors: true
+    register: nsswitchconf_st
+
+  - block:
+    #- replace:
+    #    path: /etc/nsswitch.conf
+    #    regexp: 'files dns'
+    #    replace: 'files mdns_minimal [NOTFOUND=return] dns'
+    #  ignore_errors: true
+
+    - replace:
+        path: /etc/nsswitch.conf
+        regexp: '^hosts:(.*)$'
+        replace: '#(old {{ymd}}) hosts:\1'
+      ignore_errors: true
+
+    - lineinfile:
+        path: /etc/nsswitch.conf
+        state: present
+        backrefs: true
+        regexp: '^(#\(old {{ymd}}\) hosts:.*)$'
+        line: '\1\nhosts:\t\tfiles mdns_minimal [NOTFOUND=return] dns'
+      ignore_errors: true
+    when: nsswitchconf_st.stat.exists
+    vars:
+      ymd: '{{"%Y%m%d" | strftime(nsswitchconf_st.stat.mtime|int)}}'
+
+- block:
+  #- shell: sh /root/init/common/misc_config.sh cfg_sudo_nopasswd {{sudoersd_dir}}
+  #  ignore_errors: true
+
+  - file:
+      path: '{{sudoersd_dir}}'
+      state: directory
+
+  - lineinfile:
+      path: "{{sudoersd_dir + '/99_sudonopasswd'}}"
+      state: present
+      create: true
+      regexp: '{{item.rexp}}'
+      line: '{{item.line}}'
+    ignore_errors: true
+    loop: [{rexp: '^[^#].*requiretty', line: '#Defaults:%sudo !requiretty'},
+      {rexp: '^.*%sudo.*ALL.*NOPASSWD.*', line: '%sudo ALL=(ALL:ALL) NOPASSWD: ALL'}
+      ]
+    when: variant in ['debian']
+
+  - lineinfile:
+      path: "{{sudoersd_dir + '/99_wheelnopasswd'}}"
+      state: present
+      create: true
+      regexp: '{{item.rexp}}'
+      line: '{{item.line}}'
+    ignore_errors: true
+    loop: [{rexp: '^[^#].*requiretty', line: '#Defaults:%wheel !requiretty'},
+      {rexp: '^.*%wheel.*ALL.*NOPASSWD.*', line: '%wheel ALL=(ALL:ALL) NOPASSWD: ALL'}
+      ]
+    when: variant not in ['debian']
+
+- block:
+  #- shell: sh /root/init/common/misc_config.sh cfg_inputrc_histsearch
+  #  ignore_errors: true
+
+  #- shell: command -v bind
+  #  register: bind_cmd
+  #  ignore_errors: true
+
+  - blockinfile:
+      path: /etc/skel/.inputrc
+      state: present
+      marker: '#-- {mark} managed zone --'
+      marker_begin: 'start'
+      marker_end: 'end'
+      create: true
+      block: |
+        "\e[A": history-search-backward
+        "\e[B": history-search-forward
+    ignore_errors: true
+    #when: not bind_cmd.get('failed', false)
+  when: ansible_facts.get('system')|lower == 'linux'
+
+#- block:
+#  #- shell: sh /root/init/common/misc_config.sh check_clamav
+#  #  ignore_errors: true
+#
+#  - get_url:
+#    url: https://secure.eicar.org/eicar.com.txt
+#    dest: /tmp/eicar.com.txt
+#
+#  - name: Check clamav
+#    shell: |
+#      freshclam --verbose ; freshclam --list-mirrors
+#      clamscan --verbose /tmp/eicar.com.txt
+#      clamscan --recursive /tmp ; rm /tmp/eicar.com.txt
+#    ignore_errors: true
+
+- block:
+  #- shell: sh /root/init/common/misc_config.sh cfg_sshd {{skeldir_ssh}}
+  #  ignore_errors: true
+
+  - file:
+      path: /etc/ssh/sshd_config.d
+      state: directory
+
+  - lineinfile:
+      path: /etc/ssh/sshd_config
+      state: present
+      regexp: '^.*Include /etc/ssh/sshd_config.d/\*.conf.*'
+      line: 'Include /etc/ssh/sshd_config.d/*.conf'
+    ignore_errors: true
+
+  - lineinfile:
+      path: /etc/ssh/sshd_config.d/99-rootlogin.conf
+      state: present
+      create: true
+      regexp: '^.*PermitRootLogin.*'
+      line: 'PermitRootLogin no'
+    ignore_errors: true
+
+  - blockinfile:
+      path: /etc/ssh/sshd_config.d/99-custom.conf
+      state: present
+      marker: '#-- {mark} managed zone --'
+      marker_begin: 'start'
+      marker_end: 'end'
+      create: true
+      block: |
+        UseDNS no
+        GSSAPIAuthentication no
+        HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+        PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+
+        HostKey /etc/ssh/ssh_host_ed25519_key
+        HostKey /etc/ssh/ssh_host_rsa_key
+
+        TrustedUserCAKeys /etc/ssh/sshca-id_rsa.pub
+        RevokedKeys /etc/ssh/krl.krl
+        #HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
+        #HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+
+        #Match User packer,user2
+        Match User packer
+          X11Forwarding yes
+          AllowTcpForwarding yes
+          X11UseLocalHost yes
+          X11DisplayOffset 10
+    ignore_errors: true
+
+  - stat: path='{{skeldir_ssh}}/publish_krls/sshca-id_rsa.pub'
+    ignore_errors: true
+    register: sshca_pubkey_st
+
+  - stat: path='{{skeldir_ssh}}/known_hosts'
+    ignore_errors: true
+    register: ssh_knownhosts_st
+
+  - copy:
+      src: '{{skeldir_ssh}}/known_hosts.sample'
+      dest: '{{skeldir_ssh}}/known_hosts'
+      remote_src: true
+    ignore_errors: true
+    when: not ssh_knownhosts_st.stat.exists
+
+  - block:
+    #- shell: cat {{sshca_pubkey_st.stat.path}}
+    #  ignore_errors: true
+    #  register: sshca_pubkey
+
+    - slurp: path='{{sshca_pubkey_st.stat.path}}'
+      register: b64_sshca_pubkey
+      ignore_errors: true
+
+    - lineinfile:
+        path: '{{skeldir_ssh}}/known_hosts'
+        state: present
+        create: true
+        regexp: '{{item.rexp}}'
+        #line: '{{item.linepfx}} {{sshca_pubkey.stdout}}'
+        line: '{{item.linepfx}} {{b64_sshca_pubkey|b64decode}}'
+      ignore_errors: true
+      loop: [{rexp: '^@cert-authority 192.168.* ', linepfx: '@cert-authority 192.168.0.0/16'}
+        #, {rexp: '^@cert-authority 172.16.* ', linepfx: '@cert-authority 172.16.0.0/12'}
+        #, {rexp: '^@cert-authority 10.0.* ', linepfx: '@cert-authority 10.0.0.0/8'}
+        #, {rexp: '^@cert-authority fd00.* ', linepfx: '@cert-authority fd00::/8'}
+        ]
+
+    - shell: cp -a {{skeldir_ssh}}/publish_krls/krl.krl {{sshca_pubkey_st.stat.path}} /etc/ssh/
+      ignore_errors: true
+    when: sshca_pubkey_st.stat.exists
+
+- block:
+  #- shell: sh /root/init/common/misc_config.sh cfg_shell_keychain {{skel_shellrc}}
+  #  ignore_errors: true
+
+  - blockinfile:
+      path: '{{skel_shellrc}}'
+      state: present
+      marker: '#-- {mark} managed zone --'
+      marker_begin: 'start'
+      marker_end: 'end'
+      block: |
+        eval `keychain --agents gpg,ssh --eval`
+        unsetenv SSH_AGENT_PID
+        setenv GPG_TTY `tty`
+        gpg-connect-agent updatestartuptty /bye > /dev/null
+        setenv SSH_AUTH_SOCK `gpgconf --list-dirs agent-ssh-socket`
+    ignore_errors: true
+    #when: ansible_facts.get("user_shell") is search("csh")
+    when: ansible_facts.get("env")["SHELL"] is search("csh")
+
+  - blockinfile:
+      path: '{{skel_shellrc}}'
+      state: present
+      marker: '#-- {mark} managed zone --'
+      marker_begin: 'start'
+      marker_end: 'end'
+      block: |
+        eval `keychain --agents gpg,ssh --eval`
+        unset SSH_AGENT_PID
+        export GPG_TTY=`tty`
+        gpg-connect-agent updatestartuptty /bye > /dev/null
+        export SSH_AUTH_SOCK=`gpgconf --list-dirs agent-ssh-socket`
+    ignore_errors: true
+    when: ansible_facts.get("env")["SHELL"] is not search("csh")
+
+- block:
+  #- shell: sh /root/init/common/misc_config.sh cfg_share_nfs_data0 {{sharednode}}
+  #  ignore_errors: true
+
+  - lineinfile:
+      path: /etc/fstab
+      state: present
+      regexp: '^.*:/mnt/Data0.*'
+      line: '#{{sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto  0  0'
+    when: ansible_facts.get('system')|lower != 'linux'
+
+  - lineinfile:
+      path: /etc/fstab
+      state: present
+      regexp: '^.*:/mnt/Data0.*'
+      line: '#{{sharednode}}:/mnt/Data0 /media/nfs_Data0  nfs  rw,noauto,users,rsize=8192,wsize=8192,timeo=14,_netdev  0  0'
+    when: ansible_facts.get('system')|lower == 'linux'
+
+  - file:
+      path: /media/nfs_Data0
+      state: directory
+
+#- block:
+#  #- shell: sh /root/init/common/misc_config.sh cfg_printer_default {{sharednode}} {{printname}}
+#  #  ignore_errors: true
+#
+#  - shell: |
+#      ## Configure printer using CUPS web interface
+#      # w3m http://localhost:631
+#
+#      #lpadmin -E -U root -p {{printname}} -D "{{printname}}" -L localhost -v "ipp://{{sharednode}}/printers/{{printname}}"
+#      #lpadmin -E -U root -d {{printname}}
+#      lpadmin -E -U root -p {{printname}} -v "ipp://{{sharednode}}/printers/{{printname}}"
+#      lpadmin -E -U root -d {{printname}}
+#    ignore_errors: true
+
+#- block:
+#  #- shell: sh /root/init/common/misc_config.sh cfg_printer_pdf {{etcdir_cups}} {{cupsdir_ppd}}
+#  #  ignore_errors: true
+#
+#  - lineinfile:
+#      path: '{{etcdir_cups}}/cups-pdf.conf'
+#      state: present
+#      create: true
+#      regexp: '^Out .*'
+#      line: 'Out ${HOME}/Documents/PDF'
+#    ignore_errors: true
+#
+#  - shell: |
+#      lpadmin -E -U root -p CUPS_PDF -v "cups-pdf:/" -i {{cupsdir_ppd}}/CUPS-PDF_opt.ppd
+#      lpadmin -E -U root -d CUPS_PDF
+#    ignore_errors: true

@@ -1,0 +1,443 @@
+---
+
+#- block:
+#  #- cron:
+#  #    name: clean old /tmp directories
+#  #    user: root
+#  #    special_time: daily
+#  #    job: 'find /tmp/* -maxdepth 0 -type d -atime +15 -print0 | xargs -0 rm -irf'
+#  #  ignore_errors: true
+#
+#  #- cron:
+#  #    name: clean old /tmp files
+#  #    user: root
+#  #    special_time: daily
+#  #    job: 'find /tmp/* -maxdepth 0 -type f -atime +15 -print0 | xargs -0 rm -if'
+#  #  ignore_errors: true
+#
+#  - set_fact:
+#      dailycleantmp_file: /etc/periodic/daily/999.cleantmp
+#    when: ansible_facts.get('system')|lower == 'freebsd'
+#
+#  - block:
+#    - set_fact:
+#        dailycleantmp_file: /etc/periodic/daily/900cleantmp
+#      when: ansible_facts.get('os_family')|lower == 'alpine'
+#
+#    - set_fact:
+#        dailycleantmp_file: /etc/cron.daily/900cleantmp
+#      when: ansible_facts.get('os_family')|lower != 'alpine'
+#    when: ansible_facts.get('system')|lower == 'linux'
+#
+#  - copy:
+#      dest: '{{dailycleantmp_file}}'
+#      mode: 'ugo+x'
+#      content: |
+#        #!/bin/sh
+#
+#        find /tmp/* -maxdepth 0 -type d -atime +15 -print0 | xargs -0 rm -irf
+#        find /tmp/* -maxdepth 0 -type f -atime +15 -print0 | xargs -0 rm -if
+#
+#    ignore_errors: true
+#  when: ansible_facts.get('system')|lower in ['freebsd', 'linux']
+
+- block:
+  #- shell: sh /root/init/common/cron/bsd/config_cron.sh
+  #  ignore_errors: true
+
+  - block:
+    - copy:
+        dest: '/etc/periodic/{{item}}/0anacron'
+        mode: 'ugo+x'
+        content: |
+          #!/bin/sh
+
+          #anacron -u {job} --> date +%Y%m%d > /var/spool/anacron/{job}
+          /usr/local/sbin/anacron -u {{item}}
+      ignore_errors: true
+      loop: [daily, weekly, monthly]
+      when: ansible_facts.get('system')|lower == 'freebsd'
+
+    - block:
+      - copy:
+          dest: '/etc/{{item}}.local'
+          mode: 'ugo+x'
+          content: |
+            #!/bin/sh
+
+          force: false
+        ignore_errors: true
+        loop: [daily, weekly, monthly]
+
+      - blockinfile:
+          path: '/etc/{{item}}.local'
+          state: present
+          marker: '#-- {mark} managed zone --'
+          marker_begin: 'start'
+          marker_end: 'end'
+          create: true
+          block: |
+            #anacron -u {job} --> date +%Y%m%d > /var/spool/anacron/{job}
+            /usr/local/sbin/anacron -u {{item}}
+        ignore_errors: true
+        loop: [daily, weekly, monthly]
+
+      - replace:
+          path: '/etc/{{item}}.local'
+          regexp: '/usr/local/sbin'
+          replace: '/usr/pkg/sbin'
+        ignore_errors: true
+        when: ansible_facts.get('system')|lower == 'netbsd'
+        loop: [daily, weekly, monthly]
+      when: ansible_facts.get('system')|lower in ['netbsd', 'openbsd']
+
+  - block:
+    - copy:
+        src: '{{item}}'
+        dest: '{{item}}.orig'
+        remote_src: true
+        force: false
+      ignore_errors: true
+      loop: [/var/cron/tabs/root, /etc/crontab, /usr/local/etc/anacrontab
+            , /usr/pkg/etc/anacrontab]
+
+    - replace:
+        path: '{{item}}'
+        regexp: '^([^#].*periodic [daiwekmonth]*ly.*)$'
+        replace: '#\1'
+      ignore_errors: true
+      loop: [/var/cron/tabs/root, /etc/crontab, /usr/local/etc/anacrontab
+            , /usr/pkg/etc/anacrontab]
+      when: ansible_facts.get('system')|lower == 'freebsd'
+
+    - replace:
+        path: '{{item}}'
+        regexp: '^([^#].*/etc/[daiwekmonth]*ly.*)$'
+        replace: '#\1'
+      ignore_errors: true
+      loop: [/var/cron/tabs/root, /etc/crontab, /usr/local/etc/anacrontab
+            , /usr/pkg/etc/anacrontab]
+      when: ansible_facts.get('system')|lower in ['netbsd', 'openbsd']
+
+  - block:
+    - copy:
+        src: /root/init/common/cron/bsd/anacrontab_head.sample
+        dest: /usr/pkg/etc/anacrontab
+        remote_src: true
+        force: false
+      ignore_errors: true
+      when: ansible_facts.get('system')|lower == 'netbsd'
+
+    - copy:
+        src: /root/init/common/cron/bsd/anacrontab_head.sample
+        dest: /usr/local/etc/anacrontab
+        remote_src: true
+        force: false
+      ignore_errors: true
+      when: ansible_facts.get('system')|lower in ['freebsd', 'openbsd']
+
+    - slurp: path=/root/init/common/cron/bsd/anacrontab_tail.sample
+      register: tailb64_anacrontab
+      ignore_errors: true
+
+    - blockinfile:
+        path: /usr/pkg/etc/anacrontab
+        state: present
+        marker: '#-- {mark} managed zone --'
+        marker_begin: 'start'
+        marker_end: 'end'
+        block: "{{tailb64_anacrontab.content|b64decode}}"
+      ignore_errors: true
+      when: ansible_facts.get('system')|lower == 'netbsd'
+
+    - blockinfile:
+        path: /usr/local/etc/anacrontab
+        state: present
+        marker: '#-- {mark} managed zone --'
+        marker_begin: 'start'
+        marker_end: 'end'
+        block: "{{tailb64_anacrontab.content|b64decode}}"
+      ignore_errors: true
+      when: ansible_facts.get('system')|lower in ['freebsd', 'openbsd']
+
+    - copy:
+        src: /root/init/common/cron/bsd/crontab_syshead.sample
+        dest: /etc/crontab
+        remote_src: true
+        force: false
+      ignore_errors: true
+
+    - file: path=/etc/cron.d state=directory
+
+    - file: path=/etc/crontab state=touch
+
+    #- slurp: path=/root/init/common/cron/bsd/crontab_roottail.sample
+    #  register: tailb64_crontabroot
+    #  ignore_errors: true
+
+    #- blockinfile:
+    #    path: /var/cron/tabs/root
+    #    state: present
+    #    marker: '#-- {mark} managed zone --'
+    #    marker_begin: 'start'
+    #    marker_end: 'end'
+    #    create: true
+    #    block: "{{tailb64_crontabroot.content|b64decode}}"
+    #  ignore_errors: true
+
+    - slurp: path=/root/init/common/cron/bsd/crond_periodic.sample
+      register: tailb64_crondperiodic
+      ignore_errors: true
+
+    - blockinfile:
+        #path: /etc/crontab
+        path: /etc/cron.d/periodic
+        state: present
+        marker: '#-- {mark} managed zone --'
+        marker_begin: 'start'
+        marker_end: 'end'
+        create: true
+        block: "{{tailb64_crondperiodic.content|b64decode}}"
+      ignore_errors: true
+
+    - cron:
+        name: run anacron
+        cron_file: anacron
+        user: root
+        minute: '02'
+        hour: '6-22'
+        day: '*'
+        month: '*'
+        weekday: '*'
+        job: '/usr/local/sbin/anacron -s'
+      ignore_errors: true
+
+    - block:
+      - replace:
+          path: '{{item}}'
+          regexp: 'periodic ([daiwekmonth]*ly)'
+          replace: '/bin/sh /etc/\1'
+        ignore_errors: true
+        loop: [/var/cron/tabs/root, /etc/crontab, /usr/local/etc/anacrontab
+              , /usr/pkg/etc/anacrontab, /etc/cron.d/periodic]
+
+      - replace:
+          path: '{{item}}'
+          regexp: '/usr/local/sbin'
+          replace: '/usr/pkg/sbin'
+        ignore_errors: true
+        loop: [/var/cron/tabs/root, /etc/crontab, /usr/local/etc/anacrontab
+              , /usr/pkg/etc/anacrontab, /etc/cron.d/periodic]
+        when: ansible_facts.get('system')|lower == 'netbsd'
+
+      - replace:
+          path: '{{item}}'
+          regexp: 'tail -vn+1'
+          replace: 'tail -n+1 .'
+        ignore_errors: true
+        loop: [/var/cron/tabs/root, /etc/crontab, /usr/local/etc/anacrontab
+              , /usr/pkg/etc/anacrontab, /etc/cron.d/periodic]
+        when: ansible_facts.get('system')|lower == 'openbsd'
+      when: ansible_facts.get('system')|lower in ['netbsd', 'openbsd']
+  when: ansible_facts.get('system')|lower in ['freebsd', 'netbsd', 'openbsd']
+
+- block:
+  #- shell: sh /root/init/common/cron/linux/config_cron.sh
+  #  ignore_errors: true
+
+  - block:
+    - copy:
+        dest: '/etc/periodic/{{item}}/0anacron'
+        mode: 'ugo+x'
+        content: |
+          #!/bin/sh
+
+          #anacron -u {job} --> date +%Y%m%d > /var/spool/anacron/{job}
+          anacron -u cron.{{item}}
+      ignore_errors: true
+      loop: [daily, weekly, monthly]
+      when: ansible_facts.get('os_family')|lower == 'alpine'
+
+    - copy:
+        dest: '/etc/cron.{{item}}/0anacron'
+        mode: 'ugo+x'
+        content: |
+          #!/bin/sh
+
+          #anacron -u {job} --> date +%Y%m%d > /var/spool/anacron/{job}
+          anacron -u cron.{{item}}
+      ignore_errors: true
+      loop: [daily, weekly, monthly]
+      when: ansible_facts.get('os_family')|lower != 'alpine'
+
+    - copy:
+        dest: /etc/periodic/daily/999dailystats
+        src: /root/init/common/cron/linux/cron_daily_999dailystats.sample
+        remote_src: true
+        mode: 'ugo+x'
+      ignore_errors: true
+      when: ansible_facts.get('os_family')|lower == 'alpine'
+
+    - copy:
+        dest: /etc/cron.daily/999dailystats
+        src: /root/init/common/cron/linux/cron_daily_999dailystats.sample
+        remote_src: true
+        mode: 'ugo+x'
+      ignore_errors: true
+      when: ansible_facts.get('os_family')|lower != 'alpine'
+
+  - block:
+    - copy:
+        src: '{{item}}'
+        dest: '{{item}}.orig'
+        remote_src: true
+        force: false
+      ignore_errors: true
+      loop: [/var/spool/cron/root, /var/spool/cron/crontabs/root, /etc/crontab
+            , /etc/anacrontab]
+
+    - replace:
+        path: '{{item}}'
+        regexp: '^([^#].*/etc/periodic/[daiwekmonth]*ly.*)$'
+        replace: '#\1'
+      ignore_errors: true
+      loop: [/var/spool/cron/root, /var/spool/cron/crontabs/root, /etc/crontab
+            , /etc/anacrontab]
+      when: ansible_facts.get('os_family')|lower == 'alpine'
+
+    - replace:
+        path: '{{item}}'
+        regexp: '^([^#].*cron\.[daiwekmonth]*ly.*)$'
+        replace: '#\1'
+      ignore_errors: true
+      loop: [/var/spool/cron/root, /var/spool/cron/crontabs/root, /etc/crontab
+            , /etc/anacrontab]
+      when: ansible_facts.get('os_family')|lower != 'alpine'
+
+    - replace:
+        path: '{{item}}'
+        regexp: '^([^#].*run-crons.*)$'
+        replace: '#\1'
+      ignore_errors: true
+      loop: [/var/spool/cron/root, /var/spool/cron/crontabs/root, /etc/crontab
+            , /etc/anacrontab]
+      when: ansible_facts.get('os_family')|lower is search ("suse")
+
+  - block:
+    - copy:
+        src: /root/init/common/cron/linux/anacrontab_head.sample
+        dest: /etc/anacrontab
+        remote_src: true
+        force: false
+      ignore_errors: true
+
+    - slurp: path=/root/init/common/cron/linux/anacrontab_tail.sample
+      register: tailb64_anacrontab
+      ignore_errors: true
+
+    - blockinfile:
+        path: /etc/anacrontab
+        state: present
+        marker: '#-- {mark} managed zone --'
+        marker_begin: 'start'
+        marker_end: 'end'
+        block: "{{tailb64_anacrontab.content|b64decode}}"
+      ignore_errors: true
+
+    - copy:
+        src: /root/init/common/cron/linux/crontab_syshead.sample
+        dest: /etc/crontab
+        remote_src: true
+        force: false
+      ignore_errors: true
+
+    - file: path=/etc/cron.d state=directory
+
+    - file: path=/etc/crontab state=touch
+
+    - block:
+      - slurp: path=/root/init/common/cron/linux/crontab_roottail.sample
+        register: tailb64_crontabroot
+        ignore_errors: true
+
+      - blockinfile:
+          path: /var/spool/cron/crontabs/root
+          state: present
+          marker: '#-- {mark} managed zone --'
+          marker_begin: 'start'
+          marker_end: 'end'
+          create: true
+          block: "{{tailb64_crontabroot.content|b64decode}}"
+        ignore_errors: true
+
+      - copy:
+          dest: /etc/periodic/hourly/0anacron
+          mode: 'ugo+x'
+          content: |
+            #!/bin/sh
+
+            anacron -s
+        ignore_errors: true
+      when: ansible_facts.get('os_family')|lower == 'alpine'
+
+    - block:
+      - slurp: path=/root/init/common/cron/linux/crond_periodic.sample
+        register: tailb64_crondperiodic
+        ignore_errors: true
+
+      - blockinfile:
+          #path: /etc/crontab
+          path: /etc/cron.d/periodic
+          state: present
+          marker: '#-- {mark} managed zone --'
+          marker_begin: 'start'
+          marker_end: 'end'
+          create: true
+          block: "{{tailb64_crondperiodic.content|b64decode}}"
+        ignore_errors: true
+
+      #- copy:
+      #    dest: /etc/cron.hourly/0anacron
+      #    mode: 'ugo+x'
+      #    content: |
+      #      #!/bin/sh
+      #
+      #      #anacron -s
+      #  ignore_errors: true
+
+      - cron:
+          name: run anacron
+          cron_file: anacron
+          user: root
+          minute: '02'
+          hour: '6-22'
+          day: '*'
+          month: '*'
+          weekday: '*'
+          job: 'anacron -s'
+        ignore_errors: true
+      when: ansible_facts.get('os_family')|lower != 'alpine'
+
+    - block:
+      - replace:
+          path: '{{item}}'
+          regexp: '/etc/cron.([daiwekmonth]*ly)'
+          replace: '/etc/periodic/\1'
+        ignore_errors: true
+        loop: [/var/spool/cron/root, /var/spool/cron/crontabs/root, /etc/crontab
+            , /etc/anacrontab, /etc/cron.d/periodic]
+        when: ansible_facts.get('os_family')|lower == 'alpine'
+
+      - shell: run-parts --help | grep -e "--report" || true
+        ignore_errors: true
+        register: out_runpartscmd
+
+      - replace:
+          path: '{{item}}'
+          regexp: 'run-parts /etc'
+          replace: 'run-parts --report /etc'
+        ignore_errors: true
+        loop: [/var/spool/cron/root, /var/spool/cron/crontabs/root, /etc/crontab
+            , /etc/anacrontab, /etc/cron.d/periodic]
+        when: out_runpartscmd.stdout_lines != []
+  when: ansible_facts.get('system')|lower == 'linux'

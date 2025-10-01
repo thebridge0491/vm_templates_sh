@@ -2,45 +2,90 @@
 - hosts: all
   become: yes
   gather_facts: yes
+  vars:
+    #ansible_facts_modules: [setup]
+    ansible_facts_modules: [setup, mount_facts]
+    #items_loop: 'ansible_kernel*,ansible_os_family,ansible_lsb,ansible_distribution*,ansible_service_mgr,ansible_pkg_mgr'
+    items: "{{lookup('env', 'items', default='!all,!min,kernel,os_family,lsb,distribution,service_mgr,pkg_mgr')}}"
+  module_defaults:
+    #ansible.builtin.setup:
+    #  gather_subset: ['all']
+    ansible.builtin.mount_facts:
+      devices: "*pool0/ROOT/default,/dev/sda5"
 
   tasks:
     - block:
       - name: Brief ansible_facts
         #setup: filter={{ item }}
         #register: out
-        #loop: "{{(lookup('env', 'items') or 'ansible_os_family,ansible_lsb,ansible_distribution*').split(',')}}"
+        #loop: "{{items_loop.split(',')}}"
       #- debug: var=out.results[1].ansible_facts
-        setup: gather_subset=!all,!min,{{lookup('env', 'items') or 'os_family,lsb,distribution'}}
+      #  when: not ansible_check_mode
+        setup: gather_subset={{items}}
         register: out
-      - debug: var=out.ansible_facts
+      #- debug: var=[out.ansible_facts,'ansible_uptime_seconds={{ansible_uptime_seconds}}','ansible_version={{ansible_version.string}}']
+      - shell: who -b
+        register: last_boot
+        ignore_errors: true
+      - debug: var=[out,'last_boot='~last_boot.stdout,'ansible_version={{ansible_version.string}}']
+        when: not ansible_check_mode
+      - copy:
+          owner: packer
+          backup: true
+          dest: '/tmp/ansible_brieffacts-{{ansible_facts.get("machine")}}.txt'
+          content: |
+            {{inventory_hostname}} | SUCCESS => {{(out | combine({"last_boot": last_boot.stdout, "ansible_version": ansible_version.string})) | to_nice_yaml}}
+        ignore_errors: true
+        #become: false
+        #delegate_to: localhost
+      # logger -s -t user -p user.notice Ansible brief facts
+      - community.general.syslogger:
+          ident: user
+          facility: user
+          priority: notice
+          msg: Ansible brief facts
+        when: not ansible_check_mode
       tags: never, brieffacts
 
     - block:
-      - name: All ansible_facts
-        setup:
-        register: out
-      - debug: var=out.ansible_facts
-      tags: never, allfacts
-
-    - block:
-      - stat: path=/tmp/scripts.tar
+      - name: copy local scripts tarball to remote
+        copy: remote_src=false src=/tmp/scripts_{{variant}}.tar dest=/tmp/scripts.tar
         ignore_errors: true
-        register: scripts_tar_st
+        register: out_tarball
+      #- debug: var=out_tarball.get('failed', false)
+
+      - block:
+        - stat: path=/tmp/scripts.tar
+          ignore_errors: true
+          register: scripts_tar_st
+        when: not out_tarball.get('failed', false)
+      #- stat: path=/tmp/scripts.tar
+      #  ignore_errors: true
+      #  register: scripts_tar_st
 
       - block:
         - name: Xfer scripts
           file: path={{item}} state=absent
           loop: [/tmp/init, /tmp/scripts, /root/init, /root/scripts]
-
-        - unarchive: remote_src=yes src=/tmp/scripts.tar dest=/tmp
-
-        - shell: mv /tmp/{{variant}} /tmp/scripts ; cp -R /tmp/init /tmp/scripts /root/
-
+        - unarchive: remote_src=true src=/tmp/scripts.tar dest=/tmp
+        - copy: remote_src=true src=/tmp/{{variant}}/ dest=/tmp/scripts
+          ignore_errors: true
+        - file: path=/tmp/{{variant}} state=absent
+        - shell: |
+            chown -R $(id -un):$(id -gn) /tmp/init /tmp/scripts
+          ignore_errors: true
+        - copy: remote_src=true src={{item}} dest=/root/
+          with_items: [/tmp/init, /tmp/scripts]
         #- file: path=/tmp/scripts.tar state=absent
-        when: scripts_tar_st.stat.exists
+        #when: scripts_tar_st.stat.exists
+        when: (not out_tarball.get('failed', false)) and scripts_tar_st.stat.exists
+        vars:
+          userX:
+          groupX:
       tags: xferscripts
 
   roles:
     - role: packer
       #vars:
       #  variant: "{{(ansible_facts.get('os_family') or ansible_facts.get('distribution'))|lower}}"
+

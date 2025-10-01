@@ -1,13 +1,12 @@
 ---
 # Non-default OS based (using family, distribution, ...) vars file
 
-#pkgupgd_params: {"update_cache": yes, "upgrade": yes}
+service_mgr: "{{ansible_facts.get('service_mgr') or 'openrc'}}"
+pkg_mgr: "{{ansible_facts.get('pkg_mgr') or 'apk'}}"
+pkgclean_cmd: apk -v cache clean
+pkgrepos_cmd: tail -vn+1 /etc/apk/repositories | grep -ve "^#"
+pkgoutdated_cmd: apk upgrade --simulate
+pkglocks_cmd: true
 
-idsuffix_cmd: cat /var/lib/dbus/machine-id | cut -b29-32
-services_enabled: [openntpd, nftables, udev, dbus, avahi-daemon, nfsclient, cupsd]
-services_disabled: [ipset, ip6tables, iptables, freshclam, clamd]
-
-sudoers_group: wheel
-cupsdir_ppd: /usr/share/cups/model
-
-uiservices_enabled: [dbus, polkit, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
+firewall_tool: firewalld
+smtp_daemon: smtpd

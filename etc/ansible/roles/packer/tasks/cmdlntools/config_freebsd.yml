@@ -1,47 +1,76 @@
 ---
 
-- lineinfile:
-    path: /etc/csh.cshrc
-    state: present
-    regexp: '^setenv JAVA_HOME.*'
-    line: 'setenv JAVA_HOME {{distro_pkgs.default_java_home}}'
+- name: "Fetch missing distribution components? Enter 'yes' to continue [yesNO]:"
+  pause:
+    prompt: |
+      Do you want to fetch missing distribution components?
+      Enter 'yes' to continue, else stop playbook [yesNO]:
+  register: response_fetch
+  when: not (autoconfirm | default(false))|bool
+
+- block:
+  #- name: 'Fetch & extract missing distribution components like: src.txz'
+  #  unarchive:
+  #    remote_src: true
+  #    src: 'ftp://ftp.freebsd.org/pub/FreeBSD/releases/{{uname_m}}/{{release}}-RELEASE/{{setX}}.txz'
+  #    dest: /
+  #    extra_opts: [-z, -v]
+  #  ignore_errors: true
+  #  loop: [src]
+  #  loop_control: {"loop_var": "setX"}
+
+  - block:
+    - name: 'Fetch, then extract missing distribution components like: src.txz'
+      get_url:
+        url: 'ftp://ftp.freebsd.org/pub/FreeBSD/releases/{{uname_m}}/{{release}}-RELEASE/{{setX}}.txz'
+        dest: '/tmp/{{setX}}.txz'
+      ignore_errors: true
+      loop: [src]
+      loop_control: {"loop_var": "setX"}
+    #- unarchive:
+    #    remote_src: true
+    #    src: '/tmp/{{setX}}.txz'
+    #    dest: /
+    #    extra_opts: [-z, -v]
+    #  ignore_errors: true
+    #  loop: [src]
+    #  loop_control: {"loop_var": "setX"}
+  when: (autoconfirm | default(false) or response_fetch.user_input | default(false))|bool
+  vars:
+    uname_m: '{{ansible_facts.get("machine")}}'
+    release: '{{ansible_facts.get("distribution_version")}}'
+
+- file: path={{item}} state=touch
+  loop: [/boot/loader.conf, /etc/rc.conf]
+
+- community.general.sysrc: name={{item.flagX}} value='{{item.valX}}' state={{item.stateX}}
   ignore_errors: true
+  loop: [{'flagX': 'devfs_system_ruleset', 'valX': 'devfsrules_system', 'stateX': 'present'}
+        , {'flagX': 'syslogd_flags', 'valX': '-ss', 'stateX': 'present'}
+        , {'flagX': 'ntpd_sync_on_start', 'valX': 'YES', 'stateX': 'present'}
+        , {'flagX': 'cron_flags', 'valX': '-J 60 -j 60', 'stateX': 'present'}
+        #, {'flagX': 'anacron_flags', 'valX': '-s', 'stateX': 'value_present'}
+        #, {'flagX': 'mountd_flags', 'valX': '-r', 'stateX': 'present'}
+        ]
 
-- lineinfile:
-    path: /etc/fstab
-    state: present
-    regexp: '^fdesc'
-    line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
+#- community.general.sysrc:
+#    name: anticongestion_sleeptime
+#    value: 3600
+#    state: present
+#    path: /etc/periodic.conf
+#  ignore_errors: true
+
+- community.general.sysrc: name={{item.flagX}} value='{{item.valX}}' state=present path=/etc/periodic.conf
   ignore_errors: true
-
-- name: "Config misc services(ntp, firewall)"
-  shell: |
-    #ntpd -u ntp:ntp ; ntpq -p
-    ntpdate -v -u -b us.pool.ntp.org
-
-    pfctl -d
-    sh /root/init/common/bsd/firewall/pf/pfconf.sh config_pf allow > /etc/pf.conf.new
-    if [ ! -e /etc/pf.conf ] ; then cp /etc/pf.conf.new /etc/pf.conf ; fi
-    pfctl -vf /etc/pf.conf ; pfctl -s info ; pfctl -s rules -a '*'
-
-    cd /usr/bin
-    for file1 in lp lpq lpr lprm ; do
-      if [ -e ${file1} ] ; then
-        mv ${file1} ${file1}.old ;
-      fi ;
-      ln -s /usr/local/bin/${file1} ${file1} ;
-    done
-  ignore_errors: true
-
-- shell: sysrc devfs_system_ruleset="devfsrules_system"
-  ignore_errors: true
-
-- group: name=cups gid=193 system=yes state=present
-  ignore_errors: true
-
-- user: name={{item}} groups=cups append=yes
-  ignore_errors: true
-  loop: [root]
+  loop: [{'flagX': 'daily_clean_tmps_enable', 'valX': 'NO'}
+        #, {'flagX': 'daily_clean_tmps_days', 'valX': '15'}
+        , {'flagX': 'daily_status_ntpd_enable', 'valX': 'YES'}
+        , {'flagX': 'daily_status_disks_df_flags', 'valX': '-lhT -c'}
+        , {'flagX': 'daily_output', 'valX': ''}
+        , {'flagX': 'weekly_output', 'valX': ''}
+        , {'flagX': 'monthly_output', 'valX': ''}
+        , {'flagX': 'daily_status_security_output', 'valX': '/var/log/security.out'}
+        ]
 
 - blockinfile:
     path: /etc/devfs.rules
@@ -49,7 +78,7 @@
     marker: '#-- {mark} managed zone --'
     marker_begin: 'start'
     marker_end: 'end'
-    create: yes
+    create: true
     block: |
       [devfsrules_system=10]
       add path 'unlpt*' group cups mode 0660
@@ -59,3 +88,30 @@
       #NOTE, find USB device correspond to printer: dmesg | grep -e ugen
       #add path 'usb/X.Y.Z' group cups mode 0660
   ignore_errors: true
+
+- block:
+  - group: name=cups gid=193 system=true state=present
+    ignore_errors: true
+
+  - user: name={{item}} groups=cups append=true
+    ignore_errors: true
+    loop: [root]
+
+  - copy: remote_src=true src=/usr/bin/{{item}} dest=/usr/bin/{{item}}.old
+    ignore_errors: true
+    loop: [lp, lpq, lpr, lprm]
+
+  - file: path=/usr/bin/{{item}} state=absent
+    ignore_errors: true
+    loop: [lp, lpq, lpr, lprm]
+
+  - file: src=/usr/pkg/bin/{{item}} dest=/usr/bin/{{item}} state=link
+    ignore_errors: true
+    loop: [lp, lpq, lpr, lprm]
+    when: ansible_facts.get('system')|lower == 'netbsd'
+
+  - file: src=/usr/local/bin/{{item}} dest=/usr/bin/{{item}} state=link
+    ignore_errors: true
+    loop: [lp, lpq, lpr, lprm]
+    when: ansible_facts.get('system')|lower in ['freebsd', 'openbsd']
+#  when: ansible_facts.get('system')|lower in ['freebsd', 'netbsd', 'openbsd']

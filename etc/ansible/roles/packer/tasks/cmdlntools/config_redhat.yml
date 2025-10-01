@@ -1,41 +1,24 @@
 ---
 
-- shell: |
-    dnf --setopt=install_weak_deps=False config-manager --save
-    dnf config-manager --dump | grep -we install_weak_deps
-  ignore_errors: true
+#- file: path=/var/lib/clamav state=directory recurse=true owner=clamav group=clamav
+#  ignore_errors: true
 
-- package:
-    use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
-    name: ['@Base']
-    state: present
+#- file: path=/var/lib/clamav/clamd.sock state=touch owner=clamav group=clamav
+#  ignore_errors: true
 
-- lineinfile:
-    path: /etc/bash.bashrc
-    state: present
-    create: yes
-    regexp: '^export JAVA_HOME.*'
-    line: 'export JAVA_HOME={{distro_pkgs.default_java_home}}'
-  ignore_errors: true
-
-- file:
-    path: '{{distro_pkgs.default_java_home}}'
-    state: directory
-
-- lineinfile:
-    path: '{{distro_pkgs.default_java_home}}/release'
-    state: present
-    regexp: '^JAVA_VERSION.*'
-    line: 'JAVA_VERSION={{distro_pkgs.default_java_version}}'
-  ignore_errors: true
-
-- name: "Config misc services(ntp, firewall)"
-  shell: |
-    ntpd -u ntp:ntp ; ntpq -p ; sleep 3
-    sh /root/init/common/linux/firewall/firewalld/config_firewalld.sh cmds_firewalld allow
-
-    firewall-cmd --zone=public --permanent --add-service=mdns
-  ignore_errors: true
+#- block:
+#  - replace:
+#      path: '{{item}}'
+#      regexp: '^Example'
+#      replace: '#Example'
+#    ignore_errors: true
+#    loop: [/etc/freshclam.conf, /etc/clamd.d/scan.conf]
+#
+#  - replace:
+#      path: /etc/clamd.d/scan.conf
+#      regexp: '^#\s*LocalSocket'
+#      replace: 'LocalSocket'
+#    ignore_errors: true
 
 #- lineinfile:
 #    path: /etc/sudoers

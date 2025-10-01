@@ -1,0 +1,94 @@
+---
+
+- block:
+  - set_fact: cacheable=false voltypeX="{{ansible_facts.get('mount_points', {}).get('/', {}).get('fstype', 'ffs')}}"
+    when: ansible_facts.get('system')|lower in ['netbsd', 'openbsd']
+
+  - block:
+    - set_fact: cacheable=false dev_root="{{ansible_facts.get('mount_points', {}).get('/', {}).get('device', 'fspool0/ROOT/default')}}"
+    - set_fact: cacheable=false voltypeX="{{ansible_facts.get('mount_points', {}).get('/', {}).get('fstype', 'zfs')}}"
+    when: ansible_facts.get('system')|lower == 'freebsd'
+
+  - block:
+    - set_fact: cacheable=false dev_root="{{ansible_facts.get('mount_points', {}).get('/', {}).get('device', 'ospool0/ROOT/default')}}"
+    - set_fact: cacheable=false voltypeX="{{ansible_facts.get('mount_points', {}).get('/', {}).get('fstype', 'btrfs')}}"
+    when: ansible_facts.get('system')|lower == 'linux'
+
+- block:
+  #- mount_facts:
+  #    devices: "*pool0/ROOT/default,/dev/sda5"
+  #  register: out0
+  #- debug: var=out0
+
+  #- shell: |
+  #    zfs snapshot {{dev_root}}@{{snapshot_name | default('snap1-'+dateutc)}}
+  #
+  #    zfs list -t snapshot
+  #  register: out
+  #  ignore_errors: true
+  - name: create ZFS snapshot
+    community.general.zfs:
+      name: '{{dev_root}}@{{snapshot_name | default("snap1-"+dateutc)}}'
+      state: present
+
+  - name: display ZFS snapshot(s)
+    community.general.zfs_facts:
+      name: /
+      type: snapshot
+      properties: 'used,available,referenced,mountpoint'
+    register: out_info
+    ignore_errors: true
+  - debug: var=out_info
+  ##- debug: var=(['snapshot_name='+(snapshot_name | default('snap1-'+dateutc)),'DEV_ROOT='+dev_root,'fstype='+out0.get('ansible_facts').get('mount_points', {}).get('/', {}).get('fstype', 'btrfs')]+out.stdout_lines)
+  #- debug: var=(out.stdout_lines)
+  when: voltypeX == 'zfs' and ansible_facts.get('system')|lower in ['freebsd', 'linux']
+
+- block:
+  - shell: btrfs subvolume snapshot / /.snapshots/{{snapshot_name | default('snap1-'+dateutc)}}
+    register: out
+    ignore_errors: true
+  - debug: var=(out.stdout_lines)
+  #- name: create Btrfs snapshot
+  #  community.general.btrfs_subvolume:
+  #    name: '/@/.snapshots/{{snapshot_name | default("snap1-"+dateutc)}}'
+  #    snapshot_source: /
+  #    #filesystem_device: '{{dev_root}}'
+  #  ignore_errors: true
+
+  #- name: display Btrfs info
+  #  community.general.btrfs_info:
+  #  register: out_btrfsinfo
+  #- debug: var=(out_btrfsinfo.filesystems)
+
+  - shell: |
+      #btrfs filesystem show ; fstrim -av
+      btrfs subvolume list -s / ; fstrim -av
+    register: out
+  - debug: var=(out.stdout_lines)
+  when: voltypeX == 'btrfs' and ansible_facts.get('system')|lower in ['linux']
+
+#- block:
+#  - shell: |
+#      mksnap_ffs / /.snap/{{varsdict.snapshot_name | default('snap1-'+dateutc)}}
+#
+#      find / -flags snapshot ; snapinfo /
+#    register: out
+#  - debug: var=(out.stdout_lines)
+#  when: voltypeX == 'ufs' and ansible_facts.get('system')|lower in ['freebsd']
+
+#- block:
+#  #- shell: |
+#  #    lvcreate --snapshot --size 2G --name {{snapshot_name | default('snap1-'+dateutc)}} \
+#  #      {{dev_root.split('/')[3].split('-')[0]}}/{{dev_root.split('/')[3].split('-')[1]}}
+#  #  register: out
+#  - name: create LVM snapshot
+#    community.general.lvol:
+#      vg: "{{dev_root.split('/')[3].split('-')[0]}}"
+#      lv: "{{dev_root.split('/')[3].split('-')[1]}}"
+#      snapshot: '{{snapshot_name | default("snap1-"+dateutc)}}'
+#      size: 2G
+#
+#  - shell: lvs -S 'lv_attr =~ ^s' || lvs ; fstrim -av
+#    register: out
+#  - debug: var=(out.stdout_lines)
+#  when: voltypeX not in ['zfs', 'btrfs'] and ansible_facts.get('system')|lower in ['linux']

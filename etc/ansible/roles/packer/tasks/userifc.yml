@@ -1,47 +1,261 @@
 ---
 
 - block:
-  - name: "User interface packages (variant: {{variant}})"
-    #shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo ${pkgs_displaysvr_xorg}
-    #ignore_errors: true
-    debug: msg={{(distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}
+  - block:
+    - service: name=pamac state=stopped
+      ignore_errors: true
 
-  - package:
-      use: '{{ansible_facts.get("pkg_mgr") or pkg_mgr}}'
-      name: '{{(distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}'
-      state: present
-    when: not variant in ['redhat', 'pclinuxos', 'mageia']
-  - shell: dnf -y install {{distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")}}
-    when: variant in ['redhat']
-  - package:
-      use: '{{pkg_mgr}}'
-      name: '{{item}}'
-      state: present
-    loop: '{{(distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}'
-    when: variant in ['pclinuxos', 'mageia']
+    - file: path=/var/lib/pacman/db.lck state=absent
+      ignore_errors: true
+    when: pkg_mgr == 'pacman'
 
-- include_tasks: '{{uicfgfile}}'
+  - block:
+    - shell: |
+        apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
+          tee /etc/apt/apt.conf.d/999norecommends
+      ignore_errors: true
+
+    - lineinfile:
+        path: /etc/apt/apt.conf.d/99force-ipv4
+        state: present
+        create: true
+        regexp: 'Acquire::ForceIPv4.*;'
+        line: '#Acquire::ForceIPv4 "true";'
+      ignore_errors: true
+
+    - lineinfile:
+        path: /etc/apt/apt.conf.d/99retries03
+        state: present
+        create: true
+        regexp: '^Acquire::Retries.*;'
+        line: 'Acquire::Retries "3";'
+      ignore_errors: true
+    when: pkg_mgr in ['apt', 'apt_rpm']
+
+  - block:
+    - lineinfile:
+        path: /etc/zypp/zypp.conf
+        state: present
+        create: true
+        regexp: '.*solver.onlyRequires.*=.*'
+        line: 'solver.onlyRequires = true'
+      ignore_errors: true
+
+    - lineinfile:
+        path: /etc/zypp/zypp.conf
+        state: present
+        create: true
+        regexp: '.*installRecommends.*=.*'
+        line: 'installRecommends = no'
+      ignore_errors: true
+
+    - package: use='{{pkg_mgr}}' name=netcat-openbsd state=absent
+      ignore_errors: true
+    when: pkg_mgr == 'zypper'
+
+  - shell: |
+      dnf --setopt=install_weak_deps=False config-manager --save
+      dnf config-manager --dump | grep -we install_weak_deps
+    ignore_errors: true
+    when: pkg_mgr == 'dnf'
+
+  - block:
+    - name: "Refresh pkg db (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' name=pkg
+      register: out
+      when: pkg_mgr == 'pkgng'
+
+    - name: "Refresh pkg db (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' update_cache=true
+      register: out
+      when: pkg_mgr not in ['pkgng', 'openbsd_pkg']
+    - debug: var=out
+
+    - name: "Display user interface packages ({{desktop}})"
+      #shell: . /root/scripts/distro_pkgs.ini ; echo ${pkgs_displaysvr} ${pkgs_deskenv_${CHOICE_DESKTOP}}
+      #ignore_errors: true
+      debug: msg={{(distro_pkgs.pkgs_displaysvr+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}
+
+- block:
+  - block:
+    - name: "Enter 'yes' to continue [noYES]:"
+      pause:
+        prompt: "Enter 'yes' to continue, else stop playbook [noYES]: "
+      register: response
+
+    - name: "Check autoconfirm or response is 'yes'"
+      #fail: msg="Stopping playbook"
+      meta: end_host
+      when: not (('' == response.get('user_input', '') or response.user_input | default(true))|bool)
+    when: not (autoconfirm | default(true))|bool
+
+  - shell: setup-xorg-base
+    ignore_errors: true
+    when: variant == 'alpine'
+
+  - package: use='{{pkg_mgr}}' name='{{pkgs_userifc_commasep}}' state=present extra_args_precommand='--ignore-unknown'
+    ignore_errors: true
+    when: pkg_mgr == 'zypper'
+
+  - package: use='{{pkg_mgr}}' name='{{pkgs_userifc_commasep}}' state=present skip_broken=true
+    ignore_errors: true
+    when: pkg_mgr == 'dnf'
+
+  - block:
+    - package: use='{{pkg_mgr}}' name='{{pkgs_userifc_commasep}}' state=present
+      ignore_errors: true
+      register: out
+
+    - name: retry failed install
+      package: use='{{pkg_mgr}}' name='{{item}}' state=present
+      ignore_errors: true
+      loop: '{{pkgs_userifc_list}}'
+      when: out.get('failed', false)
+    when: pkg_mgr not in ['zypper', 'dnf']
+  vars:
+    pkgs_userifc_commasep: '{{(distro_pkgs.pkgs_displaysvr+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).replace(" ", ",")}}'
+    pkgs_userifc_list: '{{(distro_pkgs.pkgs_displaysvr+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}'
+
+
+- shell: java -version
+  register: out_java
+  ignore_errors: true
+
+#- find:
+#    #paths: /bin, /usr/bin, /usr/local/bin, /usr/pkg/bin
+#    paths: /
+#    recurse: true
+#    patterns: 'java'
+#  register: found_result
+
+- block:
+  - shell: |
+      #dirname $(dirname $(realpath $(which java)))
+      realpath $(which java) | sed "s:/bin/java::"
+    register: out_javahome
+
+  #- lineinfile:
+  #    path: /etc/csh.cshrc
+  #    state: present
+  #    regexp: '^setenv JAVA_HOME.*'
+  #    line: 'setenv JAVA_HOME {{out_javahome}}'
+  #  ignore_errors: true
+  #  when: ansible_facts.get("env")["SHELL"] is search("csh")
+
+  #- lineinfile:
+  #    path: /etc/bash.bashrc
+  #    state: present
+  #    regexp: '^export JAVA_HOME.*'
+  #    line: 'export JAVA_HOME={{out_javahome}}'
+  #  ignore_errors: true
+  #  when: ansible_facts.get("env")["SHELL"] is search("bash")
+
+  #- lineinfile:
+  #    path: /etc/ksh.kshrc
+  #    state: present
+  #    regexp: '^export JAVA_HOME.*'
+  #    line: 'export JAVA_HOME={{out_javahome}}'
+  #  ignore_errors: true
+  #  when: ansible_facts.get("env")["SHELL"] is search("ksh")
+
+  - lineinfile:
+      path: /etc/profile.d/jdk.sh
+      state: present
+      create: true
+      regexp: '^export JAVA_HOME.*'
+      line: 'export JAVA_HOME={{out_javahome}}'
+    ignore_errors: true
+
+  - lineinfile:
+      path: /etc/fstab
+      state: present
+      regexp: '^fdesc'
+      line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
+    ignore_errors: true
+    when: ansible_facts.get('system')|lower != 'linux'
+  when: not out_java.get('failed', false)
+  #when: 0 != found_result.matched
+
+
+- include_tasks: '{{cfgfile}}'
   with_first_found:
     - files:
-      - 'uiconfig_{{variant}}.yml'
+      - 'userifc/config_{{variant}}.yml'
       skip: True
-  loop_control: {"loop_var": "uicfgfile"}
+  loop_control: {"loop_var": "cfgfile"}
+
+- block:
+  #- shell: sh /root/init/common/misc_config.sh cfg_xdguserdirs {{etcdir_xdg}}
+  #  ignore_errors: true
+
+  - name: Add directory bin to XDG directories config
+    lineinfile:
+      path: '{{etcdir_xdg}}/user-dirs.defaults'
+      state: present
+      create: true
+      regexp: '^BIN=.*'
+      line: 'BIN=bin'
+    ignore_errors: true
+
+  - name: Run xdg-user-dirs-update
+    shell: |
+      export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
+      xdg-user-dirs-update ; chmod 1777 /tmp
+    ignore_errors: true
+
+#- shell: sh /root/init/common/misc_config.sh cfg_xorgtouchpad {{xorgconfd_dir}}
+#  ignore_errors: true
 
 - lineinfile:
-    path: '{{xdguserdirs_file}}'
+    path: '{{xorgconfd_dir}}/{{confX}}'
     state: present
-    create: yes
-    regexp: '^BIN=.*'
-    line: 'BIN=bin'
+    insertafter: 'MatchIsTouchpad.*'
+    regexp: '.*Option "Tapping" "on".*'
+    line: '       Option "Tapping" "on"'
   ignore_errors: true
+  loop: [10-evdev.conf, 40-libinput.conf]
+  loop_control: {"loop_var": "confX"}
 
-- name: Update XDG user dir config
-  shell: |
-    export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
-    xdg-user-dirs-update ; chmod 1777 /tmp
-  ignore_errors: true
 
-- name: "Enable user interface related service(s) (desktop: {{desktop}})"
-  service: name={{item}} enabled=yes
-  ignore_errors: true
-  loop: '{{uiservices_enabled}}'
+- block:
+  - name: "Set graphical.target default for systemd"
+    shell: systemctl set-default graphical.target
+    ignore_errors: true
+    when: service_mgr == 'systemd'
+
+  - name: "Enable user interface related service(s) ({{desktop}}) ({{service_mgr}})"
+    systemd_service: name={{item}} enabled=true masked=false
+    ignore_errors: true
+    loop: '{{distro_pkgs.get("uiservices_enabled_"+desktop, "").split(" ")}}'
+    when: service_mgr == 'systemd'
+
+  - name: "Disable user interface related service(s) ({{desktop}}) ({{service_mgr}})"
+    systemd_service: name={{item}} enabled=false masked=true
+    ignore_errors: true
+    loop: '{{distro_pkgs.get("uiservices_disabled_"+desktop, "").split(" ")}}'
+    when: service_mgr == 'systemd'
+
+  - name: "Enable user interface related service(s) ({{desktop}}) ({{service_mgr}})"
+    service: name={{item}} enabled=true
+    ignore_errors: true
+    loop: '{{distro_pkgs.get("uiservices_enabled_"+desktop, "").split(" ")}}'
+    when: service_mgr != 'systemd'
+
+  - name: "Disable user interface related service(s) ({{desktop}}) ({{service_mgr}})"
+    service: name={{item}} enabled=false
+    ignore_errors: true
+    loop: '{{distro_pkgs.get("uiservices_disabled_"+desktop, "").split(" ")}}'
+    when: service_mgr != 'systemd'
+
+- block:
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' clean=true
+    register: out
+    when: pkg_mgr in ['apt', 'pkgin', 'apt_rpm']
+
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    shell: '{{pkgclean_cmd}}'
+    ignore_errors: true
+    register: out
+    when: pkg_mgr not in ['apt', 'pkgin', 'apt_rpm']
+  - debug: var=out.stdout_lines

@@ -1,23 +1,32 @@
 ---
 
-- package:
-    use: '{{pkg_mgr}}'
-    name: '{{item}}'
-    state: present
-  loop: '{{(distro_pkgs.pkgs_displaysvr_xorg+" "+distro_pkgs.get("pkgs_deskenv_"+desktop, "")).split(" ")}}'
+- block:
+  - file: path=/etc/X11/xorg.conf.d state=directory
+    ignore_errors: true
 
-- name: "Fix text mode only grub config ; drakconf user interface"
+  - shell: "cp -an /usr/share/X11/xorg.conf.d/{{confX}} /etc/X11/xorg.conf.d/"
+    ignore_errors: true
+    loop: [10-evdev.conf, 40-libinput.conf]
+    loop_control: {"loop_var": "confX"}
+
+  - file: path=/etc/system-release state=touch
+
+  - name: "Fix text mode only default grub config"
+    replace:
+      path: /etc/default/grub
+      regexp: '{{item}}'
+      replace: ''
+    ignore_errors: true
+    #loop: ['nomodeset ', 'text ', 'xdriver=vesa ', 'noacpi ']
+    loop: ['nomodeset ', 'text ', 'xdriver=vesa ']
+
+  - name: "Run grub2-mkconfig"
+    shell: grub2-mkconfig -o /boot/grub2/grub.cfg
+    ignore_errors: true
+
+- name: "drakconf user interface"
   shell: |
-    apt-get -y --fix-broken install
     XFdrake --auto
     #drakx11 ; sleep 5 ; drakdm ; sleep 5 ; drakboot ; sleep 5
     mv /etc/X11/xorg.conf /etc/X11/xorg.conf.bak || true
-    #chkconfig --add dm ; chkconfig dm on
-
-    sed -i 's|nomodeset | |' /etc/default/grub
-    sed -i 's|text | |' /etc/default/grub
-    sed -i 's|noacpi | |' /etc/default/grub
-    sed -i 's|xdriver=vesa | |' /etc/default/grub
-    touch /etc/system-release
-    grub2-mkconfig -o /boot/grub2/grub.cfg
   ignore_errors: true

@@ -1,23 +1,156 @@
 ---
 
-- name: "Upgrade packages (variant: {{variant}})"
-  #command: env PAGER=cat freebsd-update fetch
-  shell: |
-    env PAGER=cat freebsd-update fetch
-    env PAGER=cat freebsd-update install || true
-    pkg update ; pkg fetch -udy ; pkg upgrade -y ; pkg clean -y
-  when: variant == 'freebsd'
+- block:
+  - block:
+    - service: name=pamac state=stopped
+      ignore_errors: true
 
-- name: "Upgrade packages (variant: {{variant}})"
-  shell: dnf -y check-update ; dnf -y upgrade
-  when: variant == 'redhat'
+    - file: path=/var/lib/pacman/db.lck state=absent
+      ignore_errors: true
+    when: pkg_mgr == 'pacman'
 
-- name: "Upgrade packages (variant: {{variant}})"
-  shell: |
-    apt-get -y update ; apt-get -y --fix-broken install
-    apt-get -y upgrade ; apt-get -y dist-upgrade ; apt-get -y update
-  when: variant == 'pclinuxos'
+  - lineinfile:
+      path: /etc/apt/apt.conf.d/99retries03
+      state: present
+      create: true
+      regexp: '^Acquire::Retries.*;'
+      line: 'Acquire::Retries "3";'
+    ignore_errors: true
+    when: pkg_mgr in ['apt', 'apt_rpm']
 
-- name: "Upgrade packages (variant: {{variant}})"
-  package: '{{pkgupgd_params}}'
-  when: variant not in ['freebsd', 'redhat', 'pclinuxos']
+  - block:
+    - name: "Refresh pkg db (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' name=pkg
+      register: out
+      when: pkg_mgr == 'pkgng'
+
+    - name: "Refresh pkg db (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' update_cache=true
+      register: out
+      when: pkg_mgr not in ['pkgng', 'openbsd_pkg']
+    - debug: var=out
+
+  - name: "List repos (pkg_mgr: {{pkg_mgr}})"
+    shell: '{{pkgrepos_cmd}}'
+    ignore_errors: true
+    register: out
+  - debug: var=out.stdout_lines
+
+  - name: "List outdated packages (pkg_mgr: {{pkg_mgr}})"
+    shell: '{{pkgoutdated_cmd}}'
+    ignore_errors: true
+    register: out
+  - debug: var=out.stdout_lines
+
+- block:
+  - block:
+    - name: "Enter 'yes' to continue [yesNO]:"
+      pause:
+        prompt: "Enter 'yes' to continue, else stop playbook [yesNO]: "
+      register: response
+
+    - name: "Check autoconfirm or response is 'yes'"
+      #fail: msg="Stopping playbook"
+      meta: end_host
+      when: not (response.user_input | default(false))|bool
+    when: not (autoconfirm | default(false))|bool
+
+  - name: "Upgrade packages (pkgr_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' name='*' state=latest dist_upgrade=true
+    register: out
+    when: pkg_mgr == 'apt_rpm'
+
+  - name: "Upgrade packages (pkgr_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' upgrade=true full_upgrade=true
+    register: out
+    when: pkg_mgr == 'pkgin'
+
+  - name: "Upgrade packages (pkgr_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' name='*' state=latest upgrade=true
+    register: out
+    when: pkg_mgr == 'apt'
+
+  - name: "Upgrade packages (pkgr_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' state=latest update_cache=false upgrade=true
+    register: out
+    when: pkg_mgr in ['xbps', 'pacman', 'apk']
+
+  - name: "Upgrade packages (pkgr_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' name='*' state=latest
+    register: out
+    #when: pkg_mgr in ['pkgng', 'zypper', 'dnf', 'urpmi', 'openbsd_pkg']
+    when: pkg_mgr not in ['xbps', 'pacman', 'apk', 'apt', 'pkgin', 'apt_rpm']
+  - debug: var=out.stdout_lines
+
+- include_tasks: nano.yml
+
+- name: "List pkg locks (pkg_mgr: {{pkg_mgr}})"
+  shell: '{{pkglocks_cmd}}'
+  ignore_errors: true
+  register: out
+  when: pkg_mgr not in ['pkgin', 'openbsd_pkg']
+- debug: var=out.stdout_lines
+
+- block:
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' clean=true
+    register: out
+    when: pkg_mgr in ['apt', 'pkgin', 'apt_rpm']
+
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    shell: '{{pkgclean_cmd}}'
+    ignore_errors: true
+    register: out
+    when: pkg_mgr not in ['apt', 'pkgin', 'apt_rpm']
+  - debug: var=out.stdout_lines
+
+
+- block:
+  - block:
+    - name: "Run freebsd-update [fetch|install]"
+      #command: env PAGER=cat freebsd-update fetch
+      shell: |
+        # Unset these as if they're empty it'll break freebsd-update
+        [ -z "${no_proxy}" ] && unset no_proxy
+        [ -z "${http_proxy}" ] && unset http_proxy
+        [ -z "${https_proxy}" ] && unset https_proxy
+
+        grep -ie CreateBootEnv /etc/freebsd-update.conf
+        bectl list ; bectl list -c creation
+
+        env PAGER=cat freebsd-update --not-running-from-cron fetch
+        env PAGER=cat freebsd-update --not-running-from-cron install || true
+      ignore_errors: true
+      register: out
+    - debug: var=out.stdout_lines
+    when: ansible_facts.get('system')|lower in ['freebsd']
+
+  - block:
+    - name: "Dist-upgrade packages (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' name="*" state=latest upgrade=dist
+      register: out
+      when: pkg_mgr == 'apt'
+
+    - name: "Dist-upgrade packages (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' name="*" state=dist-upgrade
+      register: out
+      when: pkg_mgr == 'zypper'
+    - debug: var=out.stdout_lines
+    when: pkg_mgr in ['apt', 'zypper']
+
+
+- block:
+  - name: "Find file qemu-bridge-helper"
+    find:
+      paths: /usr
+      recurse: true
+      patterns: 'qemu-bridge-helper'
+    register: found_result
+
+  - name: "Re-set setuid for qemu-bridge-helper"
+    file:
+      path: '{{found_result.files[0].path}}'
+      # mode=['u+s' | 4755]
+      mode: u+s
+    when: 0 != found_result.matched
+  when: ansible_facts.get('system')|lower in ['linux']

@@ -1,12 +1,15 @@
 ---
 # Non-default OS based (using family, distribution, ...) vars file
 
-variant: "{{(ansible_facts.get('os_family') or ansible_facts.get('distribution') or ansible_facts.get('lsb')['codename'])|lower}}"
+service_mgr: "{{ansible_facts.get('service_mgr') or 'runit'}}"
 pkg_mgr: "{{ansible_facts.get('pkg_mgr') or 'xbps'}}"
-pkgupgd_params: {"update_cache": yes, "upgrade": yes, "use": "{{pkg_mgr}}"}
+pkgclean_cmd: xbps-remove -Ooy
+pkgrepos_cmd: xbps-query -L
+pkgoutdated_cmd: xbps-install --dry-run -u
+pkglocks_cmd: xbps-query --list-hold-pkgs
 
-idsuffix_cmd: cat /var/lib/dbus/machine-id | cut -b29-32
-services_enabled: [ntpd, nftables, udevd, dbus, avahi-daemon, rpcbind, cupsd]
-services_disabled: [ipset, ip6tables, iptables, clamd]
+#idsuffix_cmd: (cat /var/lib/dbus/machine-id || printf '0%.0s' {1..32}) | cut -b29-32
+idsuffix_cmd: test -e /var/lib/dbus/machine-id && cat /var/lib/dbus/machine-id | cut -b29-32 || echo 0000
 
-uiservices_enabled: [dbus, polkitd, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]
+firewall_tool: nftables
+smtp_daemon: opensmtpd

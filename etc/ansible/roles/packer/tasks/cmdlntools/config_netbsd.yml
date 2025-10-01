@@ -1,65 +1,116 @@
 ---
 
-- name: Fetch missing distribution sets (xbase)
-  shell: |
-    arch=$(uname -m) ; rel=$(sysctl -n kern.osrelease)
-    cd /tmp
-    for setX in xbase ; do
-      ftp http://cdn.netbsd.org/pub/NetBSD/NetBSD-${rel}/${arch}/binary/sets/${setX}.tar.xz ;
-      tar -C / -xpJf ${setX}.tar.xz ;
-    done
+- name: "Fetch missing distribution sets? Enter 'yes' to continue [yesNO]:"
+  pause:
+    prompt: |
+      Do you want to fetch missing distribution sets?
+      Enter 'yes' to continue, else stop playbook [yesNO]:
+  register: response_fetch
+  when: not (autoconfirm | default(false))|bool
 
-- shell: "cp -R /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}"
-  ignore_errors: true
-  loop: [ntpd, dbus, freshclamd, clamd, avahidaemon, cupsd]
+- block:
+#  - name: 'Fetch & extract missing distribution sets like: xbase.tar.xz'
+#    unarchive:
+#      remote_src: true
+#      src: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
+#      dest: /
+#      extra_opts: [-p, -J]
+#    ignore_errors: true
+#    loop: [xbase]
+#    loop_control: {"loop_var": "setX"}
 
-- file:
-    path: /var/run/dbus
-    state: directory
+  - block:
+    - name: 'Fetch, then extract missing distribution sets like: xbase.tar.xz'
+      get_url:
+        url: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
+        dest: '/tmp/{{setX}}.tar.xz'
+      ignore_errors: true
+      loop: [xbase]
+      loop_control: {"loop_var": "setX"}
+    #- unarchive:
+    #    remote_src: true
+    #    src: '/tmp/{{setX}}.tar.xz'
+    #    dest: /
+    #    extra_opts: [-p, -J]
+    #  ignore_errors: true
+    #  loop: [xbase]
+    #  loop_control: {"loop_var": "setX"}
+  when: (autoconfirm | default(false) or response_fetch.user_input | default(false))|bool
+  vars:
+    uname_m: '{{ansible_facts.get("machine")}}'
+    rel: '{{ansible_facts.get("distribution_version")}}'
 
-- lineinfile:
-    path: /etc/rc.conf
-    state: present
-    regexp: '^{{item}}=.*'
-    line: '{{item}}=YES'
-  ignore_errors: true
-  loop: [ntpd, pf, pflogd, dbus, avahidaemon, rpcbind, nfsd, mountd, cupsd, lpd]
+- block:
+  - file: path={{item}} state=directory
+    ignore_errors: true
+    loop: [/var/run/dbus, /var/db/dbus]
 
-- lineinfile:
-    path: /etc/csh.cshrc
-    state: present
-    regexp: '^export JAVA_HOME.*'
-    line: 'export JAVA_HOME={{distro_pkgs.default_java_home}}'
-  ignore_errors: true
+  - shell: "cp -a /usr/pkg/share/examples/rc.d/{{item}} /etc/rc.d/{{item}}"
+    ignore_errors: true
+    #loop: [dbus, avahidaemon, cupsd, freshclamd, clamd]
+    loop: [dbus, avahidaemon, cupsd]
 
-- lineinfile:
-    path: /etc/fstab
-    state: present
-    regexp: '^fdesc.*'
-    line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
-  ignore_errors: true
+  - group: name=dbus gid=81 system=true state=present
+    ignore_errors: true
 
-- name: "Config misc services(ntp, firewall)"
-  shell: |
-    #/usr/sbin/ntpd -u ntp:ntp ; /usr/sbin/ntpq -p
-    /usr/sbin/ntpdate -v -u -b us.pool.ntp.org
+  - user: name=dbus uid=81 groups=dbus comment='System message bus' home=/ shell=/usr/bin/false
+    ignore_errors: true
 
-    /sbin/pfctl -d
-    env sed_inplace="sed -i" sh /root/init/common/bsd/firewall/pf/pfconf.sh config_pf allow > /etc/pf.conf.new
-    if [ ! -e /etc/pf.conf ] ; then cp /etc/pf.conf.new /etc/pf.conf ; fi
-    sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outallow_in_allow.rules
-    sed -i '/icmp6 / s|icmp6 |ipv6-icmp |' /etc/pf/outdeny_out_allow.rules
-    /sbin/pfctl -vf /etc/pf.conf ; /sbin/pfctl -s info ; /sbin/pfctl -s rules -a '*'
+- block:
+  - copy:
+      src: /etc/daily
+      dest: /etc/daily.orig
+      remote_src: true
+      force: false
+    ignore_errors: true
 
-    #cd /usr/bin
-    #for file1 in lp lpq lpr lprm ; do
-    #  if [ -e ${file1} ] ; then
-    #    mv ${file1} ${file1}.old ;
-    #  fi ;
-    #  ln -s /usr/local/bin/${file1} ${file1} ;
-    #done
-  ignore_errors: true
+  # change daily security mail output to log file
+  - replace:
+      path: /etc/daily
+      regexp: '^(.*)(mail .*daily insecurity output.*)$'
+      replace: '\1#\2\n\1cat $SECOUT > /var/log/security.out'
+    ignore_errors: true
 
-#- user: name={{item}} groups=cups append=yes
-#  ignore_errors: true
-#  loop: [root]
+#- block:
+#  - group: name=cups gid=193 system=true state=present
+#    ignore_errors: true
+#
+#  - user: name={{item}} groups=cups append=true
+#    ignore_errors: true
+#    loop: [root]
+#
+#  - copy: remote_src=true src=/usr/bin/{{item}} dest=/usr/bin/{{item}}.old
+#    ignore_errors: true
+#    loop: [lp, lpq, lpr, lprm]
+#
+#  - file: path=/usr/bin/{{item}} state=absent
+#    ignore_errors: true
+#    loop: [lp, lpq, lpr, lprm]
+#
+#  - file: src=/usr/pkg/bin/{{item}} dest=/usr/bin/{{item}} state=link
+#    ignore_errors: true
+#    loop: [lp, lpq, lpr, lprm]
+#    when: ansible_facts.get('system')|lower == 'netbsd'
+#
+#  - file: src=/usr/local/bin/{{item}} dest=/usr/bin/{{item}} state=link
+#    ignore_errors: true
+#    loop: [lp, lpq, lpr, lprm]
+#    when: ansible_facts.get('system')|lower in ['freebsd', 'openbsd']
+##  when: ansible_facts.get('system')|lower in ['freebsd', 'netbsd', 'openbsd']
+
+#- block:
+#  - lineinfile:
+#      path: /etc/rc.conf
+#      state: present
+#      regexp: '^{{item}}=.*'
+#      line: '{{item}}=YES'
+#    ignore_errors: true
+#    loop: '{{distro_pkgs.services_enabled.split(" ")}}'
+#
+#  - lineinfile:
+#      path: /etc/rc.conf
+#      state: present
+#      regexp: '^{{item}}=.*'
+#      line: '{{item}}=NO'
+#    ignore_errors: true
+#    loop: '{{distro_pkgs.services_disabled.split(" ")}}'

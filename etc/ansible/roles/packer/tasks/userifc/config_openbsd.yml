@@ -1,53 +1,106 @@
 ---
 
-- name: Fetch missing distribution sets (xbase*, xserv*, xfont*, xshare*) & sysmerge updates
-  shell: |
-    arch=$(arch -s) ; rel=$(sysctl -n kern.osrelease)
-    setVer=$(echo ${rel} | tr '.' '\0')
-    cd /tmp
-    for setX in xbase xserv xfont xshare ; do
-      ftp http://cdn.openbsd.org/pub/OpenBSD/${rel}/${arch}/${setX}${setVer}.tgz ;
-      tar -C / -xpzf ${setX}${setVer}.tgz ;
-    done
-    sysmerge
+- name: "Fetch missing distribution sets? Enter 'yes' to continue [yesNO]:"
+  pause:
+    prompt: |
+      Do you want to fetch missing distribution sets?
+      Enter 'yes' to continue, else stop playbook [yesNO]:
+  register: response_fetch
+  when: not (autoconfirm | default(false))|bool
+
+- block:
+#  - name: 'Fetch & extract missing distribution sets like: xbase*.tgz'
+#    unarchive:
+#      remote_src: true
+#      src: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
+#      dest: /
+#      extra_opts: [-p, -z]
+#    ignore_errors: true
+#    loop: [xbase, xserv, xfont, xshare]
+#    loop_control: {"loop_var": "setX"}
+
+  - block:
+    - name: 'Fetch, then extract missing distribution sets like: xbase*.tgz'
+      get_url:
+        url: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
+        dest: '/tmp/{{setX}}{{setVer}}.tgz'
+      ignore_errors: true
+      loop: [xbase, xserv, xfont, xshare]
+      loop_control: {"loop_var": "setX"}
+    - unarchive:
+        remote_src: true
+        src: '/tmp/{{setX}}{{setVer}}.tgz'
+        dest: /
+        extra_opts: [-p, -z]
+      ignore_errors: true
+      loop: [xbase, xserv, xfont, xshare]
+      loop_control: {"loop_var": "setX"}
+
+  - name: sysmerge updates
+    shell: sysmerge
+    ignore_errors: true
+  when: (autoconfirm | default(false) or response_fetch.user_input | default(false))|bool
+  vars:
+    arch_s: '{{ansible_facts.get("machine")}}'
+    rel: '{{ansible_facts.get("distribution_version")}}'
+    setVer: '{{ansible_facts.get("distribution_version")|replace(".", "")}}'
 
 - lineinfile:
     path: /etc/rc.local
     state: present
-    create: yes
-    regexp: '^export XDG_CONFIG_HOME=.*'
-    line: 'export XDG_CONFIG_HOME=/etc/xdg'
+    mode: 'ugo+x'
+    regexp: '.*dbus-uuidgen.*'
+    #line: '/usr/local/bin/dbus-uuidgen --ensure=/etc/machine-id'
+    line: '/usr/local/bin/dbus-uuidgen --ensure'
   ignore_errors: true
 
-- lineinfile:
-    path: /etc/sysctl.conf
-    state: present
-    create: yes
-    regexp: '^machdep.allowaperture=.*'
-    line: 'machdep.allowaperture=2'
-  ignore_errors: true
+- block:
+  - file: path=/etc/X11/xorg.conf.d state=directory
+    ignore_errors: true
 
-- lineinfile:
-    path: /root/.xinitrc
-    state: present
-    create: yes
-    regexp: '^ck-launch-session.*'
-    line: 'ck-launch-session dbus-launch --exit-with-session startlxqt'
-  ignore_errors: true
-  when: desktop in ['lxqt']
+  #- shell: "cp -an /usr/local/share/X11/xorg.conf.d/{{confX}} /etc/X11/xorg.conf.d/"
+  #  ignore_errors: true
+  #  loop: [10-evdev.conf, 40-libinput.conf]
+  #  loop_control: {"loop_var": "confX"}
 
-- lineinfile:
-    path: /root/.xinitrc
-    state: present
-    create: yes
-    regexp: '^ck-launch-session.*'
-    line: 'ck-launch-session dbus-launch --exit-with-session startxfce4'
-  ignore_errors: true
-  when: desktop in ['xfce']
+  - lineinfile:
+      path: /etc/rc.local
+      state: present
+      create: yes
+      regexp: '^export XDG_CONFIG_HOME=.*'
+      line: 'export XDG_CONFIG_HOME=/etc/xdg'
+    ignore_errors: true
 
-- shell: |
-    ln -s /root/.xinitrc /root/.xsession
-    cp /root/.xinitrc /home/packer/.xinitrc
-    chown packer:$(id -gn packer) /home/packer/.xinitrc
-    (cd /home/packer ; ln -s /home/packer/.xinitrc .xsession)
-  ignore_errors: true
+  - lineinfile:
+      path: /etc/sysctl.conf
+      state: present
+      create: yes
+      regexp: '^machdep.allowaperture=.*'
+      line: 'machdep.allowaperture=2'
+    ignore_errors: true
+
+- block:
+  - lineinfile:
+      path: /root/.xinitrc
+      state: present
+      create: yes
+      regexp: '^ck-launch-session.*'
+      line: 'ck-launch-session dbus-launch --exit-with-session startlxqt'
+    ignore_errors: true
+    when: desktop in ['lxqt']
+
+  - lineinfile:
+      path: /root/.xinitrc
+      state: present
+      create: yes
+      regexp: '^ck-launch-session.*'
+      line: 'ck-launch-session dbus-launch --exit-with-session startxfce4'
+    ignore_errors: true
+    when: desktop in ['xfce']
+
+  - copy: src=/root/.xinitrc dest=/home/packer/.xinitrc owner=packer
+    ignore_errors: true
+
+  - file: src={{item}}/.xinitrc dest={{item}}/.xsession state=link
+    ignore_errors: true
+    loop: [/root, /home/packer]

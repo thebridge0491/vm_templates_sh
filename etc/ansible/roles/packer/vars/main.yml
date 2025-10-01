@@ -1,12 +1,21 @@
 ---
 # vars file for packer
 
-variant: "{{(ansible_facts.get('os_family') or ansible_facts.get('distribution'))|lower}}"
-pkgupgd_params: {"update_cache": yes, "upgrade": yes}
+#variant: "{{(ansible_facts.get('os_family') or ansible_facts.get('distribution'))|lower}}"
+variant: "{{({'Artix Linux': 'Archlinux', 'Arch Linux': 'Archlinux', 'openSUSE Tumbleweed-Slowroll': 'Suse'}.get(ansible_facts.get('os_family') or ansible_facts.get('distribution')) or (ansible_facts.get('os_family') or ansible_facts.get('distribution')))|lower}}"
 
+dateutc: "{{'%Y%m%d' | strftime(utc=true)}}"
+distro_pkgs: {'pkgs_cmdln_tools': '', 'services_enabled': '', 'services_disabled': '',
+  'pkgs_displaysvr': '', 'uiservices_enabled_xfce': '', 'uiservices_disabled_xfce': '',
+  'pkgs_deskenv_xfce': '', 'labservices_enabled': '', 'labservices_disabled': '',
+  'pkgs_lang_py': '', 'pkgs_lang_c': '', 'pkgs_lang_java': ''}
+
+#idsuffix_cmd: (cat /etc/machine-id || printf '0%.0s' {1..32}) | cut -b29-32
+idsuffix_cmd: test -e /etc/machine-id && cat /etc/machine-id | cut -b29-32 || echo 0000
+
+firewall_tool: nftables
+smtp_daemon: smtpd
 hostname_chgfiles: [/etc/hosts, /etc/hostname]
-firewall_chgfiles: [/etc/nftables.conf, /etc/nftables/outallow_nftables.conf,
-  /etc/nftables/outdeny_nftables.conf]
 skeldir_par: /etc/skel
 skel_dirs: [/etc/skel/.gnupg, /etc/skel/.pki, /etc/skel/.ssh]
 skelmaps_srcdest: [{'srcskel': '_gnupg/*', 'destskel': '.gnupg/'},
@@ -14,16 +23,16 @@ skelmaps_srcdest: [{'srcskel': '_gnupg/*', 'destskel': '.gnupg/'},
   {'srcskel': '_ssh/*', 'destskel': '.ssh/'},
   {'srcskel': '_gitconfig.sample', 'destskel': '.gitconfig'},
   {'srcskel': '_hgrc.sample', 'destskel': '.hgrc'}]
-sudoers_file: /etc/sudoers
-sudoers_group: wheel
+sudoersd_dir: /etc/sudoers.d
 skeldir_ssh: /etc/skel/.ssh
 skel_shellrc: /etc/skel/.bashrc
-sharednode: "{{lookup('env', 'SHARED_NODE') or 'localhost.local'}}"
-printname: "{{lookup('env', 'PRINT_NAME') or 'printer1'}}"
+sharednode: "{{lookup('env', 'SHAREDNODE') or 'localhost.local'}}"
+printname: "{{lookup('env', 'PRINTNAME') or 'printer1'}}"
 etcdir_cups: /etc/cups
 cupsdir_ppd: /usr/share/cups/model
 
 desktop: xfce
-xdguserdirs_file: /etc/xdg/user-dirs.defaults
+xorgconfd_dir: /etc/X11/xorg.conf.d
+etcdir_xdg: /etc/xdg
 
 langs: py c java

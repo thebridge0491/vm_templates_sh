@@ -87,11 +87,15 @@ to create updated scripts tarball:
 
 (salt) provisioning example:
 
-        salt-ssh --sudo --user=packer -L 'guest#01,' state.apply upgradepkgs
+        salt-ssh --sudo --user=packer -L 'guest#01,' state.apply upgradepkgs \
+
+          [pillar='{"state1": {"autoconfirm": "YES"}}']
 
 (ansible) provisioning example:
 
-        ansible-playbook -bu packer -l 'guest#01,' etc/ansible/playbook.yml -t upgradepkgs
+        ansible-playbook -bu packer -l 'guest#01,' etc/ansible/playbook.yml \
+
+          -t upgradepkgs [--extra-vars 'autoconfirm=YES']
 
 Author/Copyright
 ----------------

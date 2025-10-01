@@ -1,13 +1,15 @@
 ---
 # Non-default OS based (using family, distribution, ...) vars file
 
-pkgupgd_params: {"update_cache": yes, "upgrade": "dist", "autoclean": yes}
+service_mgr: "{{ansible_facts.get('service_mgr') or 'sysvinit'}}"
+pkg_mgr: "{{ansible_facts.get('pkg_mgr') or 'apt'}}"
+pkgclean_cmd: apt-get -y clean
+pkgrepos_cmd: tail -vn+1 /etc/apt/sources.list /etc/apt/sources.list.d/*.list | grep -ve "^#"
+pkgoutdated_cmd: apt-get --simulate -y upgrade
+pkglocks_cmd: apt-mark showhold
 
-idsuffix_cmd: cat /var/lib/dbus/machine-id | cut -b29-32
-services_enabled: [ntp, ufw, udev, eudev, dbus, avahi-daemon, nfs-common, cups, cups-browsed]
-services_disabled: [ipset, ip6tables, iptables, clamav-freshclam]
+idsuffix_cmd: test -e /var/lib/dbus/machine-id && cat /var/lib/dbus/machine-id | cut -b29-32 || echo 0000
 
-sudoers_group: sudo
+firewall_tool: firewalld
+smtp_daemon: opensmtpd
 cupsdir_ppd: /usr/share/ppd/cups-pdf
-
-uiservices_enabled: [dbus, "{{'sddm' if desktop == 'lxqt' else 'lightdm'}}"]

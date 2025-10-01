@@ -2,55 +2,99 @@
 # tasks file for packer
 
 - block:
+  - name: Verify minimum ansible[-core] version
+    assert:
+      #that: "ansible_version.full is version_compare('2.18', '>=')"
+      that: "ansible_version.full is version('2.18', '>=')"
+      msg: "You must update ansible[-core] to 2.18+"
+  tags: always
+
+- block:
   - name: Load OS based (using family, distribution, ...) vars file
     include_vars: '{{item}}'
     with_first_found:
       - files:
-        - "{{ansible_lsb['id']|lower}}.yml"
-        - "{{ansible_lsb['codename']|lower}}.yml"
-        - "{{ansible_distribution|lower}}.yml"
-        - "{{ansible_os_family|lower}}.yml"
+        #- "{{(ansible_lsb['id'] or ansible_lsb['codename'])|lower}}.yml"
+        - "{{(ansible_os_family or ansible_distribution)|lower}}.yml"
+        - "{{{'Artix Linux': 'Artix', 'Arch Linux': 'Archlinux', 'openSUSE Tumbleweed-Slowroll': 'Suse'}.get(ansible_os_family or ansible_distribution)|lower}}.yml"
         skip: True
+  #tags: never, upgradepkgs, nanopkg, cmdlntools, userifc, codelab
+  tags: always
 
+- block:
   - name: Get keys from ini
-    shell: sed -n '/^[a-z0-9_]*=/ s|\(.*\)=.*|\1|p' /root/init/{{variant}}/distro_pkgs.ini
+    shell: sed -n '/^[a-z0-9_]*=/ s|\(.*\)=.*|\1|p' /root/scripts/distro_pkgs.ini
     ignore_errors: true
     register: keysout
 
   #- name: (shell cmd) Get matching key|value's from ini
-  #  shell: . /root/init/{{variant}}/distro_pkgs.ini ; echo ${{item}}
+  #  shell: . /root/scripts/distro_pkgs.ini ; echo ${{item}}
   #  ignore_errors: true
   #  register: inivalue
   #  loop: '{{keysout.stdout_lines}}'
 
   #- name: (ini values fm shell cmd) Set dictionary of variables from ini
   #  set_fact:
-  #    cacheable: yes
+  #    cacheable: true
   #    distro_pkgs: '{{ distro_pkgs|default({})|combine({ item.item: item.stdout }) }}'
   #  loop: '{{inivalue.results}}'
 
   - name: retrieve remote ini file
-    fetch:
-      src: /root/init/{{variant}}/distro_pkgs.ini
-      dest: /tmp/
+    fetch: src=/root/scripts/distro_pkgs.ini dest=/tmp/
     ignore_errors: true
 
   #- name: (lookup:ini) Set variable from ini
   #  set_fact:
-  #    cacheable: yes
-  #    pkgs_cmdln_tools: "{{ lookup('ini', 'pkgs_cmdln_tools type=properties file=/tmp/{{inventory_hostname}}/root/init/{{variant}}/distro_pkgs.ini')|replace('\"', '') }}"
+  #    cacheable: true
+  #    pkgs_cmdln_tools: "{{ lookup('ini', 'pkgs_cmdln_tools type=properties file=/tmp/{{inventory_hostname}}/root/scripts/distro_pkgs.ini')|replace('\"', '')|regex_replace('\\${service_mgr:-[a-z]*}', service_mgr) }}"
 
   - name: (lookup:ini) Set dictionary of variables from ini
     set_fact:
-      cacheable: yes
-      distro_pkgs: "{{ distro_pkgs|default({})|combine({item: lookup('ini', item ~ ' type=properties file=/tmp/{{inventory_hostname}}/root/init/{{variant}}/distro_pkgs.ini')|replace('\"', '')}) }}"
+      cacheable: true
+      distro_pkgs: "{{ distro_pkgs|default({})|combine({item: lookup('ini', item ~ ' type=properties file=/tmp/{{inventory_hostname}}/root/scripts/distro_pkgs.ini')|replace('\"', '')|regex_replace('\\${service_mgr:-[a-z]*}', service_mgr)}) }}"
     loop: '{{keysout.stdout_lines}}'
   #- debug: var=distro_pkgs
-  tags: always
-
-- import_tasks: nano.yml
+  tags: never, cmdlntools, userifc, codelab
+  #tags: always
 
 - block:
+  - name: "Set distribution version"
+    set_fact: cacheable=true ansible_distribution_version='rolling'
+    when: variant in ['archlinux']
+  tags: always
+
+- block:
+  - name: Set snapshot name
+    set_fact:
+      cacheable: false
+      snapshot_name: '{{ansible_facts.get("distribution").split(" ")[0]|lower+"_"+ansible_facts.get("distribution_version")+"-"+dateutc}}'
+  tags: upgradepkgs
+
+- block:
+  - name: Set snapshot name
+    set_fact: cacheable=false snapshot_name='{{"pre_cmdlntools-"+dateutc}}'
+  tags: never, cmdlntools
+
+- block:
+  - name: Set snapshot name
+    set_fact: cacheable=false snapshot_name='{{"pre_userifc-"+dateutc}}'
+  tags: never, userifc
+
+- block:
+  - name: Set snapshot name
+    set_fact: cacheable=false snapshot_name='{{"pre_codelab-"+dateutc}}'
+  tags: never, codelab
+
+#- import_tasks: nano.yml
+#  tags: never, nanopkg
+- import_tasks: snapshot.yml
+  tags: never, snapshot, upgradepkgs, cmdlntools, userifc, codelab
+
+- block:
+  - block:
+    - include_tasks: nano.yml
+    tags: never, nanopkg
+
   - block:
     - include_tasks: upgradepkgs.yml
     tags: upgradepkgs
