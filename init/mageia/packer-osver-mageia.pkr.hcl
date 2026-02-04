@@ -22,19 +22,20 @@ variable "repo_directory_x64" {
 
 variable "iso_url_directory_x64" {
   type    = string
-  #default = "/distrib/9/x86_64/install/images"
   default = "/iso/9/Mageia-9-Live-Xfce-x86_64"
+  #default = "/distrib/9/x86_64/install/images"
 }
 
 variable "iso_base_x64" {
   type    = string
-  #default = "Mageia-9-netinstall-x86_64"
   default = "live/Mageia-9-Live-Xfce-x86_64"
+  #default = "Mageia-9-netinstall-x86_64"
 }
 
 variable "iso_cdlabel_x64" {
   type    = string
   default = "Mageia-9-Live-Xfce-x86_64"
+  #default = "Mageia-9-x86_64-netinstall"
 }
 
 variable "mirror_host_aa64" {

@@ -227,20 +227,6 @@ cfg_printer_default() { # requires sudo/root access
   lpadmin -E -U root -d ${printname}
 }
 
-cfg_xorgtouchpad() { # requires sudo/root access
-  xorgconfd_dir=${1:-/etc/X11/xorg.conf.d}
-
-  # enable touchpad tapping
-  for confX in 10-evdev.conf 40-libinput.conf ; do
-    ${sed_inplace} '/MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
-      ${xorgconfd_dir}/${confX} ;
-  done
-  ## ??? egrep -i 'synap|alps|etps|elan' /proc/bus/input/devices
-  #libinput list-devices ; xinput --list
-  #xinput list-props XX [; xinput disable YY] # by id, list-props or disable
-  #xinput set-prop <deviceid|devicename> <deviceproperty> <value>
-}
-
 cfg_xdguserdirs() { # requires sudo/root access
   etcdir_xdg=${1:-/etc/xdg}
 
@@ -250,6 +236,20 @@ cfg_xdguserdirs() { # requires sudo/root access
   fi
   export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
   xdg-user-dirs-update ; chmod 1777 /tmp
+}
+
+cfg_xorgtouchpad() { # requires sudo/root access
+  xorgconfd_dir=${1:-/etc/X11/xorg.conf.d}
+
+  # enable touchpad tapping
+  for confX in 10-evdev.conf 40-libinput.conf ; do
+    ${sed_inplace} '/^[^#]\s*MatchIsTouchpad/a \ \ \ \ \ \ \ \ Option "Tapping" "on"' \
+      ${xorgconfd_dir}/${confX} ;
+  done
+  ## ??? egrep -i 'synap|alps|etps|elan' /proc/bus/input/devices
+  #libinput list-devices ; xinput --list
+  #xinput list-props XX [; xinput disable YY] # by id, list-props or disable
+  #xinput set-prop <deviceid|devicename> <deviceproperty> <value>
 }
 
 #========================================================================#

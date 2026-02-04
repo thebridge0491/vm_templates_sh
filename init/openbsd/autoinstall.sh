@@ -46,19 +46,17 @@ sed -i 's|rw|rw,noatime|' /etc/fstab
 init_hostname=\$(hostname -s)
 sed -i '/^127.0.1.1/ s|127.0.1.1|#127.0.1.1|' /etc/hosts
 echo "127.0.1.1   \${init_hostname}.localdomain  \${init_hostname}" >> /etc/hosts
-sed -n "/\.localdomain/ s|^.* \(.*\)\.localdomain.*$|\1|p" /etc/hosts \
+sed -n '/\.localdomain/ s|^.* \(.*\)\.localdomain.*$|\1|p' /etc/hosts \
   > /etc/myname
 hostname \$(cat /etc/myname)
 
 
 services_enabled="sshd"
-pkg_list="sudo-- nano-- pciutils-- python--%3 gtar--"
+pkg_list="sudo-- nano-- pciutils-- py3-pip-- py3-urllib3-- gtar--"
 # vim-- bzip2-- findutils-- ggrep-- zip-- unzip-- xfce4--
 
 pkg_add -u
-for pkgX in \${pkg_list} ; do
-  pkg_add \${pkgX} ;
-done
+pkg_add -ziU \${pkgX_list}
 
 echo "Config services" ; sleep 3
 
@@ -81,7 +79,7 @@ mkdir -p /etc/sudoers.d
 ##chmod 0440 /etc/sudoers.d/99_packernopasswd
 
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -95,8 +93,8 @@ if [ -z "\$(grep 'Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config)" 
   echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config ;
 fi
 echo "Temporarily permit root login via ssh password" ; sleep 3
-#sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
-sed -i "s|.*PermitRootLogin|#PermitRootLogin|" /etc/ssh/sshd_config
+#sed -i '/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|' /etc/ssh/sshd_config
+sed -i 's|.*PermitRootLogin|#PermitRootLogin|' /etc/ssh/sshd_config
 echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-rootlogin.conf
 
 mv /root/.forward /root/.forward.orig

@@ -25,6 +25,8 @@ export GRP_NM=${GRP_NM:-vg0}
 export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos}
 export UNAME_M=$(uname -m)
 
+export DNFCMD="dnf --setopt=install_weak_deps=False"
+
 
 # ifconfig [; ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
 # dhcpcd {ifdev} ; dhclient {ifdev}
@@ -40,7 +42,25 @@ export CHROOT_CMD=chroot
 
 bootstrap() {
   echo "Bootstrap base pkgs" ; sleep 3
-  if command -v rpm > /dev/null && command -v apt-get > /dev/null ; then
+  if [ "btrfs" = "${VOL_MGR}" ] ; then
+    umount /mnt/var/mail ; rm -fr /mnt/var/mail ;
+    mkdir -p /mnt/var/spool/mail ;
+    DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
+    mount -o noatime,compress=lzo,subvol=@/var_mail ${DEV_PV} /mnt/var/spool/mail ;
+    sed -i 's|/var/mail|/var/spool/mail|' /mnt/etc/fstab* ;
+  fi
+  if command -v dnf > /dev/null ; then
+    pkg_list="basesystem-minimal apt rpm dnf python3-dnf makedev" ;
+    #${DNFCMD} --releasever=${RELEASE:-2025} --installroot=/mnt --nogpgcheck --repofrompath=quickrepo${RELEASE:-2025},http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.x86_64/ --repo=quickrepo${RELEASE:-2025} -y install apt rpm dnf python3-dnf locales-en ;
+    ${DNFCMD} --releasever=${RELEASE:-2025} --installroot=/mnt --nogpgcheck -y config-manager --add-repo http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.x86_64 ;
+    ${DNFCMD} --releasever=${RELEASE:-2025} --installroot=/mnt --nogpgcheck -y config-manager --add-repo http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.kde6 ;
+    ${DNFCMD} --releasever=${RELEASE:-2025} --installroot=/mnt --nogpgcheck -y config-manager --add-repo http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.xfce4 ;
+    ${DNFCMD} --releasever=${RELEASE:-2025} --installroot=/mnt --nogpgcheck -y config-manager --add-repo http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.mate ;
+    #${DNFCMD} --releasever=${RELEASE:-2025} --installroot=/mnt --nogpgcheck -y config-manager --add-repo http://${MIRROR}/pclinuxos/apt/pclinuxos/64bit/RPMS.kernel ;
+    ${DNFCMD} --installroot=/mnt -y check-update ;
+    ${DNFCMD} --releasever=${RELEASE:-2025} --installroot=/mnt --nogpgcheck --skip-broken -y install ${pkg_list} ;
+    ${DNFCMD} --installroot=/mnt -y repolist ;
+  elif command -v rpm > /dev/null && command -v apt-get > /dev/null ; then
     rm -r /mnt/var/lib/rpm /mnt/var/cache/apt ;
     mkdir -p /mnt/var/lib/rpm /mnt/var/cache/apt ;
     rpm -v --root /mnt --initdb ;
@@ -55,7 +75,7 @@ bootstrap() {
     rpm -v --root /mnt --nodeps -i /tmp/dash-static.rpm ;
     (cd /mnt/bin ; cp -a dash.static sh) ;
 
-    pkg_list="basesystem-minimal apt rpm makedev" ;
+    pkg_list="basesystem-minimal apt rpm dnf python3-dnf makedev" ;
     apt-get --root /mnt -y update ;
     apt-get --root /mnt -y install ${pkg_list} ;
     # fix AND re-attempt install for infrequent errors
@@ -113,25 +133,36 @@ echo "Config pkg repo mirror(s)" ; sleep 3
 if [ -e /etc/os-release ] ; then
 . /etc/os-release
 fi
-#sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list
-#sed -i "/${MIRROR}/ s|^.*rpm|rpm|" /etc/apt/sources.list
-grep -e '^rpm.*' /etc/apt/sources.list ; sleep 5
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} --releasever=${RELEASE:-2025} --refresh -y distro-sync ;
+  ${DNFCMD} -y repolist enabled ;
+else
+  #sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list ;
+  #sed -i "/${MIRROR}/ s|^.*rpm|rpm|" /etc/apt/sources.list ;
+  grep -e '^rpm.*' /etc/apt/sources.list ;
+fi
+sleep 5
 
 
 services_enabled="sshd"
-pkg_list="basesystem-minimal bash apt rpm locales-en sudo whois dhcpcd man-pages nano dosfstools xfsprogs iptables-nft lib64hal1 python3-urllib3"
+pkg_list="basesystem-minimal bash apt rpm dnf python3-dnf locales-en sudo whois dhcpcd man-pages nano dosfstools xfsprogs iptables-nft lib64hal1 python3-urllib3"
 # openssh-server task-xfce
 
 echo "Add software package selection(s)" ; sleep 3
-apt-get -y update ; apt-get --fix-broken -y install
-for pkgX in \${pkg_list} ; do
-  apt-get -y install \${pkgX} ;
-done
-# fix AND re-attempt install for infrequent errors
-apt-get --fix-broken -y install
-for pkgX in \${pkg_list} ; do
-  apt-get -y install \${pkgX} ;
-done
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} --releasever=${RELEASE:-2025} -y check-update ;
+  ${DNFCMD} --releasever=${RELEASE:-2025} --skip-broken -y install \${pkg_list} ;
+else
+  apt-get -y update ; apt-get --fix-broken -y install ;
+  for pkgX in \${pkg_list} ; do
+    apt-get -y install \${pkgX} ;
+  done ;
+  # fix AND re-attempt install for infrequent errors
+  apt-get --fix-broken -y install ;
+  for pkgX in \${pkg_list} ; do
+    apt-get -y install \${pkgX} ;
+  done ;
+fi
 
 
 echo "Config keyboard ; localization" ; sleep 3
@@ -227,14 +258,23 @@ cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 
 EOF
 
-
-apt-get --fix-broken -y  install
+if ! command -v dnf > /dev/null ; then
+  apt-get --fix-broken -y install ;
+fi
 # install/enable ssh after reboot
-#apt-get -y install openssh-server
+#if command -v dnf > /dev/null ; then
+#  ${DNFCMD} --releasever=${RELEASE:-2025} --skip-broken -y install openssh-server ;
+#else
+#  apt-get -y install openssh-server ;
+#fi
 service sshd stop #; service network stop
 
 
-apt-get -y clean
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} -y clean packages ;
+else
+  apt-get -y clean ;
+fi
 
 exit
 
@@ -253,14 +293,20 @@ fi
 
 pkg_list="basesystem kernel-latest mkinitrd bootloader grub2 grub2-efi efibootmgr" # microcode_ctl
 
-for pkgX in \${pkg_list} ; do
-  apt-get -y install \${pkgX} ;
-done
-# fix AND re-attempt install for infrequent errors
-apt-get --fix-broken -y install
-for pkgX in \${pkg_list} ; do
-  apt-get -y install \${pkgX} ;
-done
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} -y check-update ;
+
+  ${DNFCMD} --skip-broken -y install \${pkg_list} ;
+else
+  for pkgX in \${pkg_list} ; do
+    apt-get -y install \${pkgX} ;
+  done ;
+  # fix AND re-attempt install for infrequent errors
+  apt-get --fix-broken -y install ;
+  for pkgX in \${pkg_list} ; do
+    apt-get -y install \${pkgX} ;
+  done ;
+fi
 
 kver="\$(ls -A /lib/modules/ | tail -1)" # or ? uname -r
 echo \${kver} ; sleep 5
@@ -268,13 +314,21 @@ echo \${kver} ; sleep 5
 modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
 if [ "btrfs" = "${VOL_MGR}" ] ; then
-  apt-get -y install btrfs-progs ;
-  apt-get --fix-broken -y install ; apt-get -y install btrfs-progs ;
+  if command -v dnf > /dev/null ; then
+    ${DNFCMD} --skip-broken -y install btrfs-progs ;
+  else
+    apt-get -y install btrfs-progs ;
+    apt-get --fix-broken -y install ; apt-get -y install btrfs-progs ;
+  fi ;
   modprobe btrfs ; sleep 5 ;
 elif [ "lvm" = "${VOL_MGR}" ] ; then
-  apt-get -y install lvm2 ;
-  # cryptsetup
-  apt-get --fix-broken -y install ; apt-get -y install lvm2 ;
+  if command -v dnf > /dev/null ; then
+    ${DNFCMD} --skip-broken -y install lvm2 ;
+  else
+    apt-get -y install lvm2 ;
+    # cryptsetup
+    apt-get --fix-broken -y install ; apt-get -y install lvm2 ;
+  fi ;
   modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
 fi
 
@@ -307,7 +361,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
@@ -320,7 +374,11 @@ efibootmgr -v ; sleep 3
 
 whois-mkpasswd -m help ; sleep 10
 
-apt-get -y clean
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} -y clean all
+else
+  apt-get -y clean ;
+fi
 
 exit
 

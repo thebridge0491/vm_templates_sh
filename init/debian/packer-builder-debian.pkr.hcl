@@ -38,12 +38,12 @@ variable "qemudisk_interface_x64" {
 
 variable "qemu_firmware_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_CODE.fd"
+  default = "/usr/share/OVMF/OVMF_CODE.4m.fd"
 }
 
 variable "qemu_nvram_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_VARS.fd"
+  default = "/usr/share/OVMF/OVMF_VARS.4m.fd"
 }
 
 variable "qemudisk_interface_aa64" {
@@ -193,15 +193,15 @@ locals {
 
   boot_command_x64_chroot  = ["<down><up><wait5m>c<wait>",
     "linux /live/vmlinuz ",
-    "boot=live components username=devuan ${var.boot_cmdln_options} ",
-    "textmode=1 text 3<enter>",
+    "boot=live components noautologin username=devuan ${var.boot_cmdln_options} ",
+    "vga=auto<enter> textmode=1 text 3",
     "initrd /live/initrd.img<enter>",
     "boot<enter><wait3m><enter>devuan<enter>devuan<enter>sudo su<enter>",
     "mount -o remount,size=1500M /run/live/overlay ; df -lh ; sleep 5 ; ",
     "systemctl stop ssh ; systemctl status ssh ; ",
     "invoke-rc.d ssh stop ; invoke-rc.d ssh status<enter>sleep 3 ; ",
     "ip link ; sleep 3 ; dhcpcd eth0 ; dhclient eth0 ; ",
-    "sed -i '/main.*$/ s|main.*$|main contrib non-free|' /etc/apt/sources.list ; ",
+    "sed -i '/main.*$/ s|main.*$|main non-free-firmware contrib non-free|' /etc/apt/sources.list ; ",
     "apt-get --yes update --allow-releaseinfo-change ; ",
     "apt-get --yes install gdisk lvm2 btrfs-progs arch-install-scripts ${var.foreign_pkgmgr} ; ",
     "if [ 'zfs' = '${var.vol_mgr}' ] ; then ",
@@ -257,8 +257,7 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
-      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -289,18 +288,20 @@ build {
     execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
     inline           = ["cd /tmp",
       "sh init/common/collect_osinfo.sh collect_all"]
-    only             = ["qemu.guest_vm"]
+    except             = ["qemu.guest_vm"]
   }
   provisioner "file" {
     destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
     direction   = "download"
     generated   = true
-    only        = ["qemu.guest_vm"]
+    except        = ["qemu.guest_vm"]
     source      = "/tmp/info.tar"
   }
   provisioner "shell-local" {
-    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
+    inline = ["mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}",
+      "cd output-vms/collect_osinfo/vm_init/${var.variant}",
       "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
+    except        = ["qemu.guest_vm"]
   }
 
   post-processor "checksum" {

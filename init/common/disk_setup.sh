@@ -65,6 +65,7 @@ _sgdisk_part() {
     sgdisk --new 7:0:-1M --typecode 7:8300 --change-name 7:"${GRP_NM}-osHome" \
       /dev/${DEVX} ;
   fi
+  #parted /dev/${DEVX} unit GiB resizepart <IDX> 24
 
   sync ; sgdisk --print /dev/${DEVX} ; sgdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary || partprobe
@@ -97,6 +98,8 @@ _sfdisk_part() {
     echo -n size=5GiB,name="${GRP_NM}-osVar" | sfdisk -N 6 /dev/${DEVX} ;
     echo -n name="${GRP_NM}-osHome" | sfdisk -N 7 /dev/${DEVX} ;
   fi
+  #echo ", size=24GiB" | sfdisk -N <IDX> /dev/${DEVX}
+  #parted /dev/${DEVX} unit GiB resizepart <IDX> 24
 
   sync ; sfdisk --list /dev/${DEVX} ; sleep 3 ; sfdisk --verify /dev/${DEVX}
   sleep 3 ; partprobe --summary || partprobe
@@ -144,6 +147,7 @@ _parted_part() {
     parted -s -a optimal /dev/${DEVX} unit MiB \
       mkpart primary ext2 ${DIFF} ${END} name 7 ${GRP_NM}-osHome ;
   fi
+  #parted /dev/${DEVX} unit GiB resizepart <IDX> 24
 
   parted -s /dev/${DEVX} set 1 bios_grub on
   parted -s /dev/${DEVX} set 2 esp on
@@ -273,21 +277,34 @@ btrfspart_create() {
 
   btrfs quota enable /mnt
   btrfs subvolume create /mnt/@             # 256
-  btrfs subvolume create /mnt/@/home        # 257
-  btrfs subvolume create /mnt/@/var         # 258
-  chattr +C /mnt/@/var
+  btrfs subvolume create /mnt/@/usr_local   # 257
+  btrfs subvolume create /mnt/@/home        # 258
+  btrfs subvolume create /mnt/@/root        # 259
+  btrfs subvolume create /mnt/@/var_log     # 260
+  btrfs subvolume create /mnt/@/var_cache   # 261
+  btrfs subvolume create /mnt/@/var_mail    # 262
+  btrfs subvolume create /mnt/@/var_spool   # 263
+  btrfs subvolume create /mnt/@/var_tmp     # 264
+  btrfs subvolume create /mnt/@/opt         # 265
+  chattr +C /mnt/@/var_log /mnt/@/var_cache /mnt/@/var_mail /mnt/@/var_spool \
+    /mnt/@/var_tmp
   #btrfs subvolume create /mnt/@/tmp
 
-  btrfs subvolume create /mnt/@/.snapshots  # 259
+  btrfs subvolume create /mnt/@/.snapshots  # 266
   mkdir -p /mnt/@/.snapshots/1
-  btrfs subvolume create /mnt/@/.snapshots/1/snapshot  # 260
-  #btrfs subvolume set-default 260 /mnt
+  btrfs subvolume create /mnt/@/.snapshots/1/snapshot  # 267
+  ##btrfs subvolume set-default /mnt/@/.snapshots/1/snapshot
+  #btrfs subvolume set-default 267 /mnt
   btrfs subvolume set-default $(btrfs subvolume list /mnt | grep "@/.snapshots/1/snapshot" | grep -oP '(?<=ID )[0-9]+') /mnt
 
   btrfs subvolume list /mnt | cut -d' ' -f2 | xargs -I{} -n1 btrfs qgroup create 0/{} /mnt
   sleep 3 ; btrfs quota rescan /mnt
   btrfs qgroup limit 7368M /mnt/@/home
-  btrfs qgroup limit 5G /mnt/@/var
+  btrfs qgroup limit 5G /mnt/@/var_log
+  btrfs qgroup limit 5G /mnt/@/var_cache
+  btrfs qgroup limit 5G /mnt/@/var_mail
+  btrfs qgroup limit 5G /mnt/@/var_spool
+  btrfs qgroup limit 5G /mnt/@/var_tmp
   #btrfs qgroup limit 2G /mnt/@/tmp
   btrfs qgroup show -re /mnt ; sleep 5
 
@@ -356,9 +373,17 @@ mount_filesystems() {
     DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
     #mount -o noatime,compress=lzo,subvol=@ ${DEV_PV} /mnt ;
     mount -o noatime,compress=lzo ${DEV_PV} /mnt ;
-    mkdir -p /mnt/var /mnt/home /mnt/.snapshots ; #/mnt/tmp ;
-    mount -o noatime,compress=lzo,subvol=@/var ${DEV_PV} /mnt/var ;
+    mkdir -p /mnt/var/log /mnt/var/cache /mnt/var/mail /mnt/var/spool /mnt/var/tmp \
+      /mnt/usr/local /mnt/home /mnt/root /mnt/opt /mnt/.snapshots ; #/mnt/tmp ;
+    mount -o noatime,compress=lzo,subvol=@/var_log ${DEV_PV} /mnt/var/log ;
+    mount -o noatime,compress=lzo,subvol=@/var_cache ${DEV_PV} /mnt/var/cache ;
+    mount -o noatime,compress=lzo,subvol=@/var_mail ${DEV_PV} /mnt/var/mail ;
+    mount -o noatime,compress=lzo,subvol=@/var_spool ${DEV_PV} /mnt/var/spool ;
+    mount -o noatime,compress=lzo,subvol=@/var_tmp ${DEV_PV} /mnt/var/tmp ;
+    mount -o noatime,compress=lzo,subvol=@/usr_local ${DEV_PV} /mnt/usr/local ;
     mount -o noatime,compress=lzo,subvol=@/home ${DEV_PV} /mnt/home ;
+    mount -o noatime,compress=lzo,subvol=@/root ${DEV_PV} /mnt/root ;
+    mount -o noatime,compress=lzo,subvol=@/opt ${DEV_PV} /mnt/opt ;
     #mount -o noatime,compress=lzo,subvol=@/tmp ${DEV_PV} /mnt/tmp ;
     mount -o noatime,compress=lzo,subvol=@/.snapshots ${DEV_PV} \
       /mnt/.snapshots ;
@@ -366,8 +391,15 @@ mount_filesystems() {
     mkdir -p /mnt/etc /mnt/media ;
     sh -c 'cat > /mnt/etc/fstab' << EOF ;
 PARTLABEL=${PV_NM:-pvol0}  /          auto    noatime,compress=lzo   0   0
-PARTLABEL=${PV_NM:-pvol0}  /var  auto    noatime,compress=lzo,subvol=@/var   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/tmp  auto    noatime,compress=lzo,subvol=@/var_tmp   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/spool  auto    noatime,compress=lzo,subvol=@/var_spool   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/mail  auto    noatime,compress=lzo,subvol=@/var_mail   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/log  auto    noatime,compress=lzo,subvol=@/var_log   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/cache  auto    noatime,compress=lzo,subvol=@/var_cache   0   0
+PARTLABEL=${PV_NM:-pvol0}  /usr/local  auto    noatime,compress=lzo,subvol=@/usr_local   0   0
 PARTLABEL=${PV_NM:-pvol0}  /home  auto    noatime,compress=lzo,subvol=@/home   0   0
+PARTLABEL=${PV_NM:-pvol0}  /root  auto    noatime,compress=lzo,subvol=@/root   0   0
+PARTLABEL=${PV_NM:-pvol0}  /opt  auto    noatime,compress=lzo,subvol=@/opt   0   0
 #PARTLABEL=${PV_NM:-pvol0}  /tmp  auto    noatime,compress=lzo,subvol=@/tmp   0   0
 PARTLABEL=${PV_NM:-pvol0}  /.snapshots  auto    noatime,compress=lzo,subvol=@/.snapshots   0   0
 EOF
@@ -409,8 +441,8 @@ sysfs                           /sys        sysfs   defaults    0   0
 
 #9p_Data0           /media/9p_Data0  9p  trans=virtio,version=9p2000.L,rw,_netdev  0  0
 
-#PARTLABEL=data0    /mnt/Data0   exfat   auto,failok,rw,gid=sudo,uid=0   0    0
-#PARTLABEL=data0    /mnt/Data0   exfat   auto,failok,rw,dmask=0000,fmask=0111   0    0
+#PARTLABEL=data0    /mnt/Data0   exfat   auto,nofail,rw,gid=sudo,uid=0   0    0
+#PARTLABEL=data0    /mnt/Data0   exfat   auto,nofail,rw,dmask=0000,fmask=0111   0    0
 
 EOF
 

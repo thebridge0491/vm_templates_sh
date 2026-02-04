@@ -22,14 +22,23 @@
 # usage: [MACHINE=x86_64 variant=oshost] sh vminstall_chroot.sh [oshost_func [GUEST]]
 #   (default) [variant=freebsd] sh vminstall_chroot.sh [freebsd_guestvm [freebsd-x86_64-std]]
 
-STORAGE_DIR=${STORAGE_DIR:-$(dirname ${0})} ; PROVIDER=${PROVIDER:-libvirt}
-MACHINE=${MACHINE:-x86_64}
+## Note - OVMF/AAVMF pkgs firmware/nvram files([OVMF|AAVMF]_[CODE|VARS].fd):
+## (freebsd pkgs: edk2-qemu-x64, qemu)
+##   /usr/local/share/edk2-qemu/QEMU_*.fd, /usr/local/share/qemu/edk2-aarch64-code.fd,
+##   /usr/local/share/qemu/edk2-arm-vars.fd
+## (void pkg: edk2-ovmf)
+##   /usr/share/edk2/x64/OVMF_*.fd, /usr/share/edk2/aarch64/QEMU_*.fd
+## (debian pkgs: ovmf, qemu-efi-aarch64)
+##   /usr/share/OVMF/OVMF_*.fd, /usr/share/AAVMF/AAVMF_*.fd
+
+#STORAGE_DIR=${STORAGE_DIR:-$(dirname ${0})}
+PROVIDER=${PROVIDER:-libvirt} ; MACHINE=${MACHINE:-x86_64}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros} ; DISK_SZ=${DISK_SZ:-30720M}
 BHYVE_FIRMWARE_X64=${BHYVE_FIRMWARE_X64:-/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd}
-QEMU_FIRMWARE_X64=${QEMU_FIRMWARE_X64:-/usr/share/OVMF/OVMF_CODE.fd}
-QEMU_NVRAM_X64=${QEMU_NVRAM_X64:-/usr/share/OVMF/OVMF_VARS.fd}
-QEMU_FIRMWARE_AA64=${QEMU_FIRMWARE_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
-QEMU_NVRAM_AA64=${QEMU_NVRAM_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd}
+QEMU_FIRMWARE_X64=${QEMU_FIRMWARE_X64:-${STORAGE_DIR:-/usr/share/OVMF}/OVMF_CODE.4m.fd}
+QEMU_NVRAM_X64=${QEMU_NVRAM_X64:-${STORAGE_DIR:-/usr/share/OVMF}/OVMF_VARS.4m.fd}
+QEMU_FIRMWARE_AA64=${QEMU_FIRMWARE_AA64:-${STORAGE_DIR:-/usr/share/AAVMF}/AAVMF_CODE.fd}
+QEMU_NVRAM_AA64=${QEMU_NVRAM_AA64:-${STORAGE_DIR:-/usr/share/AAVMF}/AAVMF_VARS.fd}
 
 #mac_last3=$(hexdump -n3 -e '3/1 ":%02x"' /dev/random | cut -c2-)
 #mac_last3=$(od -N3 -tx1 -An /dev/random | awk '$1=$1' | tr ' ' :)
@@ -269,13 +278,14 @@ void_guestvm() {
   variant=${variant:-void} ; GUEST=${1:-${variant}-${MACHINE}-std}
 
   if [ "aarch64" = "${MACHINE}" ] ; then
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-live-aarch64-*.iso' | tail -n1)}
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-live-aarch64-*.iso' | tail -n1)}
     #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-mklive-aarch64-*.iso' | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-hrmpf-aarch64-*.iso' | tail -n1)}
     (cd ${ISOS_PARDIR}/void ; sha256sum --ignore-missing -c sha256sum.txt)
   else
     #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-live-x86_64-*.iso' | tail -n1)}
-    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-hrmpf-x86_64-*.iso' | tail -n1)}
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-mklive-x86_64-*.iso' | tail -n1)}
+    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-mklive-x86_64-*.iso' | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/void -name 'void-hrmpf-x86_64-*.iso' | tail -n1)}
     (cd ${ISOS_PARDIR}/void ; sha256sum --ignore-missing -c sha256sum.txt)
   fi
 
@@ -383,7 +393,7 @@ alpine_guestvm() {
 #----------------------------------------
 
 ## debian ##
-  ##append to boot params: textmode=1 text 3 [systemd.unit=multi-user.target]
+  ##append to boot params: noautologin apparmor=0 textmode=1 text 3 [systemd.unit=multi-user.target]
 
   ##!! (debian) login user/passwd: user/live
   ##!! (devuan) login user/passwd: devuan/devuan
@@ -440,7 +450,7 @@ debian_guestvm() {
   #[wicked ifstatus all ; wicked ifup {ifdev}]
   #zypper --non-interactive refresh
 
-  #zypper install ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr [lvm2 btrfsprogs] arch-install-scripts [pacman dnf-utils debootstrap apk-tools]
+  #zypper install ca-certificates-cacert ca-certificates-mozilla gptfdisk efibootmgr [lvm2 btrfsprogs] arch-install-scripts [pacman dnf-utils dnf5-plugins debootstrap apk-tools]
   #zypper --gpg-auto-import-keys refresh
   #update-ca-certificates
 
@@ -457,13 +467,11 @@ suse_guestvm() {
   variant=${variant:-suse} ; GUEST=${1:-${variant}-${MACHINE}-std}
 
   if [ "aarch64" = "${MACHINE}" ] ; then
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "openSUSE-Leap-*-Live-aarch64*.iso" | tail -n1)}
-    (cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-aarch64*.iso.sha256)
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "openSUSE-Tumbleweed-*-Live-aarch64*.iso" | tail -n1)}
+    (cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c openSUSE-Tumbleweed-*-Live-aarch64*.iso.sha256)
   else
-    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "GeckoLinux_*.x86_64*.iso" | tail -n1)}
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "openSUSE-Leap-*-Live-x86_64*.iso" | tail -n1)}
-    #(cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c GeckoLinux_*.x86_64*.iso.sha256)
-    (cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c openSUSE-Leap-*-Live-x86_64*.iso.sha256)
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "openSUSE-Tumbleweed-*-Live-x86_64*.iso" | tail -n1)}
+    (cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c openSUSE-Tumbleweed-*-Live-x86_64*.iso.sha256)
   fi
 
   sleep 5 ; _prep ; sleep 3

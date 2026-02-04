@@ -76,6 +76,12 @@ bootstrap() {
   echo "Bootstrap base pkgs" ; sleep 3
   if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs umount ${ZPOOLNM}/var/mail ; zfs destroy ${ZPOOLNM}/var/mail ;
+  elif [ "btrfs" = "${VOL_MGR}" ] ; then
+    umount /mnt/var/mail ; rm -fr /mnt/var/mail ;
+    mkdir -p /mnt/var/spool/mail ;
+    DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
+    mount -o noatime,compress=lzo,subvol=@/var_mail ${DEV_PV} /mnt/var/spool/mail ;
+    sed -i 's|/var/mail|/var/spool/mail|' /mnt/etc/fstab* ;
   fi
   # patterns-base-base --> --type pattern base --> +pattern:base
   pkg_list="+pattern:base system-group-wheel makedev"
@@ -105,16 +111,13 @@ bootstrap() {
     zypper --non-interactive --root /mnt --gpg-auto-import-keys addrepo http://${MIRROR}/update/openSUSE-non-oss-current/ update-non-oss
     fi ;
     zypper --non-interactive --root /mnt --gpg-auto-import-keys refresh
-    for pkgX in ${pkg_list} ; do
-      zypper --non-interactive --root /mnt install -y --no-recommends ${pkgX} ;
-    done ;
-    #zypper --non-interactive --root /mnt install -y --no-recommends ${pkg_list} ;
-    zypper --non-interactive --root /mnt repos ;
+    zypper --no-refresh --ignore-unknown --non-interactive --root /mnt install -y --no-recommends --allow-downgrade ${pkg_list} ;
+    zypper --no-refresh --non-interactive --root /mnt repos ;
   else
     mv /mnt/etc/fstab /mnt/etc/fstab.disk_setup ;
     _rootfs_extract ;
     cp -a /mnt/etc/fstab /mnt/etc/fstab.rootfs ;
-    cp -a /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
+    mv /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
     mv /mnt/etc/resolv.conf /mnt/etc/resolv.conf.rootfs ;
     cp /etc/resolv.conf /mnt/etc/resolv.conf ; cp /etc/mtab /mnt/etc/mtab ;
     # LANG=[C|en_US].UTF-8
@@ -124,24 +127,21 @@ set -x
 unalias -a
 
 if [ "slowroll" = "${RELEASE}" ] ; then
-  zypper --non-interactive removerepo repo-oss repo-non-oss repo-update repo-debug repo-source update-oss update-non-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/slowroll/repo/oss/ repo-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/slowroll/repo/non-oss/ repo-non-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/slowroll/repo/oss/ update-oss
-  #zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/slowroll/repo/non-oss/ update-non-oss # ??
+  zypper --no-refresh --non-interactive removerepo repo-oss repo-non-oss repo-update repo-debug repo-source update-oss update-non-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/slowroll/repo/oss/ repo-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/slowroll/repo/non-oss/ repo-non-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/slowroll/repo/oss/ update-oss
+  #zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/slowroll/repo/non-oss/ update-non-oss # ??
 fi
 
 zypper --non-interactive --gpg-auto-import-keys refresh
 if [ "slowroll" = "${RELEASE}" ] ; then
-  zypper --non-interactive install -y openSUSE-repos-Slowroll distribution-logos-openSUSE-Slowroll ;
-  zypper --non-interactive install -y --oldpackage openSUSE-release ;
+  zypper --no-refresh --non-interactive install -y openSUSE-repos-Slowroll distribution-logos-openSUSE-Slowroll ;
+  zypper --no-refresh --non-interactive install -y --oldpackage openSUSE-release ;
 fi
-for pkgX in ${pkg_list} ; do
-  zypper --non-interactive install -y --no-recommends \${pkgX} ;
-done
-#zypper --non-interactive install -y --no-recommends ${pkg_list}
+zypper --no-refresh --ignore-unknown --non-interactive install -y --no-recommends --allow-downgrade ${pkg_list}
 zypper --non-interactive --gpg-auto-import-keys refresh
-zypper --non-interactive repos
+zypper --no-refresh --non-interactive repos
 
 exit
 
@@ -196,24 +196,25 @@ systemctl stop sshd ; systemctl disable sshd
 echo "Config pkg repo mirror(s)" ; sleep 3
 . /etc/os-release
 
+zypper --non-interactive --gpg-auto-import-keys refresh
 if [ "tumbleweed" = "${RELEASE}" ] ; then
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/tumbleweed/repo/oss/ repo-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/tumbleweed/repo/non-oss/ repo-non-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/tumbleweed/ update-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/tumbleweed-non-oss/ update-non-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/tumbleweed/repo/oss/ repo-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/tumbleweed/repo/non-oss/ repo-non-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/tumbleweed/ update-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/tumbleweed-non-oss/ update-non-oss
 elif [ "slowroll" = "${RELEASE}" ] ; then
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/slowroll/repo/oss/ repo-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/slowroll/repo/non-oss/ repo-non-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/slowroll/repo/oss/ update-oss
-  #zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/slowroll/repo/non-oss/ update-non-oss # ???
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/slowroll/repo/oss/ repo-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/slowroll/repo/non-oss/ repo-non-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/slowroll/repo/oss/ update-oss
+  #zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/slowroll/repo/non-oss/ update-non-oss # ???
 else # elif [ "opensuse-leap" = "\${ID}" ] ; then
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/oss/ repo-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/non-oss/ repo-non-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/oss/ update-oss
-  zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/non-oss/ update-non-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/oss/ repo-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/distribution/leap/\${VERSION_ID}/repo/non-oss/ repo-non-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/oss/ update-oss
+  zypper --no-refresh --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/update/leap/\${VERSION_ID}/non-oss/ update-non-oss
 fi
 
-zypper repos ; sleep 5
+zypper --no-refresh --non-interactive repos ; sleep 5
 
 
 services_enabled="sshd tmp.mount"
@@ -224,17 +225,15 @@ pkg_list="+pattern:base lsb-release system-group-wheel pciutils sudo whois nano 
 echo "Add software package selection(s)" ; sleep 3
 zypper --non-interactive --gpg-auto-import-keys refresh
 if [ "slowroll" = "${RELEASE}" ] ; then
-  zypper --non-interactive install -y openSUSE-repos-Slowroll distribution-logos-openSUSE-Slowroll ;
-  zypper --non-interactive install -y --oldpackage openSUSE-release ;
+  zypper --no-refresh --ignore-unknown --non-interactive install -y openSUSE-repos-Slowroll distribution-logos-openSUSE-Slowroll ;
+  zypper --no-refresh --ignore-unknown --non-interactive install -y --oldpackage openSUSE-release ;
 fi
-zypper --non-interactive install -y --no-recommends ca-certificates-cacert ca-certificates-mozilla
-zypper --gpg-auto-import-keys refresh
+zypper --no-refresh --ignore-unknown --non-interactive install -y --no-recommends ca-certificates-cacert ca-certificates-mozilla
+zypper --non-interactive --gpg-auto-import-keys refresh
 update-ca-certificates
 
-for pkgX in \${pkg_list} ; do
-  zypper --non-interactive install -y --no-recommends \${pkgX} ;
-done
-zypper --non-interactive install -y --no-recommends openssh
+zypper --no-refresh --ignore-unknown --non-interactive install -y --no-recommends --allow-downgrade \${pkg_list}
+zypper --no-refresh --ignore-unknown --non-interactive install -y --no-recommends --allow-downgrade openssh
 systemctl stop sshd ; systemctl enable sshd
 
 
@@ -315,15 +314,19 @@ mkdir -p \${sudoers_base}.d
 ##chmod 0440 \${sudoers_base}.d/99_packernopasswd
 
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" \${sudoers_base}
+#sed -i '/^[^#].*requiretty/ s|^|#|' \${sudoers_base}
 cat << EOF | EDITOR="tee -a" visudo -f \${sudoers_base}.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
 
 EOF
+cat << EOF | EDITOR="tee -a" visudo -f \${sudoers_base}.d/99_securepath
+Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+EOF
 
 
-zypper --non-interactive clean
+zypper --no-refresh --non-interactive clean
 
 exit
 
@@ -346,20 +349,17 @@ fi
 
 # patterns-base-bootloader --> --type pattern bootloader --> +pattern:bootloader
 # patterns-yast-yast2_basis --> --type pattern yast2_basis --> +pattern:yast2_basis
-pkg_list="+pattern:bootloader +pattern:yast2_basis kernel\${LINSUF} grub2 shim efibootmgr"
+pkg_list="+pattern:bootloader +pattern:yast2_basis dracut-tools dracut kernel\${LINSUF} grub2 shim efibootmgr"
 
-##zypper --non-interactive remove busybox-sed busybox-grep # ???
-zypper --non-interactive install -y --force-resolution --no-recommends +pattern:bootloader +pattern:yast2_basis
+##zypper --no-refresh --ignore-unknown --non-interactive remove busybox-sed busybox-grep # ???
+zypper --no-refresh --ignore-unknown --non-interactive install -y --force-resolution --no-recommends +pattern:bootloader +pattern:yast2_basis
 
-for pkgX in \${pkg_list} ; do
-  zypper --non-interactive install -y \${pkgX} ;
-done
-
-if [ ! "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
-  zypper --non-interactive install -y kernel-firmware ;
+zypper --no-refresh --ignore-unknown --non-interactive install -y --allow-downgrade \${pkg_list}
+if [ ! "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
+  zypper --no-refresh --non-interactive install -y kernel-firmware ;
 fi
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
-  zypper --non-interactive remove -y kernel-firmware* ;
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
+  zypper --no-refresh --non-interactive remove -y kernel-firmware* ;
 fi
 
 kver="\$(ls -A /lib/modules/ | tail -1)" # ?? or uname -r
@@ -373,20 +373,20 @@ modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
 if [ "zfs" = "${VOL_MGR}" ] ; then
   ## temp downgrade grub2[x86_64-efi|i386-pc] due to unknown filesystem error (ZFS)
-  #zypper --non-interactive install -y --from repo-oss --from repo-non-oss --oldpackage grub2-i386-pc grub2-x86_64-efi shim grub2 ;
+  #zypper --no-refresh --ignore-unknown --non-interactive install -y --from repo-oss --from repo-non-oss --oldpackage grub2-i386-pc grub2-x86_64-efi shim grub2 ;
   #zypper addlock grub2-i386-pc grub2-x86_64-efi shim grub2 ;
 
   if [ "tumbleweed" = "${RELEASE}" ] ; then
-    zypper --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/openSUSE_Tumbleweed/filesystems.repo ;
+    zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/openSUSE_Tumbleweed/filesystems.repo ;
   elif [ "slowroll" = "${RELEASE}" ] ; then
-    zypper --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/openSUSE_Slowroll/filesystems.repo ;
+    zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/openSUSE_Slowroll/filesystems.repo ;
   else
-    zypper --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/\${VERSION_ID}/filesystems.repo ;
+    zypper --non-interactive --gpg-auto-import-keys addrepo http://${MIRROR}/repositories/filesystems/\${VERSION_ID}/filesystems.repo ;
   fi ;
-  zypper --gpg-auto-import-keys refresh ;
+  zypper --non-interactive --gpg-auto-import-keys refresh ;
 
-  zypper --non-interactive install -y kernel\${LINSUF}-devel dkms zfs ;
-  zypper --non-interactive install -y zfs ;
+  zypper --no-refresh --ignore-unknown --non-interactive install -y kernel\${LINSUF}-devel dkms zfs ;
+  zypper --no-refresh --ignore-unknown --non-interactive install -y zfs ;
 
   # ?? Error - no zfs.ko module, just binaries zfs, zpool, etc (zfs ver 2.1.2)
   find /lib/modules -type f -name '*zfs.ko*' ;
@@ -417,13 +417,13 @@ if [ "zfs" = "${VOL_MGR}" ] ; then
   dracut_extra_opts='--add-drivers "zfs"' ;
 
   echo "Hold zfs & kernel package upgrades (require manual upgrade)" ;
-  zypper addlock zfs zfs-sudo kernel\${LINSUF} kernel\${LINSUF}-devel ;
-  zypper locks ; sleep 3 ;
+  zypper --no-refresh --non-interactive addlock zfs zfs-sudo kernel\${LINSUF} kernel\${LINSUF}-devel ;
+  zypper --no-refresh --non-interactive locks ; sleep 3 ;
 elif [ "btrfs" = "${VOL_MGR}" ] ; then
-  zypper --non-interactive install -y btrfsprogs ;
+  zypper --no-refresh --ignore-unknown --non-interactive install -y btrfsprogs ;
   modprobe btrfs ; sleep 5 ;
 elif [ "lvm" = "${VOL_MGR}" ] ; then
-  zypper --non-interactive install -y lvm2 ;
+  zypper --no-refresh --ignore-unknown --non-interactive install -y lvm2 ;
   # cryptsetup
   modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
 fi
@@ -433,7 +433,7 @@ kernel-install add \${kver} /boot/vmlinuz-\${kver}
 
 #mkinitrd /boot/initrd-\${kver}.img \${kver}
 dracut --force \${dracut_extra_opts} --kver \${kver}
-#zypper --non-interactive install -y -f kernel\${LINSUF}
+#zypper --no-refresh --ignore-unknown --non-interactive install -y -f kernel\${LINSUF}
 
 
 grub2-probe /boot
@@ -456,8 +456,8 @@ else
 fi
 find / -ipath /boot/efi/*/*.efi ; sleep 5
 
-#sed -ie "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
-#sed -ie "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
+#sed -ie 's|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|' /etc/default/grub
+#sed -ie '/GRUB_DEFAULT/ s|=.*$|=saved|' /etc/default/grub
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 #echo "#GRUB_CMDLINE_LINUX='cryptdevice=/dev/sda2:cryptroot'" >> /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|^\(.*\)$|#\1\n\1|' /etc/default/grub
@@ -473,7 +473,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
@@ -491,7 +491,7 @@ efibootmgr -v ; sleep 3
 
 mkpasswd -m help ; sleep 10
 
-zypper --non-interactive clean --all
+zypper --no-refresh --non-interactive clean --all
 
 exit
 

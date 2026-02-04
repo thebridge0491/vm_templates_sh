@@ -385,7 +385,8 @@
       <package>openssh</package>
       <package>makedev</package>
       <package>openssh-askpass</package>
-      <package>python311</package>
+      <package>python312</package>
+      <package>python312-urllib3</package>
       <!--<package>kernel-devel</package>-->
       <package>kernel-longterm</package>
       <package>btrfsprogs</package>
@@ -536,7 +537,7 @@ sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|^\(.*\)$|#\1\n\1|' /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rootdelay=5"|' \
   /etc/default/grub
 #grub2-install --target=i386-pc --recheck /dev/[sv]da
-if [ "$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub2-mkconfig -o /boot/grub2/grub.cfg

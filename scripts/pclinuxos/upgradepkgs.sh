@@ -32,7 +32,8 @@ snapshot() {
     # example remove: btrfs subvolume delete /.snapshots/snap1
     # example (manual) restore:
     #   mv /.snapshots/1/snapshot /.snapshots/1/broke-snap1
-    #   mv /.snapshots/snap1 /.snapshots/1/snapshot
+    #   btrfs subvolume snapshot /.snapshots/snap1 /.snapshots/1/snapshot
+    #   #btrfs subvolume set-default /.snapshots/1/snapshot
     #   btrfs subvolume set-default $(btrfs subvolume list / \
     #     | grep "@/.snapshots/1/snapshot" | grep -oP '(?<=ID )[0-9]+') /
 
@@ -90,8 +91,6 @@ run_upgradepkgs() {
   done
   grep -e '^Hold' /etc/apt/apt.conf
 
-  apt-get -y clean
-
 
   # Re-set setuid for qemu-bridge-helper
   qemubridge_helper=`find /usr -type f -name qemu-bridge-helper | head -n1`
@@ -99,6 +98,8 @@ run_upgradepkgs() {
     #chmod [u+s | 4755] ${qemubridge_helper} ;
     chmod u+s ${qemubridge_helper} ;
   fi
+
+  apt-get -y clean
 }
 
 #----------------------------------------

@@ -6,8 +6,8 @@
     "_qemu_binary_aa64": "qemu-system-aarch64",
     "qemudisk_image": "",
     "qemudisk_interface": "virtio-scsi",
-    "qemu_firmware": "/usr/share/OVMF/OVMF_CODE.fd",
-    "qemu_nvram": "/usr/share/OVMF/OVMF_VARS.fd",
+    "qemu_firmware": "/usr/share/OVMF/OVMF_CODE.4m.fd",
+    "qemu_nvram": "/usr/share/OVMF/OVMF_VARS.4m.fd",
     "_qemuargs_cpu_x64": "Skylake-Client",
     "_qemuargs_machine_x64": "q35,accel=kvm:hvf:tcg",
     "_qemudisk_interface_aa64": "virtio",
@@ -149,8 +149,7 @@
       "inline": ["mkdir -p {{user `home`}}/.ssh/publish_krls {{user `home`}}/.pki/publish_crls",
         "cp -a {{user `home`}}/.ssh/publish_krls init/common/skel/_ssh/",
         "cp -a {{user `home`}}/.pki/publish_crls init/common/skel/_pki/",
-        "tar -cf /tmp/scripts_{{user `variant`}}.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}",
-        "mkdir -p output-vms/collect_osinfo/vm_init/{{user `variant`}}/{{user `build_timestamp`}}#{{user `RELEASE`}}"],
+        "tar -cf /tmp/scripts_{{user `variant`}}.tar init/common init/{{user `variant`}} -C scripts {{user `variant`}}"],
       "except": ["box-libvirt", "box-bhyve"]
     },
     {
@@ -183,6 +182,43 @@
       "scripts": ["init/common/zerofill_freebsd.sh"],
       "except": ["qemu_guestvm", "virtualbox_guestvm", "box-libvirt",
         "box-bhyve"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": ["HOME_DIR=/home/packer"],
+      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
+      "inline": ["cd /tmp",
+        "sh init/common/collect_osinfo.sh collect_all"],
+      "except": ["box-libvirt", "box-bhyve", "qemu_guestvm"]
+    },
+    {
+      "type": "file",
+      "destination": "output-vms/collect_osinfo/vm_init/{{user `variant`}}/",
+      "direction": "download",
+      "generated": true,
+      "source": "/tmp/info.tar",
+      "except": ["box-libvirt", "box-bhyve", "qemu_guestvm"]
+    },
+    {
+      "type": "shell-local",
+      "inline": ["mkdir -p output-vms/collect_osinfo/vm_init/{{user `variant`}}/{{user `build_timestamp`}}#{{user `RELEASE`}}",
+        "cd output-vms/collect_osinfo/vm_init/{{user `variant`}}",
+        "tar -xf info.tar -C {{user `build_timestamp`}}#{{user `RELEASE`}} && rm info.tar"],
+      "except": ["box-libvirt", "box-bhyve", "qemu_guestvm"]
+    }],
+
+    {
+      "type": "shell-local",
+      "inline": ["if command -v erb > /dev/null ; then",
+        "erb author={{user `author`}} guest={{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}} datestamp={{user `build_timestamp`}} init/common/catalog.json.erb > output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "elif command -v mustache > /dev/null ; then",
+        "echo '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' | mustache - init/common/catalog.json.mustache > output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "elif command -v chevron > /dev/null ; then",
+        "echo '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' | chevron -d /dev/stdin init/common/catalog.json.mustache > output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "elif command -v pystache > /dev/null ; then",
+        "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' > output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
+        "fi", "cp -a init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/"],
+      "only": ["qemu_guestvm", "virtualbox_guestvm"]
     },
     {
       "type": "shell-local",
@@ -231,29 +267,6 @@
         "tar -cvzf {{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}-{{user `build_timestamp`}}.bhyve.box metadata.json info.json Vagrantfile `ls vmrun* *.fd` box.img"],
       "only": ["box-bhyve"]
     },
-    {
-      "type": "shell",
-      "environment_vars": ["HOME_DIR=/home/packer"],
-      "execute_command": "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}",
-      "inline": ["cd /tmp",
-        "sh init/common/collect_osinfo.sh collect_all"],
-      "except": ["box-libvirt", "box-bhyve"]
-    },
-    {
-      "type": "file",
-      "destination": "output-vms/collect_osinfo/vm_init/{{user `variant`}}/",
-      "direction": "download",
-      "generated": true,
-      "source": "/tmp/info.tar",
-      "except": ["box-libvirt", "box-bhyve"]
-    },
-    {
-      "type": "shell-local",
-      "inline": ["cd output-vms/collect_osinfo/vm_init/{{user `variant`}}",
-        "tar -xf info.tar -C {{user `build_timestamp`}}#{{user `RELEASE`}} && rm info.tar"],
-      "except": ["box-libvirt", "box-bhyve"]
-    }],
-
   "post-processors": [
     {
       "type": "checksum",
@@ -266,19 +279,6 @@
       "checksum_types": ["sha256"],
       "output": "output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}.ovf.{{.ChecksumType}}",
       "only": ["virtualbox_guestvm"]
-    },
-    {
-      "type": "shell-local",
-      "inline": ["if command -v erb > /dev/null ; then",
-        "erb author={{user `author`}} guest={{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}} datestamp={{user `build_timestamp`}} init/common/catalog.json.erb > output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
-        "elif command -v mustache > /dev/null ; then",
-        "echo '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' | mustache - init/common/catalog.json.mustache > output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
-        "elif command -v chevron > /dev/null ; then",
-        "echo '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' | chevron -d /dev/stdin init/common/catalog.json.mustache > output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
-        "elif command -v pystache > /dev/null ; then",
-        "pystache init/common/catalog.json.mustache '{\"author\":\"{{user `author`}}\",\"guest\":\"{{user `variant`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}\",\"datestamp\":\"{{user `build_timestamp`}}\"}' > output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}_catalog.json",
-        "fi", "cp -a init/common/qemu_lxc/vmrun.sh output-vms/{{user `variant`}}{{user `RELEASE`}}-{{user `MACHINE`}}-{{user `vol_mgr`}}/"],
-      "only": ["qemu_guestvm", "virtualbox_guestvm"]
     },
     {
       "type": "vagrant",

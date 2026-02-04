@@ -47,22 +47,37 @@ remount_filesys() {
   echo "Re-mount filesystems" ; sleep 3
   if [ "btrfs" = "${VOL_MGR}" ] ; then
     DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
-    mount -o noatime,compress=lzo,subvol=@ ${DEV_PV} /mnt ;
-    mkdir -p /mnt/.snapshots /mnt/var /mnt/tmp /mnt/home ;
+    #mount -o noatime,compress=lzo,subvol=@ ${DEV_PV} /mnt ;
+    mount -o noatime,compress=lzo ${DEV_PV} /mnt ;
+    mkdir -p /mnt/var/log /mnt/var/cache /mnt/var/mail /mnt/var/spool /mnt/var/tmp \
+      /mnt/usr/local /mnt/home /mnt/root /mnt/opt /mnt/.snapshots ; #/mnt/tmp ;
+    mount -o noatime,compress=lzo,subvol=@/var_log ${DEV_PV} /mnt/var/log ;
+    mount -o noatime,compress=lzo,subvol=@/var_cache ${DEV_PV} /mnt/var/cache ;
+    mount -o noatime,compress=lzo,subvol=@/var_mail ${DEV_PV} /mnt/var/mail ;
+    mount -o noatime,compress=lzo,subvol=@/var_spool ${DEV_PV} /mnt/var/spool ;
+    mount -o noatime,compress=lzo,subvol=@/var_tmp ${DEV_PV} /mnt/var/tmp ;
+    mount -o noatime,compress=lzo,subvol=@/usr_local ${DEV_PV} /mnt/usr/local ;
+    mount -o noatime,compress=lzo,subvol=@/home ${DEV_PV} /mnt/home ;
+    mount -o noatime,compress=lzo,subvol=@/root ${DEV_PV} /mnt/root ;
+    mount -o noatime,compress=lzo,subvol=@/opt ${DEV_PV} /mnt/opt ;
+    #mount -o noatime,compress=lzo,subvol=@/tmp ${DEV_PV} /mnt/tmp ;
     mount -o noatime,compress=lzo,subvol=@/.snapshots ${DEV_PV} \
       /mnt/.snapshots ;
-    mount -o noatime,compress=lzo,subvol=@/var ${DEV_PV} /mnt/var ;
-    mount -o noatime,compress=lzo,subvol=@/home ${DEV_PV} /mnt/home ;
-    #mount -o noatime,compress=lzo,subvol=@/tmp ${DEV_PV} /mnt/tmp ;
 
     cp /mnt/etc/fstab /mnt/etc/fstab.old ;
 #    sh -c 'cat >> /mnt/etc/fstab' << EOF ;
-#PARTLABEL=${PV_NM:-pvol0}  /          auto    noatime,compress=lzo,subvol=/@   0   0
-#PARTLABEL=${PV_NM:-pvol0}  /.snapshots  auto    noatime,compress=lzo,subvol=/@/.snapshots   0   0
-#PARTLABEL=${PV_NM:-pvol0}  /var  auto    noatime,compress=lzo,subvol=/@/var   0   0
-#PARTLABEL=${PV_NM:-pvol0}  /home  auto    noatime,compress=lzo,subvol=/@/home   0   0
-##PARTLABEL=${PV_NM:-pvol0}  /tmp  auto    noatime,compress=lzo,subvol=/@/tmp   0   0
-#
+#PARTLABEL=${PV_NM:-pvol0}  /          auto    noatime,compress=lzo   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /var/tmp  auto    noatime,compress=lzo,subvol=@/var_tmp   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /var/spool  auto    noatime,compress=lzo,subvol=@/var_spool   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /var/mail  auto    noatime,compress=lzo,subvol=@/var_mail   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /var/log  auto    noatime,compress=lzo,subvol=@/var_log   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /var/cache  auto    noatime,compress=lzo,subvol=@/var_cache   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /usr/local  auto    noatime,compress=lzo,subvol=@/usr_local   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /home  auto    noatime,compress=lzo,subvol=@/home   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /root  auto    noatime,compress=lzo,subvol=@/root   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /opt  auto    noatime,compress=lzo,subvol=@/opt   0   0
+##PARTLABEL=${PV_NM:-pvol0}  /tmp  auto    noatime,compress=lzo,subvol=@/tmp   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /.snapshots  auto    noatime,compress=lzo,subvol=@/.snapshots   0   0
 #EOF
   elif [ "lvm" = "${VOL_MGR}" ] ; then
     mount /dev/mapper/${GRP_NM}-osRoot /mnt ;
@@ -146,7 +161,7 @@ networking urandom hostname hwclock modules sysctl bootmisc swap loadkmap mount-
 # udev udev-trigger udev-settle udev-postmount
 services_enabled="dhcpcd sshd"
 services_disabled="syslog crond"
-pkg_list="eudev eudev-openrc udev-init-scripts lsb-release-minimal man-db man-pages dhcpcd bash sudo mkpasswd util-linux util-linux-misc coreutils iproute2-ss musl-locales pciutils shadow openssh python3"
+pkg_list="eudev eudev-openrc udev-init-scripts lsb-release-minimal man-db man-pages dhcpcd bash sudo mkpasswd util-linux util-linux-misc coreutils tar procps-ng grep iproute2-ss musl-locales pciutils shadow openssh python3 py3-urllib3"
 # efibootmgr xfce4
 
 echo "Add software package selection(s)" ; sleep 3
@@ -206,9 +221,9 @@ mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 sleep 5
 
 
-#sed -i "/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|" /etc/sudoers
-#sed -i "/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|" /etc/sudoers
-#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+#sed -i '/^%wheel.*(ALL)\s*ALL/ s|%wheel|# %wheel|' /etc/sudoers
+#sed -i '/^#.*%wheel.*NOPASSWD.*/ s|^#.*%wheel|%wheel|' /etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -217,8 +232,8 @@ EOF
 
 
 #echo "Temporarily permit root login via ssh password" ; sleep 3
-#sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
-#sed -i "s|.*PermitRootLogin|#PermitRootLogin|" /etc/ssh/sshd_config
+#sed -i '/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|' /etc/ssh/sshd_config
+#sed -i 's|.*PermitRootLogin|#PermitRootLogin|' /etc/ssh/sshd_config
 #echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-rootlogin.conf
 
 

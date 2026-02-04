@@ -23,7 +23,7 @@ $o = {
     'basesystem', 'kernel-server-latest', 'microcode_ctl', 'locales-en',
     'pciutils', 'sudo', 'dhcpcd', 'man-pages', 'dosfstools', 'lvm2', 'grub',
     'grub2-efi', 'efibootmgr', 'openssh-server', 'nano', 'urpmi', 'dnf',
-    'dnf-plugins-core', 'python3-dnf-plugin-versionlock' #, 'harddrake-ui', 'xdm', 'task-xfce'
+    'dnf-plugins-core', 'python3-dnf-plugin-versionlock', 'python3-urllib3' #, 'harddrake-ui', 'xdm', 'task-xfce'
   ],
   'enabled_media' => [
     'Core Release (Installer)', 'Nonfree Release (Installer)',
@@ -180,7 +180,7 @@ $o = {
     sed -ie "/^GRUB_CMDLINE_LINUX_DEFAULT/ s|=\"\(.*\)\"|=\"\1 rootdelay=5\"|"  \
       /etc/default/grub
     #grub2-install --target=i386-pc --recheck /dev/[sv]da
-    if [ "`dmesg | grep -ie \'Hypervisor detected\'`" ] ; then
+    if [ "`dmesg | grep -iE \'kvm|qemu|hypervisor\'`" ] ; then
       sed -ie \'/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|\' /etc/default/grub ;
     fi
     grub2-mkconfig -o /boot/grub2/grub.cfg

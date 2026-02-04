@@ -53,13 +53,20 @@ export CHROOT_CMD=chroot
 
 bootstrap() {
   echo "Bootstrap base pkgs" ; sleep 3
+  if [ "btrfs" = "${VOL_MGR}" ] ; then
+    umount /mnt/var/mail ; rm -fr /mnt/var/mail ;
+    mkdir -p /mnt/var/spool/mail ;
+    DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
+    mount -o noatime,compress=lzo,subvol=@/var_mail ${DEV_PV} /mnt/var/spool/mail ;
+    sed -i 's|/var/mail|/var/spool/mail|' /mnt/etc/fstab* ;
+  fi
   pkg_list="basesystem-minimal-core urpmi dnf dnf-plugins-core makedev"
   if command -v dnf > /dev/null ; then
-    #${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck --repofrompath=quickrepo${RELEASE},http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/ --repo=quickrepo${RELEASE} install -y urpmi dnf dnf-plugins-core locales-en ;
-    ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck config-manager -y --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
-    ${DNFCMD} --installroot=/mnt check-update -y ;
-    ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck install -y ${pkg_list} ;
-    ${DNFCMD} --installroot=/mnt repolist -y ;
+    #${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck --repofrompath=quickrepo${RELEASE},http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release/ --repo=quickrepo${RELEASE} --skip-broken -y install urpmi dnf dnf-plugins-core locales-en ;
+    ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck -y config-manager --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
+    ${DNFCMD} --installroot=/mnt -y check-update ;
+    ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck --skip-broken -y install ${pkg_list} ;
+    ${DNFCMD} --installroot=/mnt -y repolist ;
   elif command -v yum-config-manager > /dev/null ; then
     rm -r /mnt/var/lib/rpm /mnt/var/cache/dnf ;
     mkdir -p /mnt/var/lib/rpm /mnt/var/cache/dnf ;
@@ -70,9 +77,9 @@ bootstrap() {
     #rpm -v -qip /tmp/repos.rpm ; sleep 5 ;
     #rpm -v --root /mnt --nodeps -i /tmp/repos.rpm ;
     yum-config-manager --releasever=${RELEASE} --installroot=/mnt --nogpgcheck -y --add-repo http://${MIRROR}/distrib/${RELEASE}/${UNAME_M}/media/core/release ;
-    ${YUMCMD} --installroot=/mnt check-update -y ;
-    ${YUMCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck install -y ${pkg_list} ;
-    ${YUMCMD} --installroot=/mnt repolist -y ;
+    ${YUMCMD} --installroot=/mnt -y check-update ;
+    ${YUMCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck --skip-broken -y install ${pkg_list} ;
+    ${YUMCMD} --installroot=/mnt -y repolist ;
   elif command -v urpmi > /dev/null ; then
     #urpmi.addmedia --urpmi-root /mnt --distrib --mirrorlist '${MIRRORLIST}'
     urpmi.addmedia --urpmi-root /mnt --distrib http://${MIRROR}/distrib/${RELEASE}/${UNAME_M} ;
@@ -130,23 +137,21 @@ VERSION_MAJOR=\$(echo \${VERSION_ID} | cut -d. -f1)
 ##urpmi.addmedia --distrib --mirrorlist '${MIRRORLIST}'
 #urpmi.addmedia --distrib http://${MIRROR}/distrib/\${VERSION_ID}/${UNAME_M}
 #urpmq --list-url ; sleep 5
-${DNFCMD} --releasever=${RELEASE} config-manager --set-enabled \${ID}-${UNAME_M} updates-${UNAME_M}
-${DNFCMD} --releasever=${RELEASE} --refresh distro-sync -y
+${DNFCMD} --releasever=${RELEASE} -y config-manager --set-enabled \${ID}-${UNAME_M} updates-${UNAME_M}
+${DNFCMD} --releasever=${RELEASE} --refresh -y distro-sync
 #cat /etc/yum.repos.d/* ; sleep 5
-${DNFCMD} repolist -y enabled ; sleep 5
+${DNFCMD} -y repolist enabled ; sleep 5
 
 services_enabled="sshd tmp.mount"
 pkg_list="basesystem-minimal locales-en pciutils sudo whois dhcpcd man-pages dosfstools xfsprogs openssh-server nano urpmi dnf dnf-plugins-core systemd python3-dnf-plugin-versionlock python3-urllib3 'dnf-command(versionlock)'" # harddrake-ui xdm task-xfce"
 
 echo "Add software package selection(s)" ; sleep 3
 #urpmi.update -a
-${DNFCMD} --releasever=${RELEASE} check-update -y
-for pkgX in \${pkg_list} ; do
-  #urpmi --no-recommends --auto \${pkgX} ;
-  ${DNFCMD} --releasever=${RELEASE} install -y \${pkgX} ;
-done
+${DNFCMD} --releasever=${RELEASE} -y check-update
+#for pkgX in \${pkg_list} ; do urpmi --no-recommends --auto \${pkgX} ; done
+${DNFCMD} --releasever=${RELEASE} --skip-broken -y install \${pkg_list}
 #urpmi --no-recommends --auto openssh-server
-${DNFCMD} --releasever=${RELEASE} install -y openssh-server
+${DNFCMD} --releasever=${RELEASE} --skip-broken -y install openssh-server
 systemctl stop sshd ; systemctl enable sshd
 
 
@@ -232,14 +237,14 @@ mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 ##chmod 0440 /etc/sudoers.d/99_packernopasswd
 
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
 
 EOF
 
-${DNFCMD} clean -y packages
+${DNFCMD} -y clean packages
 
 exit
 
@@ -257,12 +262,12 @@ set -x
 pkg_list="basesystem kernel-server-latest microcode_ctl grub grub2-efi efibootmgr"
 
 #urpmi.update -a
-${DNFCMD} check-update -y
+${DNFCMD} -y check-update
 
-for pkgX in \${pkg_list} ; do
-  #urpmi --no-recommends --auto \${pkgX} ;
-  ${DNFCMD} install -y \${pkgX} ;
-done
+#for pkgX in \${pkg_list} ; do
+#  urpmi --no-recommends --auto \${pkgX} ;
+#done
+${DNFCMD} --skip-broken -y install \${pkg_list}
 
 kver="\$(ls -A /lib/modules/ | tail -1)" # or ? uname -r
 echo \${kver} ; sleep 5
@@ -271,11 +276,11 @@ modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
 if [ "btrfs" = "${VOL_MGR}" ] ; then
   #urpmi --no-recommends --auto btrfs-progs ;
-  ${DNFCMD} install -y btrfs-progs ;
+  ${DNFCMD} --skip-broken -y install btrfs-progs ;
   modprobe btrfs ; sleep 5 ;
 elif [ "lvm" = "${VOL_MGR}" ] ; then
   #urpmi --no-recommends --auto lvm2 ;
-  ${DNFCMD} install -y lvm2 ;
+  ${DNFCMD} --skip-broken -y install lvm2 ;
   # cryptsetup
   modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
 fi
@@ -309,8 +314,8 @@ else
 fi
 find / -ipath /boot/efi/*/*.efi ; sleep 5
 
-#sed -ie "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
-#sed -ie "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
+#sed -ie 's|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|' /etc/default/grub
+#sed -ie '/GRUB_DEFAULT/ s|=.*$|=saved|' /etc/default/grub
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 #echo "#GRUB_CMDLINE_LINUX='cryptdevice=/dev/sda2:cryptroot'" >> /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|^\(.*\)$|#\1\n\1|' /etc/default/grub
@@ -323,7 +328,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
@@ -341,7 +346,7 @@ efibootmgr -v ; sleep 3
 
 whois-mkpasswd -m help ; sleep 10
 
-${DNFCMD} clean -y all
+${DNFCMD} -y clean all
 
 exit
 

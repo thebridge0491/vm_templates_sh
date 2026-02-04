@@ -38,12 +38,12 @@ variable "qemudisk_interface_x64" {
 
 variable "qemu_firmware_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_CODE.fd"
+  default = "/usr/share/OVMF/OVMF_CODE.4m.fd"
 }
 
 variable "qemu_nvram_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_VARS.fd"
+  default = "/usr/share/OVMF/OVMF_VARS.4m.fd"
 }
 
 variable "qemudisk_interface_aa64" {
@@ -293,8 +293,7 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
-      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -322,6 +321,50 @@ build {
     except           = ["qemu.guest_vm", "virtualbox-iso.guest_vm",
       "null.box-libvirt", "null.box-bhyve"]
     scripts          = ["init/common/zerofill_freebsd.sh"]
+  }
+  provisioner "shell" {
+    environment_vars = ["HOME_DIR=/home/packer"]
+    except           = ["null.box-libvirt", "null.box-bhyve", "qemu.guest_vm"]
+    execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
+    inline           = ["cd /tmp",
+      "sh init/common/collect_osinfo.sh collect_all"]
+  }
+  provisioner "file" {
+    destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
+    direction   = "download"
+    except           = ["null.box-libvirt", "null.box-bhyve", "qemu.guest_vm"]
+    generated   = true
+    source      = "/tmp/info.tar"
+  }
+  provisioner "shell-local" {
+    except = ["null.box-libvirt", "null.box-bhyve", "qemu.guest_vm"]
+    inline = ["mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}",
+      "cd output-vms/collect_osinfo/vm_init/${var.variant}",
+      "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
+  }
+
+  post-processor "checksum" {
+    checksum_types = ["sha256"]
+    only           = ["qemu.guest_vm"]
+    #output         = "${local.output_directory}/${local.vm_base}.{{.BuilderType}}.{{.ChecksumType}}"
+    output         = "${local.output_directory}/${local.vm_base}.qcow2.{{.ChecksumType}}"
+  }
+  post-processor "checksum" {
+    checksum_types = ["sha256"]
+    only           = ["virtualbox-iso.guest_vm"]
+    output         = "${local.output_directory}/${local.vm_base}.ovf.{{.ChecksumType}}"
+  }
+  post-processor "shell-local" {
+    inline = ["if command -v erb > /dev/null ; then",
+      "erb author=${var.author} guest=${local.vm_base} datestamp=${local.build_timestamp} init/common/catalog.json.erb > ${local.output_directory}/${local.vm_base}_catalog.json",
+      "elif command -v mustache > /dev/null ; then",
+      "echo '{\"author\":\"${var.author}\",\"guest\":\"${local.vm_base}\",\"datestamp\":\"${local.build_timestamp}\"}' | mustache - init/common/catalog.json.mustache > ${local.output_directory}/${local.vm_base}_catalog.json",
+      "elif command -v chevron > /dev/null ; then",
+      "echo '{\"author\":\"${var.author}\",\"guest\":\"${local.vm_base}\",\"datestamp\":\"${local.build_timestamp}\"}' | chevron -d /dev/stdin init/common/catalog.json.mustache > ${local.output_directory}/${local.vm_base}_catalog.json",
+      "elif command -v pystache > /dev/null ; then",
+      "pystache init/common/catalog.json.mustache '{\"author\":\"${var.author}\",\"guest\":\"${local.vm_base}\",\"datestamp\":\"${local.build_timestamp}\"}' > ${local.output_directory}/${local.vm_base}_catalog.json",
+      "fi", "cp -a init/common/qemu_lxc/vmrun.sh ${local.output_directory}/"]
+    except = ["null.box-libvirt", "null.box-bhyve"]
   }
   provisioner "shell-local" {
     inline = ["if command -v erb > /dev/null ; then",
@@ -366,49 +409,6 @@ build {
       "mv ${local.vm_base}.raw box.img",
       "tar -cvzf ${local.vm_base}-${local.build_timestamp}.bhyve.box metadata.json info.json Vagrantfile `ls vmrun* *.fd` box.img"]
     only   = ["null.box-bhyve"]
-  }
-  provisioner "shell" {
-    environment_vars = ["HOME_DIR=/home/packer"]
-    except           = ["null.box-libvirt", "null.box-bhyve"]
-    execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
-    inline           = ["cd /tmp",
-      "sh init/common/collect_osinfo.sh collect_all"]
-  }
-  provisioner "file" {
-    destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
-    direction   = "download"
-    except           = ["null.box-libvirt", "null.box-bhyve"]
-    generated   = true
-    source      = "/tmp/info.tar"
-  }
-  provisioner "shell-local" {
-    except = ["null.box-libvirt", "null.box-bhyve"]
-    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
-      "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
-  }
-
-  post-processor "checksum" {
-    checksum_types = ["sha256"]
-    only           = ["qemu.guest_vm"]
-    #output         = "${local.output_directory}/${local.vm_base}.{{.BuilderType}}.{{.ChecksumType}}"
-    output         = "${local.output_directory}/${local.vm_base}.qcow2.{{.ChecksumType}}"
-  }
-  post-processor "checksum" {
-    checksum_types = ["sha256"]
-    only           = ["virtualbox-iso.guest_vm"]
-    output         = "${local.output_directory}/${local.vm_base}.ovf.{{.ChecksumType}}"
-  }
-  post-processor "shell-local" {
-    except = ["null.box-libvirt", "null.box-bhyve"]
-    inline = ["if command -v erb > /dev/null ; then",
-      "erb author=${var.author} guest=${local.vm_base} datestamp=${local.build_timestamp} init/common/catalog.json.erb > ${local.output_directory}/${local.vm_base}_catalog.json",
-      "elif command -v mustache > /dev/null ; then",
-      "echo '{\"author\":\"${var.author}\",\"guest\":\"${local.vm_base}\",\"datestamp\":\"${local.build_timestamp}\"}' | mustache - init/common/catalog.json.mustache > ${local.output_directory}/${local.vm_base}_catalog.json",
-      "elif command -v chevron > /dev/null ; then",
-      "echo '{\"author\":\"${var.author}\",\"guest\":\"${local.vm_base}\",\"datestamp\":\"${local.build_timestamp}\"}' | chevron -d /dev/stdin init/common/catalog.json.mustache > ${local.output_directory}/${local.vm_base}_catalog.json",
-      "elif command -v pystache > /dev/null ; then",
-      "pystache init/common/catalog.json.mustache '{\"author\":\"${var.author}\",\"guest\":\"${local.vm_base}\",\"datestamp\":\"${local.build_timestamp}\"}' > ${local.output_directory}/${local.vm_base}_catalog.json",
-      "fi", "cp -a init/common/qemu_lxc/vmrun.sh ${local.output_directory}/"]
   }
   post-processor "vagrant" {
     keep_input_artifact  = true

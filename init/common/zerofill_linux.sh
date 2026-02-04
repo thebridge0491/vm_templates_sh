@@ -1,8 +1,8 @@
 #!/bin/sh -eux
 
-dd bs=4M if=/dev/zero of=/EMPTY || echo "dd exit code $? is suppressed"
-dd bs=4M if=/dev/zero of=/var/tmp/EMPTY || echo "dd exit code $? is suppressed"
-dd bs=4M if=/dev/zero of=/home/EMPTY || echo "dd exit code $? is suppressed"
+dd bs=4M if=/dev/zero of=/EMPTY status=progress || echo "dd exit code $? is suppressed"
+dd bs=4M if=/dev/zero of=/var/tmp/EMPTY status=progress || echo "dd exit code $? is suppressed"
+dd bs=4M if=/dev/zero of=/home/EMPTY status=progress || echo "dd exit code $? is suppressed"
 
 rm -f /home/EMPTY ; rm -f /var/tmp/EMPTY ; rm -f /EMPTY
 sync  # Block until the empty file(s) has been removed
@@ -19,7 +19,7 @@ esac
 if [ "x${swapuuid}" != "x" ] ; then
     swappart="$(readlink -f ${swapdev})" ;
     swapoff "${swappart}" ;
-    dd bs=4M if=/dev/zero of="${swappart}" || echo "dd exit code $? is suppressed" ;
+    dd bs=4M if=/dev/zero of="${swappart}" status=progress || echo "dd exit code $? is suppressed" ;
     mkswap -L "${swaplabel}" -U "${swapuuid}" "${swappart}" ;
     partprobe --summary || partprobe ; sync ; swapon -a ;
 fi

@@ -38,9 +38,8 @@ cmds_firewalld() {
 
   _cmds_firewalld_out${policy_out}
   # ##########
-  ##(sleep 120 && firewall-offline-cmd --disabled)& && \
-  ##  (firewall-offline-cmd --enabled ; firewall-cmd --reload)
-  #firewall-offline-cmd --enabled ; firewall-cmd --reload
+  #(sleep 120 && firewall-offline-cmd --disabled)& \
+  #  (firewall-cmd --reload ; firewall-offline-cmd --enabled)
 
   #if [ $(firewall-cmd --zone=public --query-service=mdns) ] ; then
   #  #yast firewall services add zone=EXT service=service:avahi ; # openSUSE

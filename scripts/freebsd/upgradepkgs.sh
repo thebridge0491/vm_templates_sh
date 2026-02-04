@@ -3,6 +3,28 @@
 ## scripts/upgradepkgs.sh
 set +e
 
+fetch_distrosets() {
+  # src ports
+  distrosets=${distrosets:-src}
+
+  if command -v aria2c > /dev/null ; then
+    FETCH_CMD=${FETCH_CMD:-aria2c} ;
+  fi
+
+  read -p "Extract after fetch distribution components/sets? Enter 'y' to continue [yN]: " response
+  # fetch distribution components like: src.txz
+  # release: [sysctl -n kern.osrelease | freebsd-version] | cut -d- -f1
+  # uname_m: [amd64 | arm64] ; release: X.Y
+  uname_m=$(uname -m) ; release=$(sysctl -n kern.osrelease | cut -d- -f1)
+  cd /tmp
+  for setX in ${distrosets} ; do
+    fetch ftp://ftp.freebsd.org/pub/FreeBSD/releases/${uname_m}/${release}-RELEASE/${setX}.txz
+    if [ "y" = "${response}" ] || [ "Y" = "${response}" ] ; then
+      tar -C / -xzvf ${setX}.txz ;
+    fi ;
+  done
+}
+
 snapshot() {
   snapshot_name=${snapshot_name:-snap1-$(date -u "+%Y%m%d")}
 
@@ -71,11 +93,6 @@ run_upgradepkgs() {
   done
   pkg lock -lq ; sleep 3
 
-  ASSUME_ALWAYS_YES=yes pkg clean -y
-  if command -v portmaster > /dev/null ; then
-    portmaster -a ; portmaster -n --clean-distfiles ; sleep 3
-  fi
-
 
   # Unset these as if they're empty it'll break freebsd-update
   [ -z "${no_proxy}" ] && unset no_proxy
@@ -104,6 +121,11 @@ run_upgradepkgs() {
   # NOTE: the install action fails if there are no updates so || true it
   env PAGER=cat ${freebsd_update} cron      # interactive: fetch, else cron
   env PAGER=cat ${freebsd_update} install || true
+
+  ASSUME_ALWAYS_YES=yes pkg clean -y
+  if command -v portmaster > /dev/null ; then
+    portmaster -a ; portmaster -n --clean-distfiles ; sleep 3
+  fi
 }
 
 #----------------------------------------

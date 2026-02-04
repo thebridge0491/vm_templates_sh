@@ -81,7 +81,7 @@ _prep_lang_py() {
   ${PYTHON:-python3} -m pip install --user build
   #${PYTHON:-python3} -m pip install --user wheel pytest pytest-timeout nose2 \
   #  hypothesis coverage pylint pep8 pycodestyle pydocstyle sphinx cffi click \
-  #  pyyaml toml configparser
+  #  ruamel.yaml pyyaml toml configparser
 }
 
 _cachepath_lang_jvm() {

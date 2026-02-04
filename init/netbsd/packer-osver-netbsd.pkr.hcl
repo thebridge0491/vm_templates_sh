@@ -17,12 +17,12 @@ variable "mirror_host_x64" {
 
 variable "iso_url_directory_x64" {
   type    = string
-  default = "/images/10.0"
+  default = "/images/10.1"
 }
 
 variable "iso_base_x64" {
   type    = string
-  default = "NetBSD-10.0-amd64"
+  default = "NetBSD-10.1-amd64"
 }
 
 variable "mirror_host_aa64" {
@@ -32,12 +32,12 @@ variable "mirror_host_aa64" {
 
 variable "iso_url_directory_aa64" {
   type    = string
-  default = "/images/10.0"
+  default = "/images/10.1"
 }
 
 variable "iso_base_aa64" {
   type    = string
-  default = "NetBSD-10.0-evbarm-aarch64"
+  default = "NetBSD-10.1-evbarm-aarch64"
 }
 
 variable "boot_cmdln_options" {

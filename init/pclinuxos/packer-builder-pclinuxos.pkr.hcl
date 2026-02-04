@@ -38,12 +38,12 @@ variable "qemudisk_interface_x64" {
 
 variable "qemu_firmware_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_CODE.fd"
+  default = "/usr/share/OVMF/OVMF_CODE.4m.fd"
 }
 
 variable "qemu_nvram_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_VARS.fd"
+  default = "/usr/share/OVMF/OVMF_VARS.4m.fd"
 }
 
 variable "qemudisk_interface_aa64" {
@@ -153,8 +153,9 @@ locals {
     "initrd /isolinux/initrd.gz<enter>",
     "boot<enter><wait2m><enter>guest<enter><enter><wait10>su<enter><wait10>",
     "mount -o remount,size=1500M /run ; df -lh ; sleep 5 ; ",
-    "dhclient eth0 ; sleep 5 ; apt-get update ; ",
-    "apt-get install -y netcat gdisk efibootmgr lib64hal1 lib64aio1 lvm2 btrfs-progs ; ",
+    "dhclient eth0 ; sleep 5 ; dnf -y check-update || apt-get update ; ",
+    "dnf --setopt=install_weak_deps=False --skip-broken -y install netcat gdisk efibootmgr lib64hal1 lib64aio1 dnf python3-dnf lvm2 btrfs-progs || ",
+    "apt-get -y install netcat gdisk efibootmgr lib64hal1 lib64aio1 dnf python3-dnf lvm2 btrfs-progs ; ",
     "apt-get --fix-broken -y install ; ", "cd /tmp ; ",
     "wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/install.sh' ; ",
     "env MKFS_CMD=$${MKFS_CMD:-mkfs.ext4} sh -x /tmp/disk_setup.sh part_format sfdisk ${var.vol_mgr} ; ",
@@ -167,13 +168,17 @@ locals {
     "initrd /isolinux/initrd.gz<enter>",
     "boot<enter><wait5m><enter>guest<enter><enter><wait10>su<enter><wait10>",
     "mount -o remount,size=1500M /run ; df -lh ; sleep 5 ; ",
-    "apt-get update ; ",
-    "apt-get install -y netcat gdisk efibootmgr lib64hal1 lib64aio1 lvm2 btrfs-progs ; ",
+    "dnf -y check-update || apt-get update ; ",
+    "dnf --setopt=install_weak_deps=False --skip-broken -y install netcat gdisk efibootmgr lib64hal1 lib64aio1 dnf python3-dnf lvm2 btrfs-progs || ",
+    "apt-get -y install netcat gdisk efibootmgr lib64hal1 lib64aio1 dnf python3-dnf lvm2 btrfs-progs ; ",
     "apt-get --fix-broken -y install ; ", "cd /tmp ; ",
     "wget 'http://{{.HTTPIP}}:{{.HTTPPort}}/common/disk_setup.sh' 'http://{{.HTTPIP}}:{{.HTTPPort}}/${var.variant}/post_liveinstall.sh' ; ",
     "env MKFS_CMD=$${MKFS_CMD:-mkfs.ext4} sh -x /tmp/disk_setup.sh part_format sfdisk ${var.vol_mgr} ; ",
+    "sh -x /tmp/disk_setup.sh mount_filesystems ${var.vol_mgr}<enter><wait30s>",
+    "ln -s /mnt /target ; ",
     "echo '' ; echo '(btrfs) USE Custom partitioning in live install WITH Mount options advanced for / (root): subvol=@' ; ",
     "echo '' ; sleep 30 ; draklive-install --expert --noauto || mylive-install ; sync ; sleep 30<enter><wait>",
+    "umount -R /mnt ; rm -fr /target ; sync ; sleep 30 ; ",
     "env VOL_MGR=${var.vol_mgr} sh -x /tmp/post_liveinstall.sh run_postinstall ${var.variant}-boxv0000 '${var.passwd_plain}'<enter><wait>"]
 
   boot_command     = ("aarch64" == var.MACHINE ? null :
@@ -219,8 +224,7 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
-      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -251,18 +255,20 @@ build {
     execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
     inline           = ["cd /tmp",
       "sh init/common/collect_osinfo.sh collect_all"]
-    only             = ["qemu.guest_vm"]
+    except             = ["qemu.guest_vm"]
   }
   provisioner "file" {
     destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
     direction   = "download"
     generated   = true
-    only        = ["qemu.guest_vm"]
+    except        = ["qemu.guest_vm"]
     source      = "/tmp/info.tar"
   }
   provisioner "shell-local" {
-    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
+    inline = ["mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}",
+      "cd output-vms/collect_osinfo/vm_init/${var.variant}",
       "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
+    except        = ["qemu.guest_vm"]
   }
 
   post-processor "checksum" {

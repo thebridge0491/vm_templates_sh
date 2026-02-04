@@ -1,0 +1,62 @@
+# lang_pkgs.txt                                 S-sys dir, H-home, P-project
+#                                               install dir: (S), (H), (P)
+#					search pkg /				install pkg /
+#					list installed				update installed
+#					------------------------	------------------------
+# pypi.python.org:	pip search xx			 (H)pip install --user xx
+#   				pip list					pip list --outdated ;
+#												  pip install --upgrade xx
+# (jip=jython -m pip)jip search xx			 (H)jip install --user gId:aId:ver
+#					jip list					jip update xx
+# ----------------------------------------------------------------------
+# maven.apache.org:	???					     (H)mvn -f pom.xml depn:resolve
+#   org/maven		mvn -f <path> depn:tree
+# repo1.maven.:		???					     (H)ant -f <path> resolve
+#   org/maven		ant -f <path> depntree
+# ----------------------------------------------------------------------
+# nuget.org:		nuget list xx			 (P)nuget install xx
+#					???							nuget update
+# ----------------------------------------------------------------------
+
+# rubygems.org:		gem search "^xx$"		 (H)gem install --user-install xx
+#					gem list					gem update
+# ----------------------------------------------------------------------
+# godoc.org:		go get -n xx			?(P)go get xx
+#					go list						go get -u
+# ----------------------------------------------------------------------
+# crates.io:		cargo search xx			?(H)cargo install xx
+#   rust(cargo)		cargo install --list		cargo update
+# ----------------------------------------------------------------------
+# github.com/:		lein search "/xx$"		?(P)edit project.clj; lein deps
+#   clojure			???							???
+# ----------------------------------------------------------------------
+# hackage. :		???					   (H,P)stack install xx
+#   haskell.org		stack exec ghc-pkg --       stack update ;
+#					  list		      			  stack install xx
+# ----------------------------------------------------------------------
+# opam.ocaml.org:	opam search xx			 (H)opam install xx
+#   				opam list					opam update; opam upgrade
+# ----------------------------------------------------------------------
+# quicklisp.org:	(ql:system-apropos "xx")?(P)(ql:quickload 'xx)
+#   				(ql-dist:					(ql:update-client) ;
+#					  installed-systems t)		  (ql:update-all-dists)
+# ----------------------------------------------------------------------
+# (swift)):		    ??          			?(P)swift package resolve
+#					??   						??
+# ----------------------------------------------------------------------
+
+# luarocks.org:		luarocks search xx		 (S)sudo luarocks install xx
+#					luarocks list				???
+# ----------------------------------------------------------------------
+# cpan.org:			cpanm --info xx			 (S)sudo cpanm --sudo xx
+#					instmodsh ; cmd? l			cpan-outdated -p | cpanm
+# ----------------------------------------------------------------------
+# npmjs.com:		npm search /^xx			 (P)npm install [-g] xx
+#					npm list [-g]				npm update [-g]
+# ----------------------------------------------------------------------
+# pear.php.net:		pear search xx			 (S)sudo pear install xx
+#   [pear|pecl] 	pear list					pear list-upgrades ;
+#												  pear upgrade-all
+# packagist.org:	composer search xx		 (S)sudo composer install xx
+#   composer.phar 	composer show				composer update
+# ----------------------------------------------------------------------

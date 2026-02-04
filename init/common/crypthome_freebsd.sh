@@ -29,7 +29,7 @@ crypt_open() {
   MKFS_CMD=${MKFS_CMD:-newfs -U}
   kldload crypto ; kldload aesni ; kldload geom_eli
   kldstat | grep -e crypto -e aesni -e geom_eli ; sleep 5 ; geli version
-  #true || dd bs=1m if=/dev/random of=/dev/gpt/fsHome
+  #true || dd bs=4m if=/dev/random of=/dev/gpt/fsHome status=progress
   echo -n vmpacker | geli init -J - -l 256 -e AES-XTS -s 4096 \
     -B none gpt/fsHome
   echo -n vmpacker | geli attach -j - gpt/fsHome
@@ -58,7 +58,7 @@ addkey_hdrbkup() {
   MNT=${1:-/}
   exists_zpool_cache ${MNT}
   mkdir -p ${MNT}boot/obscure ${MNT}root/backups
-  dd count=1 bs=4096 if=/dev/random of=${MNT}boot/obscure/puzzle_gpt_fsHome.dat
+  dd bs=4m if=/dev/random of=${MNT}boot/obscure/puzzle_gpt_fsHome.dat count=1 status=progress
   geli dump gpt/fsHome ; sleep 5
   geli setkey -n 1 -P -K ${MNT}boot/obscure/puzzle_gpt_fsHome.dat gpt/fsHome
   geli setkey -n 0 gpt/fsHome

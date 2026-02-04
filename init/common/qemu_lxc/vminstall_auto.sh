@@ -22,12 +22,22 @@
 # usage: [MACHINE=x86_64 VOL_MGR=???] sh vminstall_auto.sh [oshost_func [GUEST]]
 #   (default) [VOL_MGR=std] sh vminstall_auto.sh [freebsd_guestvm [freebsd-x86_64-std]]
 
-STORAGE_DIR=${STORAGE_DIR:-$(dirname ${0})} ; MACHINE=${MACHINE:-x86_64}
+## Note - OVMF/AAVMF pkgs firmware/nvram files([OVMF|AAVMF]_[CODE|VARS].fd):
+## (freebsd pkgs: edk2-qemu-x64, qemu)
+##   /usr/local/share/edk2-qemu/QEMU_*.fd, /usr/local/share/qemu/edk2-aarch64-code.fd,
+##   /usr/local/share/qemu/edk2-arm-vars.fd
+## (void pkg: edk2-ovmf)
+##   /usr/share/edk2/x64/OVMF_*.fd, /usr/share/edk2/aarch64/QEMU_*.fd
+## (debian pkgs: ovmf, qemu-efi-aarch64)
+##   /usr/share/OVMF/OVMF_*.fd, /usr/share/AAVMF/AAVMF_*.fd
+
+#STORAGE_DIR=${STORAGE_DIR:-$(dirname ${0})}
+MACHINE=${MACHINE:-x86_64}
 ISOS_PARDIR=${ISOS_PARDIR:-/mnt/Data0/distros} ; DISK_SZ=${DISK_SZ:-30720M}
-QEMU_FIRMWARE_X64=${QEMU_FIRMWARE_X64:-/usr/share/OVMF/OVMF_CODE.fd}
-QEMU_NVRAM_X64=${QEMU_NVRAM_X64:-/usr/share/OVMF/OVMF_VARS.fd}
-QEMU_FIRMWARE_AA64=${QEMU_FIRMWARE_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd}
-QEMU_NVRAM_AA64=${QEMU_NVRAM_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd}
+QEMU_FIRMWARE_X64=${QEMU_FIRMWARE_X64:-${STORAGE_DIR:-/usr/share/OVMF}/OVMF_CODE.4m.fd}
+QEMU_NVRAM_X64=${QEMU_NVRAM_X64:-${STORAGE_DIR:-/usr/share/OVMF}/OVMF_VARS.4m.fd}
+QEMU_FIRMWARE_AA64=${QEMU_FIRMWARE_AA64:-${STORAGE_DIR:-/usr/share/AAVMF}/AAVMF_CODE.fd}
+QEMU_NVRAM_AA64=${QEMU_NVRAM_AA64:-${STORAGE_DIR:-/usr/share/AAVMF}/AAVMF_VARS.fd}
 
 #mac_last3=$(hexdump -n3 -e '3/1 ":%02x"' /dev/random | cut -c2-)
 #mac_last3=$(od -N3 -tx1 -An /dev/random | awk '$1=$1' | tr ' ' :)
@@ -385,20 +395,18 @@ suse_guestvm() {
   GUEST=${1:-${variant}-${MACHINE}-${VOL_MGR}}
 
   if [ "aarch64" = "${MACHINE}" ] ; then
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse -name "openSUSE-Leap-*-NET-aarch64*.iso" | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse -name "openSUSE-Tumbleweed-*-Live-aarch64*.iso" | tail -n1)}
     if [ "${ISO_PATH}" ] ; then
-      (cd ${ISOS_PARDIR}/suse/aarch64 ; sha256sum --ignore-missing -c openSUSE-Leap-*-NET-aarch64*.iso.sha256) ;
+      (cd ${ISOS_PARDIR}/suse/aarch64 ; sha256sum --ignore-missing -c openSUSE-Tumbleweed-*-Live-aarch64*.iso.sha256) ;
     fi
 
     ##dnld: <mirror>/distribution/<version>/repo/oss/boot/aarch64/loader/{linux,initrd}
     KERNEL_PATH=${KERNEL_PATH:-$(find ${ISOS_PARDIR}/suse/aarch64 -name 'linux' | tail -n1)}
     INITRD_PATH=${INITRD_PATH:-$(find ${ISOS_PARDIR}/suse/aarch64 -name 'initrd' | tail -n1)}
   else
-    #ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse/live -name "GeckoLinux_*.x86_64*.iso" | tail -n1)}
-    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse -name "openSUSE-Leap-*-NET-x86_64*.iso" | tail -n1)}
+    ISO_PATH=${ISO_PATH:-$(find ${ISOS_PARDIR}/suse -name "openSUSE-Tumbleweed-*-NET-x86_64*.iso" | tail -n1)}
     if [ "${ISO_PATH}" ] ; then
-      #(cd ${ISOS_PARDIR}/suse/live ; sha256sum --ignore-missing -c GeckoLinux_*.x86_64*.iso.sha256) ;
-      (cd ${ISOS_PARDIR}/suse ; sha256sum --ignore-missing -c openSUSE-Leap-*-NET-x86_64*.iso.sha256) ;
+      (cd ${ISOS_PARDIR}/suse ; sha256sum --ignore-missing -c openSUSE-Tumbleweed-*-NET-x86_64*.iso.sha256) ;
     fi
 
     ##dnld: <mirror>/distribution/<version>/repo/oss/boot/x86_64/loader/{linux,initrd}
@@ -570,8 +578,10 @@ _pclinuxos() {
   #export MIRRORHOST=spout.ussg.indiana.edu/linux/pclinuxos
   #sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list
   #sed -i "/${MIRRORHOST}/ s|^.*rpm|rpm|" /etc/apt/sources.list
-  #apt-get -y update ; sleep 5
-  #apt-get -y install netcat gdisk efibootmgr lib64hal1 lib64aio1 [lvm2 btrfs-progs]
+  #dnf -y repolist enabled
+  #dnf -y check-update || apt-get -y update ; sleep 5
+  #[dnf --setopt=install_weak_deps=False --skip-broken -y install | apt-get -y install]
+  #dnf --setopt=install_weak_deps=False --skip-broken -y install netcat gdisk efibootmgr lib64hal1 lib64aio1 [lvm2 btrfs-progs]
   #apt-get --fix-broken -y install
 
   #[[sgdisk -p | sfdisk -l] /dev/[sv]da | parted /dev/[sv]da -s unit GiB print]

@@ -56,8 +56,8 @@ EOF
   /sbin/pfctl -vf /etc/pf.conf
   # ##########
   #diff -s /etc/pf.conf /etc/pf.conf.new
-  ##(sleep 120 && /sbin/pfctl -d)& && /sbin/pfctl -e
-  #/sbin/pfctl -e
+  #(sleep 120 && /sbin/pfctl -d)& \
+  #  /sbin/pfctl -e
 
   #if [ -z "$(grep -e 'domain.*mdns' /etc/pf/outallow_in_allow.rules)" ] ; then
   #  #echo 'pass in proto udp from any to any port { domain, mdns } keep state' >> /etc/pf/outallow_in_allow.rules ;

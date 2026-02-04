@@ -49,12 +49,43 @@ export CHROOT_CMD=chroot
 #  export CHROOT_CMD=xchroot ; # (void: pkg xtools[-minimal])
 #fi
 
+_rootfs_extract() {
+  #tarball_ver=$(curl -Ls http://images.linuxcontainers.org/images/${ID:-debian}/${VERSION_CODENAME:-trixie}/${MACHINE}/default | sed -n 's|.*>\(202[_:0-9]*\)/<.*|\1|p' | tail -n1)
+  tarball_ver=$(curl -Ls http://images.linuxcontainers.org/images/${ID:-devuan}/${VERSION_CODENAME:-excalibur}/${MACHINE}/default | sed -n 's|.*>\(202[_:0-9]*\)/<.*|\1|p' | tail -n1)
+  curl -Lo /tmp/rootfs.tar.xz \
+    http://images.linuxcontainers.org/images/${ID:-devuan}/${VERSION_CODENAME:-excalibur}/${MACHINE}/default/${tarball_ver:-20251103_11:50}/rootfs.tar.xz
+  curl -Lo /tmp/rootfs.tar.xz.CHECKSUM \
+    http://images.linuxcontainers.org/images/${ID:-devuan}/${VERSION_CODENAME:-excalibur}/${MACHINE}/default/${tarball_ver:-20251103_11:50}/SHA256SUMS
+  cp -a /tmp/rootfs.tar.xz.CHECKSUM /tmp/CHECKSUM
+  sha256sum --ignore-missing -c /tmp/CHECKSUM
+
+  #(cat /tmp/rootfs.tar.xz | tar --unlink -xpJf - -C ${DESTDIR:-/mnt} --numeric-owner)
+  (cat /tmp/rootfs.tar.xz | tar -xaJf - -C ${DESTDIR:-/mnt} --numeric-owner)
+}
+
 bootstrap() {
   echo "Bootstrap base pkgs" ; sleep 3
   if command -v debootstrap > /dev/null ; then
-    debootstrap --print-debs --no-check-gpg --arch ${MACHINE} --include=makedev ${RELEASE:-stable} /tmp/pkgs_debootstrap http://${MIRROR} | tee /tmp/pkgs_debootstrap.txt ;
-    #debootstrap --no-check-gpg --arch ${MACHINE} --variant minbase --include=makedev ${RELEASE:-stable} /mnt file:/cdrom/debian/ ;
-    debootstrap --verbose --no-check-gpg --arch ${MACHINE} --include=makedev ${RELEASE:-stable} /mnt http://${MIRROR} ;
+    debootstrap --print-debs --no-check-gpg --arch ${MACHINE} ${RELEASE:-stable} /tmp/pkgs_debootstrap http://${MIRROR} | tee /tmp/pkgs_debootstrap.txt ;
+    ## ??? --exclude=usr-is-merged OR --no-merged-usr
+    #debootstrap --no-check-gpg --arch ${MACHINE} --variant minbase --exclude=usr-is-merged ${RELEASE:-stable} /mnt file:/cdrom/debian/ ;
+    debootstrap --verbose --no-check-gpg --arch ${MACHINE} --exclude=usr-is-merged ${RELEASE:-stable} /mnt http://${MIRROR} ;
+  else
+    mv /mnt/etc/fstab /mnt/etc/fstab.disk_setup ;
+    _rootfs_extract ;
+    cp -a /mnt/etc/fstab /mnt/etc/fstab.rootfs ;
+    mv /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
+    mv /mnt/etc/resolv.conf /mnt/etc/resolv.conf.rootfs ;
+    cp /etc/resolv.conf /mnt/etc/resolv.conf ; cp /etc/mtab /mnt/etc/mtab ;
+    # LANG=[C|en_US].UTF-8
+    cat << EOFchroot | LANG=C.UTF-8 LANGUAGE=en ${CHROOT_CMD} /mnt /bin/sh ;
+set -x
+
+unalias -a
+
+exit
+
+EOFchroot
   fi
   sleep 5
 
@@ -94,7 +125,7 @@ export TERM=xterm-color     # xterm | xterm-color
 
 ls /proc ; sleep 5 ; ls /dev ; sleep 5
 
-echo "Config pkg repo components(main contrib non-free)" ; sleep 3
+echo "Config pkg repo components(main non-free-firmware contrib non-free)" ; sleep 3
 sed -i 's|VERSION_CODENAME="\(.*\) .*"|VERSION_CODENAME="\1"|' /etc/os-release
 . /etc/os-release
 #cp -a /etc/apt/sources.list /etc/apt/sources.list.old
@@ -116,15 +147,14 @@ deb-src http://${MIRROR} stable-backports main
 EOF
 sed -i "s| stable| \${VERSION_CODENAME}|g" \
   /etc/apt/sources.list.d/\${VERSION_CODENAME}.list
-sed -i '/main.*$/ s|main.*$|main contrib non-free|g' \
+sed -i '/main.*$/ s|main.*$|main non-free-firmware contrib non-free|g' \
   /etc/apt/sources.list.d/\${VERSION_CODENAME}.list
 sed -i '/^#[ ]*deb/ s|^#||g' /etc/apt/sources.list.d/\${VERSION_CODENAME}.list
 sed -i '/^[ ]*deb cdrom:/ s|^|#|g' /etc/apt/sources.list.d/\${VERSION_CODENAME}.list
 cat /etc/apt/sources.list.d/\${VERSION_CODENAME}.list ; sleep 5
-apt-get --allow-releaseinfo-change --yes update
 
 #mount -t proc none /proc
-cd /dev ; MAKEDEV generic
+#cd /dev ; MAKEDEV generic
 
 
 services_enabled="eudev udev dhcpcd sshd ssh"
@@ -145,6 +175,24 @@ apt-get --allow-releaseinfo-change --yes update
 for pkgX in \${pkg_list} ; do
   apt-get --no-install-recommends --yes install \${pkgX} ;
 done
+
+echo -e '#!/bin/sh\nexit 101' > /usr/sbin/policy-rc.d
+chmod +x /usr/sbin/policy-rc.d
+if command -v systemctl > /dev/null ; then
+  systemctl mask ssh ;
+fi
+DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --yes install openssh-server
+if command -v systemctl > /dev/null ; then
+  systemctl stop ssh ;
+elif command -v sv > /dev/null ; then
+  sv down ssh ;
+elif command -v rc-update > /dev/null ; then
+  rc-service sshd stop ;
+elif command -v update-rc.d > /dev/null ; then
+  invoke-rc.d sshd stop ; invoke-rc.d ssh stop ;
+fi
+rm /usr/sbin/policy-rc.d
+
 tasksel --new-install install standard
 
 
@@ -256,7 +304,7 @@ fi
 echo "Enable services" ; sleep 3
 for svc in \${services_enabled} ; do
   if command -v systemctl > /dev/null ; then
-    systemctl enable \${svc} ;
+    systemctl unmask \${svc} ; systemctl enable \${svc} ;
   elif command -v sv > /dev/null ; then
     ln -s /etc/sv/\${svc} /etc/service/ ;
   elif command -v rc-update > /dev/null ; then
@@ -284,7 +332,7 @@ mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 ##chmod 0440 /etc/sudoers.d/99_packernopasswd
 
 
-sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_sudonopasswd
 #Defaults:%sudo !requiretty
 %sudo ALL=(ALL:ALL) NOPASSWD: ALL
@@ -318,7 +366,7 @@ for pkgX in \${pkg_list} ; do
   apt-get --no-install-recommends --yes install \${pkgX} ;
 done
 
-if [ ! "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ ! "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   apt-get --no-install-recommends --yes install firmware-linux-free firmware-linux-nonfree ;
 fi
 
@@ -356,7 +404,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
 
   for svc in lvm2-lvmpolld lvmetad ; do
     if command -v systemctl > /dev/null ; then
-      systemctl enable \${svc} ;
+      systemctl unmask \${svc} ; systemctl enable \${svc} ;
     elif command -v sv > /dev/null ; then
       ln -s /etc/sv/\${svc} /etc/service/ ;
     elif command -v rc-update > /dev/null ; then
@@ -390,8 +438,8 @@ else
 fi
 find / -ipath /boot/efi/*/*.efi ; sleep 5
 
-#sed -ie "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
-#sed -ie "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
+#sed -ie 's|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|' /etc/default/grub
+#sed -ie '/GRUB_DEFAULT/ s|=.*$|=saved|' /etc/default/grub
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 #echo "#GRUB_CMDLINE_LINUX='cryptdevice=/dev/sda2:cryptroot'" >> /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|^\(.*\)$|#\1\n\1|' /etc/default/grub
@@ -407,7 +455,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub-mkconfig -o /boot/grub/grub.cfg
@@ -422,29 +470,6 @@ fi
 efibootmgr -v ; sleep 3
 
 mkpasswd -m help ; sleep 10
-
-apt-get --no-install-recommends --yes install openssh-server
-if command -v systemctl > /dev/null ; then
-  systemctl stop ssh ;
-elif command -v sv > /dev/null ; then
-  sv down ssh ;
-elif command -v rc-update > /dev/null ; then
-  rc-service sshd stop ;
-elif command -v update-rc.d > /dev/null ; then
-  invoke-rc.d sshd stop ; invoke-rc.d ssh stop ;
-fi
-
-for svc in eudev udev sshd ssh ; do
-  if command -v systemctl > /dev/null ; then
-    systemctl enable \${svc} ;
-  elif command -v sv > /dev/null ; then
-    ln -s /etc/sv/\${svc} /etc/service/ ;
-  elif command -v rc-update > /dev/null ; then
-    rc-update add \${svc} default ;
-  elif command -v update-rc.d > /dev/null ; then
-    update-rc.d \${svc} defaults ;
-  fi ;
-done
 
 apt-get -y clean
 

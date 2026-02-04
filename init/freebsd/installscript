@@ -250,8 +250,9 @@ ifdev=$(ifconfig | grep '^[a-z]' | grep -ve lo0 | cut -d: -f1 | head -n 1)
 ## ZFS partitions
 ##=============================
 sysrc -f /boot/loader.conf zfs_load="YES"
-sh -c 'cat >> /etc/sysctl.conf' << EOF
-vfs.zfs.min_auto_ashift=12
+sh -c 'cat >> /boot/loader.conf' << EOF
+#vfs.zfs.min_auto_ashift=12
+vfs.zfs.vdev.min_auto_ashift=12
 
 EOF
 sysrc zfs_enable="YES"
@@ -276,11 +277,26 @@ sh -c 'cat >> /boot/loader.conf' << EOF
 #vfs.root.mountfrom="zfs:${ZFSBOOT_POOL_NAME}/ROOT/default"
 
 EOF
+sysrc -f /boot/loader.conf kern.geom.label.disk_ident.enable="0"
+sysrc -f /boot/loader.conf kern.geom.label.gptid.enable="0"
+sysrc -f /boot/loader.conf kern.geom.label.gpt.enable="1"
+
 sysrc -f /boot/loader.conf linux_load="YES"
 sysrc -f /boot/loader.conf cuse4bsd_load="YES"
 
-sysrc -f /boot/loader.conf security.bsd.allow_destructive_dtrace="0"
 sysrc -f /boot/loader.conf cryptodev_load="YES"
+
+sh -c 'cat >> /boot/loader.conf' << EOF
+security.bsd.allow_destructive_dtrace="0"
+# to see available modes at boot: gop list
+#exec="gop set 3"
+#exec="mode 3"
+# 720p --> 1280x720
+#kern.vt.fb.default_mode="720p"
+#vbe_max_resolution="720p"
+#efi_max_resolution="720p"
+
+EOF
 
 sysrc linux_enable="YES"
 
@@ -321,7 +337,7 @@ dhclient -l /tmp/dhclient.leases.${ifdev} -p /tmp/dhclient.${ifdev}.pid ${ifdev}
 
 services_enabled="sshd"
 services_disabled="clear_tmp"
-pkg_list="pciutils nano sudo whois python gtar" # xfce
+pkg_list="pciutils nano sudo whois python py311-urllib3 gtar" # xfce
 
 ASSUME_ALWAYS_YES=yes pkg -o OSVERSION=9999999 update -f
 ABI=\$(pkg config abi)
@@ -370,7 +386,7 @@ echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-rootlogin.conf
 
 
 mkdir -p /usr/local/etc/pkg/repos
-sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
+sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf.sample' << EOF
 FreeBSD: {
   #url: "pkg+http://pkg.freebsd.org/\$\{ABI}/quarterly",
   url: "pkg+http://pkg.freebsd.org/\$(pkg config abi)/quarterly",

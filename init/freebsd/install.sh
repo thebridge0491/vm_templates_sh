@@ -96,11 +96,26 @@ sh -c 'cat >> /boot/loader.conf' << EOF
 #vfs.root.mountfrom="zfs:fspool0/ROOT/default"
 
 EOF
+sysrc -f /boot/loader.conf kern.geom.label.disk_ident.enable="0"
+sysrc -f /boot/loader.conf kern.geom.label.gptid.enable="0"
+sysrc -f /boot/loader.conf kern.geom.label.gpt.enable="1"
+
 sysrc -f /boot/loader.conf linux_load="YES"
 sysrc -f /boot/loader.conf cuse4bsd_load="YES"
 
-sysrc -f /boot/loader.conf security.bsd.allow_destructive_dtrace="0"
 sysrc -f /boot/loader.conf cryptodev_load="YES"
+
+sh -c 'cat >> /boot/loader.conf' << EOF
+security.bsd.allow_destructive_dtrace="0"
+# to see available modes at boot: gop list
+#exec="gop set 3"
+#exec="mode 3"
+# 720p --> 1280x720
+#kern.vt.fb.default_mode="720p"
+#vbe_max_resolution="720p"
+#efi_max_resolution="720p"
+
+EOF
 
 sysrc linux_enable="YES"
 
@@ -179,7 +194,7 @@ mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 cd /etc/mail ; make aliases
 
 
-#sed -i '' "/^[^#].*requiretty/ s|^|#|" /usr/local/etc/sudoers
+#sed -i '' '/^[^#].*requiretty/ s|^|#|' /usr/local/etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /usr/local/etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -192,14 +207,14 @@ if [ -z "\$(grep 'Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config)" 
   echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config ;
 fi
 echo "Temporarily permit root login via ssh password" ; sleep 3
-#sed -i '' "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
-sed -i '' "s|.*PermitRootLogin|#PermitRootLogin|" /etc/ssh/sshd_config
+#sed -i '' '/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|' /etc/ssh/sshd_config
+sed -i '' 's|.*PermitRootLogin|#PermitRootLogin|' /etc/ssh/sshd_config
 echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-rootlogin.conf
 
 
 echo "Config pkg repo nearby mirror(s)" ; sleep 3
 mkdir -p /usr/local/etc/pkg/repos
-sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf' << EOF
+sh -c 'cat >> /usr/local/etc/pkg/repos/FreeBSD.conf.sample' << EOF
 FreeBSD: {
   #url: "pkg+http://pkg.freebsd.org/\$\{ABI}/quarterly",
   url: "pkg+http://pkg.freebsd.org/\$(pkg config abi)/quarterly",
@@ -236,8 +251,9 @@ bootloader() {
     touch /mnt/boot/loader.conf /mnt/etc/sysctl.conf \
       /mnt/etc/rc.conf ;
     sysrc -f /mnt/boot/loader.conf zfs_load="YES" ;
-    cat << EOF >> /mnt/etc/sysctl.conf ;
-vfs.zfs.min_auto_ashift=12
+    cat << EOF >> /mnt/boot/loader.conf ;
+#vfs.zfs.min_auto_ashift=12
+vfs.zfs.vdev.min_auto_ashift=12
 
 EOF
     sysrc -f /mnt/etc/rc.conf zfs_enable="YES" ;
@@ -246,6 +262,7 @@ EOF
   else
     gpart bootcode -b /mnt/boot/pmbr -p /mnt/boot/gptboot -i 1 ${DEVX} ;
   fi
+  gpart bootcode -b /mnt/boot/pmbr ${DEVX}
 
   echo "Setup EFI boot" ; sleep 3
   if [ "arm64" = "${UNAME_M}" ] || [ "aarch64" = "${UNAME_M}" ] ; then

@@ -61,6 +61,7 @@ gpart_disk() {
     gpart add -a 1M -s 5G -t freebsd-ufs -l "${GRP_NM}-fsVar" ${DEVX} ;
     gpart add -a 1M -t freebsd-ufs -l "${GRP_NM}-fsHome" ${DEVX} ;
   fi
+  #gpart resize [-s 24G] -i <IDX> ${DEVX}
 
   gpart bootcode -b /boot/pmbr ${DEVX}
   #gpart set -a active -i 1 ${DEVX} ; gpart set -a bootme -i 1 ${DEVX}
@@ -95,7 +96,8 @@ zfspart_create() {
 
   kldload opensolaris ; kldload zfs ; zfs version
   kldstat -h -v -m zfs ; sleep 5
-  sysctl vfs.zfs.min_auto_ashift=12
+  #sysctl vfs.zfs.min_auto_ashift=12
+  sysctl vfs.zfs.vdev.min_auto_ashift=12
 
   zpartnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f1)
   zpoolnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f2)

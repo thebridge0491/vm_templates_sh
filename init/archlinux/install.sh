@@ -48,9 +48,9 @@ export CHROOT_CMD=chroot
 
 _rootfs_extract() {
   #curl -Lo /tmp/rootfs.tar.zst \
-    #http://mirror.math.princeton.edu/pub/archlinux/iso/2024.03.01/archlinux-bootstrap-${UNAME_M}.tar.zst
+    #http://mirror.math.princeton.edu/pub/archlinux/iso/latest/archlinux-bootstrap-${UNAME_M}.tar.zst
   #curl -Lo /tmp/CHECKSUM \
-  #  http://mirror.math.princeton.edu/pub/archlinux/iso/2024.03.01/sha256sums.txt
+  #  http://mirror.math.princeton.edu/pub/archlinux/iso/latest/sha256sums.txt
   #ln -s /tmp/rootfs.tar.zst /tmp/archlinux-bootstrap-${UNAME_M}.tar.zst
   #sha256sum --ignore-missing -c /tmp/CHECKSUM
   ##(cat /tmp/rootfs.tar.zst | tar --unlink --zstd -xpf - -C ${DESTDIR:-/mnt})
@@ -150,6 +150,12 @@ bootstrap() {
   echo "Bootstrap base pkgs" ; sleep 3
   if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs umount ${ZPOOLNM}/var/mail ; zfs destroy ${ZPOOLNM}/var/mail ;
+  elif [ "btrfs" = "${VOL_MGR}" ] ; then
+    umount /mnt/var/mail ; rm -fr /mnt/var/mail ;
+    mkdir -p /mnt/var/spool/mail ;
+    DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
+    mount -o noatime,compress=lzo,subvol=@/var_mail ${DEV_PV} /mnt/var/spool/mail ;
+    sed -i 's|/var/mail|/var/spool/mail|' /mnt/etc/fstab* ;
   fi
   pkg_list="base base-devel lsb-release dosfstools e2fsprogs xfsprogs inetutils logrotate dialog man-db man-pages less diffutils vi nano whois elogind-${service_mgr}"
   # reiserfsprogs jfsutils sysfsutils usbutils perl s-nail texinfo # iw wireless_tools ifplugd wpa_actiond
@@ -182,7 +188,7 @@ bootstrap() {
     mv /mnt/etc/fstab /mnt/etc/fstab.disk_setup ;
     _rootfs_extract ;
     cp -a /mnt/etc/fstab /mnt/etc/fstab.rootfs ;
-    cp -a /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
+    mv /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
     mv /mnt/etc/resolv.conf /mnt/etc/resolv.conf.rootfs ;
     cp /etc/resolv.conf /mnt/etc/resolv.conf ; #cp /etc/mtab /mnt/etc/mtab ;
     # LANG=[C|en_US].UTF-8
@@ -257,8 +263,8 @@ if [ "x86_64" = "${UNAME_M}" ] ; then
   sed -i 's|^#\(SigLevel.*\)|\1| ; s|^\(SigLevel = Never\)|#\1|' /etc/pacman.conf
 fi
 
-pkg_list="base base-devel whois"
-services_enabled="dhcpcd sshd logind"
+pkg_list="base base-devel inetutils whois"
+services_enabled="dhcpcd sshd elogind"
 if [ "arch" = "\${ID}" ] || [ "archarm" = "\${ID}" ] ; then
   pkg_list="\${pkg_list} dhcpcd openssh python python-urllib3" ; # xfce4
 
@@ -278,7 +284,7 @@ done
 
 echo "Config keyboard ; localization" ; sleep 3
 kbd_mode -u ; loadkeys us
-sed -i -e '/en_US.UTF-8 UTF-8/ s|^# ||' /etc/locale.gen
+sed -i -e '/en_US.UTF-8 UTF-8/ s|^#||' /etc/locale.gen
 echo 'LANG=en_US.UTF-8' > /etc/locale.conf
 locale-gen
 
@@ -363,7 +369,7 @@ mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 ##chmod 0440 /etc/sudoers.d/99_packernopasswd
 
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -420,17 +426,17 @@ fi
 services_enabled=""
 pkg_list="linux\${LINSUF} mkinitcpio amd-ucode grub efibootmgr"
 
-pacman -Sy --needed --noconfirm \${pkg_list}
+pacman -S --needed --noconfirm \${pkg_list}
 for pkgX in \${pkg_list} ; do
-  pacman -Sy --needed --noconfirm \${pkgX} ;
+  pacman -S --needed --noconfirm \${pkgX} ;
 done
 
 echo "Customize initial ramdisk (hooks: ??)" ; sleep 3
 sed -ie '/^HOOKS/ s|^\(.*\)$|#\1\n\1|' /etc/mkinitcpio.conf
 #sed -i '/^HOOKS/ s|filesystems|encrypt filesystems|' /etc/mkinitcpio.conf # encrypt hook only if crypted root partition
 
-if [ ! "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
-  pacman -Sy --needed --noconfirm linux-firmware ;
+if [ ! "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
+  pacman -S --needed --noconfirm linux-firmware ;
 fi
 
 kver="\$(ls -A /usr/lib/modules/ | tail -1)" # ?? or uname -r
@@ -447,9 +453,9 @@ if [ "zfs" = "${VOL_MGR}" ] ; then
   pacman -Syu ;
 
   zfs_ver=\$(curl -Ls https://zxcvfdsa.com/archzfs/archzfs/x86_64 | sed -n 's|.*zfs-dkms-\([0-9.]*\).*.pkg.tar.zst.*|\1|p' | head -n1)
-  pacman -Sy --needed --noconfirm dkms linux\${LINSUF}-headers \
+  pacman -S --needed --noconfirm dkms linux\${LINSUF}-headers \
     zfs-dkms=\${zfs_ver:-2.2.4} zfs-utils=\${zfs_ver:-2.2.4} ;
-  pacman -Sy --needed --noconfirm dkms linux\${LINSUF}-headers \
+  pacman -S --needed --noconfirm dkms linux\${LINSUF}-headers \
     zfs-dkms=\${zfs_ver:-2.2.4} zfs-utils=\${zfs_ver:-2.2.4} ;
   # archzfs-linux-lts
   echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ;
@@ -505,11 +511,11 @@ EOF
   done ;
   grep -e '^IgnorePkg' /etc/pacman.conf ; sleep 3 ;
 elif [ "btrfs" = "${VOL_MGR}" ] ; then
-  pacman -Sy --needed --noconfirm btrfs-progs ;
+  pacman -S --needed --noconfirm btrfs-progs ;
   modprobe btrfs ; sleep 5 ;
 elif [ "lvm" = "${VOL_MGR}" ] ; then
   if [ "arch" = "\${ID}" ] || [ "archarm" = "\${ID}" ] ; then
-    pacman -Sy --needed --noconfirm device-mapper lvm2 ;
+    pacman -S --needed --noconfirm device-mapper lvm2 ;
     # cryptsetup mdadm
   elif [ "artix" = "\${ID}" ] || [ "armtix" = "\${ID}" ] ; then
     if command -v s6-rc > /dev/null ; then
@@ -519,7 +525,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
     elif command -v rc-update > /dev/null ; then
       service_mgr=openrc ;
     fi ;
-    pacman -Sy --needed --noconfirm device-mapper-\${service_mgr} \
+    pacman -S --needed --noconfirm device-mapper-\${service_mgr} \
       lvm2-\${service_mgr} ;
     # cryptsetup-\${service_mgr} mdadm-\${service_mgr}
   fi ;
@@ -568,8 +574,8 @@ else
 fi
 find / -ipath /boot/efi/*/*.efi ; sleep 5
 
-#sed -i -e "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
-#sed -i -e "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
+#sed -i -e 's|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|' /etc/default/grub
+#sed -i -e '/GRUB_DEFAULT/ s|=.*$|=saved|' /etc/default/grub
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|^\(.*\)$|#\1\n\1|' /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 xdriver=vesa rootdelay=5 resume=/dev/foo nomodeset text"|' /etc/default/grub
@@ -584,11 +590,11 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 if [ "aarch64" = "${UNAME_M}" ] ; then
-  sed -i -e "/GRUB_DEFAULT/ s|=.*$|=1|" /etc/default/grub ;
+  sed -i -e '/GRUB_DEFAULT/ s|=.*$|=1|' /etc/default/grub ;
   cat << EOF >> /etc/grub.d/40_custom ;
     menuentry "(aarch64) Arch Linux variant" {
       terminal_output gfxterm

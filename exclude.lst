@@ -1,7 +1,9 @@
 *.log
-*.svn
-*.git
-*.hg
+*/lib/*
+lib/*
+*.svn*
+*.git*
+*.hg*
 *.*~
 *.s
 
@@ -34,11 +36,12 @@ dist/*
 
 *__pycache__*
 .cache/*
-.hypothesis/*
-.jip*/*
-javalib/*
+*.hypothesis/*
+*.jip*/*
+*javalib/*
+*/.cache/*
 
-
+# VM templates (packer, qemu, ansible, saltstack)
 packer_cache/*
 output-vms/*
 input-vms/*

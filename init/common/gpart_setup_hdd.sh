@@ -71,7 +71,8 @@ gpart_disk() {
   fi
 
   gpart add -a 1M -s 120G -t ms-basic-data -l data0 ${DEVX}
-  gpart add -a 1M -t ms-basic-data -l data1 ${DEVX}
+  gpart add -a 1M -s 90G -t ms-basic-data -l data1 ${DEVX}
+  #gpart resize [-s 96G] -i 11 ${DEVX}
 
   gpart bootcode -b /boot/pmbr ${DEVX}
   #gpart set -a active -i 1 ${DEVX} ; gpart set -a bootme -i 1 ${DEVX}
@@ -106,7 +107,8 @@ zfspart_create() {
 
   kldload opensolaris ; kldload zfs ; zfs version
   kldstat -h -v -m zfs ; sleep 5
-  sysctl vfs.zfs.min_auto_ashift=12
+  #sysctl vfs.zfs.min_auto_ashift=12
+  sysctl vfs.zfs.vdev.min_auto_ashift=12
 
   zpartnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f1)
   zpoolnm=$(echo ${ZPARTNM_ZPOOLNM} | cut -d: -f2)

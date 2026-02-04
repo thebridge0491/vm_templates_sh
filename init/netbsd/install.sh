@@ -154,9 +154,7 @@ for pkgX in pkgin \${pkg_list} ; do
 done
 sed -i 's|#ETCCERTSDIR|ETCCERTSDIR|' /usr/pkg/etc/ca-certificates-dir.conf
 export PATH=\${PATH}:/usr/pkg/sbin:/usr/pkg/bin:/sbin:/usr/sbin
-for pkgX in \${pkg_list} ; do
-  pkgin -y install \${pkgX} ;
-done
+pkgin -y install \${pkg_list}
 sed -i 's|#ETCCERTSDIR|ETCCERTSDIR|' /usr/pkg/etc/ca-certificates-dir.conf
 
 update-ca-certificates
@@ -190,7 +188,7 @@ mkdir -p /usr/pkg/etc/sudoers.d
 cd /etc/mail ; make aliases
 
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" /usr/pkg/etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /usr/pkg/etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /usr/pkg/etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -202,8 +200,8 @@ if [ -z "\$(grep 'Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config)" 
   echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config ;
 fi
 echo "Temporarily permit root login via ssh password" ; sleep 3
-#sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
-sed -i "s|.*PermitRootLogin|#PermitRootLogin|" /etc/ssh/sshd_config
+#sed -i '/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|' /etc/ssh/sshd_config
+sed -i 's|.*PermitRootLogin|#PermitRootLogin|' /etc/ssh/sshd_config
 echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-rootlogin.conf
 
 

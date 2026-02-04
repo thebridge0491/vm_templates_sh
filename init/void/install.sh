@@ -45,9 +45,9 @@ export CHROOT_CMD=chroot
 #fi
 
 _rootfs_extract() {
-  tarball_ver=$(curl -Ls http://${MIRROR}/live/current | sed -n "s|.*void-${UNAME_M}-ROOTFS-\(.*\).tar.xz.*|\1|p" | tail -n1)
+  tarball_ver=$(curl -Ls http://${MIRROR}/live/current | sed -n 's|.*void-${UNAME_M}-ROOTFS-\(.*\).tar.xz.*|\1|p' | tail -n1)
   curl -Lo /tmp/rootfs.tar.xz \
-    http://${MIRROR}/live/current/void-${UNAME_M}-ROOTFS-${tarball_ver:-20240314}.tar.xz
+    http://${MIRROR}/live/current/void-${UNAME_M}-ROOTFS-${tarball_ver:-20250202}.tar.xz
   curl -Lo /tmp/rootfs.tar.xz.CHECKSUM \
     http://${MIRROR}/live/current/sha256sum.txt
   grep "void-${UNAME_M}-ROOTFS" /tmp/rootfs.tar.xz.CHECKSUM | grep '^SHA256' \
@@ -62,14 +62,14 @@ _rootfs_extract() {
 bootstrap() {
   echo "Bootstrap base pkgs" ; sleep 3
   pkg_list="libgcc ethtool base-container-full mkpasswd"
-  if command -v xbps-install > /dev/null ; then
+  if [ ! "1" = "${USE_ROOTFS:-1}" ] && command -v xbps-install > /dev/null ; then
     if [ "aarch64" = "${UNAME_M}" ] ; then
       yes | XBPS_ARCH=${UNAME_M} xbps-install -R http://${MIRROR}/current/aarch64 -r /mnt -Sy ${pkg_list} ;
     else
       yes | XBPS_ARCH=${UNAME_M} xbps-install -R http://${MIRROR}/current -r /mnt -Sy ${pkg_list} ;
     fi ;
   else
-    if [ ! "1" = "${USE_ROOTFS:-0}" ] ; then
+    if [ ! "1" = "${USE_ROOTFS:-1}" ] ; then
       curl -LO http://${MIRROR}/static/xbps-static-latest.${UNAME_M}-musl.tar.xz ;
       tar -xf xbps-static-latest.${UNAME_M}-musl.tar.xz ;
       if [ "aarch64" = "${UNAME_M}" ] ; then
@@ -81,7 +81,7 @@ bootstrap() {
       mv /mnt/etc/fstab /mnt/etc/fstab.disk_setup ;
       _rootfs_extract ;
       cp -a /mnt/etc/fstab /mnt/etc/fstab.rootfs ;
-      cp -a /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
+      mv /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
       mv /mnt/etc/resolv.conf /mnt/etc/resolv.conf.rootfs ;
       cp /etc/resolv.conf /mnt/etc/resolv.conf ; cp /etc/mtab /mnt/etc/mtab ;
       # LANG=[C|en_US].UTF-8
@@ -218,7 +218,7 @@ mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 ##chmod 0440 /etc/sudoers.d/99_packernopasswd
 
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -249,7 +249,7 @@ else
   pkg_list="\${pkg_list} grub-x86_64-efi" ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   for pkgX in linux-firmware-amd linux-firmware-intel linux-firmware-network linux-firmware-nvidia ; do
     echo "ignorepkg=\${pkgX}" >> /etc/xbps.d/99-ignorefirmware.conf ;
     yes | xbps-remove -y \${pkgX} ;
@@ -317,7 +317,7 @@ else
 fi
 find / -ipath /boot/efi/*/*.efi ; sleep 5
 
-#sed -ie "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
+#sed -ie 's|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|' /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|^\(.*\)$|#\1\n\1|' /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 rd.auto=1 xdriver=vesa rootdelay=5 nomodeset text"|' /etc/default/grub
 #sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 video=1024x768 "|' /etc/default/grub
@@ -331,7 +331,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub-mkconfig -o /boot/grub/grub.cfg

@@ -17,12 +17,12 @@ variable "mirror_host_x64" {
 
 variable "iso_url_directory_x64" {
   type    = string
-  default = "/7.5"
+  default = "/7.8"
 }
 
 variable "iso_base_x64" {
   type    = string
-  default = "amd64/install75"
+  default = "amd64/install78"
 }
 
 variable "mirror_host_aa64" {
@@ -32,12 +32,12 @@ variable "mirror_host_aa64" {
 
 variable "iso_url_directory_aa64" {
   type    = string
-  default = "/7.5"
+  default = "/7.8"
 }
 
 variable "iso_base_aa64" {
   type    = string
-  default = "arm64/install75"
+  default = "arm64/install78"
 }
 
 variable "boot_cmdln_options" {

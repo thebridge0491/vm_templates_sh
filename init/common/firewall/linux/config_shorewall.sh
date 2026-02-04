@@ -49,11 +49,10 @@ config_shorewall() {
   #for ruleset in iptables.rules ip6tables.rules ; do
   #  diff -s /etc/iptables/${ruleset} /etc/iptables/${ruleset}.new ;
   #done
-  ##(sleep 120 && (iptables-nft -F ; iptables-nft -X ; ip6tables-nft -F ; \
-  ##  ip6tables-nft -X))& && (iptables-nft-restore /etc/iptables/iptables.rules ; \
-  ##  ip6tables-nft-restore /etc/iptables/ip6tables.rules)
-  #iptables-nft-restore /etc/iptables/iptables.rules
-  #ip6tables-nft-restore /etc/iptables/ip6tables.rules
+  #(sleep 120 && (iptables-nft -F ; iptables-nft -X ; ip6tables-nft -F ; \
+  #  ip6tables-nft -X))& \
+  #  (iptables-nft-restore /etc/iptables/iptables.rules ; \
+  #  ip6tables-nft-restore /etc/iptables/ip6tables.rules)
 
   #if [ -z "$(grep -e 'domain.*mdns' /etc/ipset.conf)" ] ; then
   #  #ip[6]tables-nft -A In_allow -p udp -m multiport --dports domain,mdns -j ACCEPT ;

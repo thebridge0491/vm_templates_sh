@@ -16,6 +16,8 @@ export GRP_NM=${GRP_NM:-vg0}
 export MIRROR=${MIRROR:-spout.ussg.indiana.edu/linux/pclinuxos}
 export UNAME_M=$(uname -m)
 
+export DNFCMD="dnf --setopt=install_weak_deps=False"
+
 
 # ifconfig [; ifconfig wlan create wlandev ath0 ; ifconfig wlan0 up scan]
 # nmcli device status ; nmcli connection up {ifdev}
@@ -29,25 +31,41 @@ export UNAME_M=$(uname -m)
 export CHROOT_CMD=chroot
 
 remount_filesys() {
-  echo "Re-mount filesystems" ; sleep 3
+  echo "Re-mount filesystems" ; mkdir -p /mnt/install ; sleep 3
   if [ "btrfs" = "${VOL_MGR}" ] ; then
     DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
-    mount -o noatime,compress=lzo,subvol=@ ${DEV_PV} /mnt/install ;
-    mkdir -p /mnt/install/.snapshots /mnt/install/var /mnt/install/tmp \
-      /mnt/install/home ;
+    #mount -o noatime,compress=lzo,subvol=@ ${DEV_PV} /mnt/install ;
+    mount -o noatime,compress=lzo ${DEV_PV} /mnt/install ;
+    mkdir -p /mnt/install/var/log /mnt/install/var/cache /mnt/install/var/mail \
+      /mnt/install/var/spool /mnt/install/var/tmp /mnt/install/usr/local \
+      /mnt/install/home /mnt/install/root /mnt/install/opt /mnt/install/.snapshots ; #/mnt/install/tmp ;
+    mount -o noatime,compress=lzo,subvol=@/var_log ${DEV_PV} /mnt/install/var/log ;
+    mount -o noatime,compress=lzo,subvol=@/var_cache ${DEV_PV} /mnt/install/var/cache ;
+    mount -o noatime,compress=lzo,subvol=@/var_mail ${DEV_PV} /mnt/install/var/mail ;
+    mount -o noatime,compress=lzo,subvol=@/var_spool ${DEV_PV} /mnt/install/var/spool ;
+    mount -o noatime,compress=lzo,subvol=@/var_tmp ${DEV_PV} /mnt/install/var/tmp ;
+    mount -o noatime,compress=lzo,subvol=@/usr_local ${DEV_PV} /mnt/install/usr/local ;
+    mount -o noatime,compress=lzo,subvol=@/home ${DEV_PV} /mnt/install/home ;
+    mount -o noatime,compress=lzo,subvol=@/root ${DEV_PV} /mnt/install/root ;
+    mount -o noatime,compress=lzo,subvol=@/opt ${DEV_PV} /mnt/install/opt ;
+    #mount -o noatime,compress=lzo,subvol=@/tmp ${DEV_PV} /mnt/install/tmp ;
     mount -o noatime,compress=lzo,subvol=@/.snapshots ${DEV_PV} \
       /mnt/install/.snapshots ;
-    mount -o noatime,compress=lzo,subvol=@/var ${DEV_PV} /mnt/install/var ;
-    mount -o noatime,compress=lzo,subvol=@/home ${DEV_PV} /mnt/install/home ;
-    #mount -o noatime,compress=lzo,subvol=@/tmp ${DEV_PV} /mnt/install/tmp ;
 
     cp /mnt/install/etc/fstab /mnt/install/etc/fstab.old ;
     sh -c 'cat >> /mnt/install/etc/fstab' << EOF ;
-PARTLABEL=${PV_NM:-pvol0}  /          auto    noatime,compress=lzo,subvol=/@   0   0
-PARTLABEL=${PV_NM:-pvol0}  /.snapshots  auto    noatime,compress=lzo,subvol=/@/.snapshots   0   0
-PARTLABEL=${PV_NM:-pvol0}  /var  auto    noatime,compress=lzo,subvol=/@/var   0   0
-PARTLABEL=${PV_NM:-pvol0}  /home  auto    noatime,compress=lzo,subvol=/@/home   0   0
-#PARTLABEL=${PV_NM:-pvol0}  /tmp  auto    noatime,compress=lzo,subvol=/@/tmp   0   0
+PARTLABEL=${PV_NM:-pvol0}  /          auto    noatime,compress=lzo   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/tmp  auto    noatime,compress=lzo,subvol=@/var_tmp   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/spool  auto    noatime,compress=lzo,subvol=@/var_spool   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/mail  auto    noatime,compress=lzo,subvol=@/var_mail   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/log  auto    noatime,compress=lzo,subvol=@/var_log   0   0
+PARTLABEL=${PV_NM:-pvol0}  /var/cache  auto    noatime,compress=lzo,subvol=@/var_cache   0   0
+PARTLABEL=${PV_NM:-pvol0}  /usr/local  auto    noatime,compress=lzo,subvol=@/usr_local   0   0
+PARTLABEL=${PV_NM:-pvol0}  /home  auto    noatime,compress=lzo,subvol=@/home   0   0
+PARTLABEL=${PV_NM:-pvol0}  /root  auto    noatime,compress=lzo,subvol=@/root   0   0
+PARTLABEL=${PV_NM:-pvol0}  /opt  auto    noatime,compress=lzo,subvol=@/opt   0   0
+#PARTLABEL=${PV_NM:-pvol0}  /tmp  auto    noatime,compress=lzo,subvol=@/tmp   0   0
+PARTLABEL=${PV_NM:-pvol0}  /.snapshots  auto    noatime,compress=lzo,subvol=@/.snapshots   0   0
 
 PARTLABEL=${GRP_NM}-osBoot   /boot       ext2    defaults    0   2
 PARTLABEL=ESP      /boot/efi   vfat    umask=0077  0   2
@@ -139,25 +157,37 @@ echo "Config pkg repo mirror(s)" ; sleep 3
 if [ -e /etc/os-release ] ; then
 . /etc/os-release
 fi
-#sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list
-#sed -i "/${MIRROR}/ s|^.*rpm|rpm|" /etc/apt/sources.list
-grep -e '^rpm.*' /etc/apt/sources.list ; sleep 5
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} --releasever=${RELEASE:-2025} -y check-update ;
+  #${DNFCMD} --releasever=${RELEASE:-2025} --refresh -y distro-sync ;
+  ${DNFCMD} -y repolist enabled ;
+else
+  #sed -i 's|^[ ]*rpm|# rpm|' /etc/apt/sources.list ;
+  #sed -i "/${MIRROR}/ s|^.*rpm|rpm|" /etc/apt/sources.list ;
+  grep -e '^rpm.*' /etc/apt/sources.list ;
+fi
+sleep 5
 
 
 services_enabled="sshd"
-pkg_list="basesystem-minimal bash apt rpm locales-en sudo whois dhcpcd man-pages nano dosfstools xfsprogs iptables-nft lib64hal1 python3-urllib3"
+pkg_list="basesystem-minimal bash apt rpm dnf python3-dnf locales-en sudo whois dhcpcd man-pages nano dosfstools xfsprogs iptables-nft lib64hal1 python3-urllib3"
 # openssh-server task-xfce
 
 echo "Add software package selection(s)" ; sleep 3
-apt-get -y update ; apt-get --fix-broken -y install
-for pkgX in \${pkg_list} ; do
-  apt-get -y install \${pkgX} ;
-done
-# fix AND re-attempt install for infrequent errors
-apt-get --fix-broken -y install
-for pkgX in \${pkg_list} ; do
-  apt-get -y install \${pkgX} ;
-done
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} --releasever=${RELEASE:-2025} -y check-update ;
+  ${DNFCMD} --releasever=${RELEASE:-2025} --skip-broken -y install \${pkg_list} ;
+else
+  apt-get -y update ; apt-get --fix-broken -y install ;
+  for pkgX in \${pkg_list} ; do
+    apt-get -y install \${pkgX} ;
+  done ;
+  # fix AND re-attempt install for infrequent errors
+  apt-get --fix-broken -y install ;
+  for pkgX in \${pkg_list} ; do
+    apt-get -y install \${pkgX} ;
+  done ;
+fi
 
 
 #echo "Config keyboard ; localization" ; sleep 3
@@ -247,7 +277,7 @@ mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 ##chmod 0440 /etc/sudoers.d/99_packernopasswd
 
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -255,13 +285,23 @@ cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 EOF
 
 
-apt-get --fix-broken -y install
+if ! command -v dnf > /dev/null ; then
+  apt-get --fix-broken -y  install ;
+fi
 # install/enable ssh after reboot
-#apt-get -y install openssh-server
+#if command -v dnf > /dev/null ; then
+#  ${DNFCMD} --releasever=${RELEASE:-2025} --skip-broken -y install openssh-server ;
+#else
+#  apt-get -y install openssh-server ;
+#fi
 service sshd stop #; service network stop
 
 
-apt-get -y clean
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} -y clean packages ;
+else
+  apt-get -y clean ;
+fi
 
 exit
 
@@ -280,14 +320,20 @@ fi
 
 pkg_list="mkinitrd bootloader grub2 grub2-efi efibootmgr" # microcode_ctl
 
-for pkgX in \${pkg_list} ; do
-  apt-get -y install \${pkgX} ;
-done
-# fix AND re-attempt install for infrequent errors
-apt-get --fix-broken -y install
-for pkgX in \${pkg_list} ; do
-  apt-get -y install \${pkgX} ;
-done
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} -y check-update ;
+
+  ${DNFCMD} --skip-broken -y install \${pkg_list} ;
+else
+  for pkgX in \${pkg_list} ; do
+    apt-get -y install \${pkgX} ;
+  done ;
+  # fix AND re-attempt install for infrequent errors
+  apt-get --fix-broken -y install ;
+  for pkgX in \${pkg_list} ; do
+    apt-get -y install \${pkgX} ;
+  done ;
+fi
 
 kver="\$(ls -A /lib/modules/ | tail -1)" # or ? uname -r
 echo \${kver} ; sleep 5
@@ -295,13 +341,21 @@ echo \${kver} ; sleep 5
 modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
 if [ "btrfs" = "${VOL_MGR}" ] ; then
-  apt-get -y install btrfs-progs ;
-  apt-get --fix-broken -y install ; apt-get -y install btrfs-progs ;
+  if command -v dnf > /dev/null ; then
+    ${DNFCMD} --skip-broken -y install btrfs-progs ;
+  else
+    apt-get -y install btrfs-progs ;
+    apt-get --fix-broken -y install ; apt-get -y install btrfs-progs ;
+  fi ;
   modprobe btrfs ; sleep 5 ;
 elif [ "lvm" = "${VOL_MGR}" ] ; then
-  apt-get -y install lvm2 ;
-  apt-get --fix-broken -y install ; apt-get -y install lvm2 ;
-  # cryptsetup
+  if command -v dnf > /dev/null ; then
+    ${DNFCMD} --skip-broken -y install lvm2 ;
+  else
+    apt-get -y install lvm2 ;
+    # cryptsetup
+    apt-get --fix-broken -y install ; apt-get -y install lvm2 ;
+  fi ;
   modprobe dm-mod ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
 fi
 
@@ -319,8 +373,8 @@ grub2-install --target=i386-pc --recheck /dev/${DEVX}
 #cp /boot/efi/EFI/BOOT/grubx64.EFI /boot/efi/EFI/BOOT/BOOTX64.EFI
 find / -ipath /boot/efi/*/*.efi ; sleep 5
 
-#sed -ie "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
-#sed -ie "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
+#sed -ie 's|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|' /etc/default/grub
+#sed -ie '/GRUB_DEFAULT/ s|=.*$|=saved|' /etc/default/grub
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 #echo "#GRUB_CMDLINE_LINUX='cryptdevice=/dev/sda2:cryptroot'" >> /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|^\(.*\)$|#\1\n\1|' /etc/default/grub
@@ -333,7 +387,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
@@ -346,7 +400,11 @@ efibootmgr -v ; sleep 3
 
 whois-mkpasswd -m help ; sleep 10
 
-apt-get -y clean
+if command -v dnf > /dev/null ; then
+  ${DNFCMD} -y clean all
+else
+  apt-get -y clean ;
+fi
 
 exit
 

@@ -1,5 +1,5 @@
 mkdir -p ${STORAGE_DIR:-$(dirname ${0})}/nvram
-cp -an ${QEMU_NVRAM_AA64:-/usr/share/AAVMF/AAVMF_VARS.fd} ${STORAGE_DIR:-$(dirname ${0})}/nvram/${GUEST:-freebsd-aarch64-zfs}_VARS.fd
+cp -an ${QEMU_NVRAM_AA64:-${STORAGE_DIR:-$(dirname ${0})}/AAVMF_VARS.fd} ${STORAGE_DIR:-$(dirname ${0})}/nvram/${GUEST:-freebsd-aarch64-zfs}_VARS.fd
 chmod +w ${STORAGE_DIR:-$(dirname ${0})}/nvram/${GUEST:-freebsd-aarch64-zfs}_VARS.fd
 #VIRTFS_OPTS=${VIRTFS_OPTS:--virtfs local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough}
 VIRTFS_OPTS=${VIRTFS_OPTS:-}
@@ -10,5 +10,5 @@ qemu-system-aarch64 -cpu cortex-a72 -machine virt,gic-version=3,acpi=off,accel=k
   -usb -device usb-kbd -device usb-tablet -device virtio-blk-pci,drive=hd0 \
   -drive file=${STORAGE_DIR:-$(dirname ${0})}/${IMGFILE:-${GUEST:-freebsd-aarch64-std}${IMGEXT:-.qcow2}},cache=writeback,discard=unmap,detect-zeroes=unmap,if=none,id=hd0,format=${IMGFMT:-qcow2} \
   -display default,show-cursor=on -vga none -device virtio-gpu-pci \
-  ${QUEFI_OPTS:--smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${QEMU_FIRMWARE_AA64:-/usr/share/AAVMF/AAVMF_CODE.fd} -drive if=pflash,unit=1,format=raw,file=${STORAGE_DIR:-$(dirname ${0})}/nvram/${GUEST:-freebsd-aarch64-std}_VARS.fd} \
+  ${QUEFI_OPTS:--smbios type=0,uefi=on -drive if=pflash,unit=0,format=raw,readonly=on,file=${QEMU_FIRMWARE_AA64:-${STORAGE_DIR:-$(dirname ${0})}/AAVMF_CODE.fd} -drive if=pflash,unit=1,format=raw,file=${STORAGE_DIR:-$(dirname ${0})}/nvram/${GUEST:-freebsd-aarch64-std}_VARS.fd} \
   ${VIRTFS_OPTS}

@@ -14,12 +14,14 @@ case ${OS_NAME} in
   'Darwin') NAME=$(sw_vers -productName) ;;
   'FreeBSD'|'OpenBSD'|'NetBSD'|'Linux')
     #NAME=$(lsb_release -i)
-    . /etc/os-release
+    test -e /etc/os-release && . /etc/os-release ;
     if [ ! -e /etc/os-release ] && [ -f /usr/lib/os-release ] ; then
       . /usr/lib/os-release ;
     fi ;
     #sudo tar -xf /root/scripts.tar ;
-    sudo find /root/scripts -name 'distro_pkg*' -exec cp {} /tmp/ \; ;
+    sudo find /root/scripts -name 'distro_pkg*' -exec cp -a {} /tmp/ \; ;
+    sudo find /root/init -name 'config_samples*' -exec cp -a {} /var/tmp/ \; ;
+    sudo chmod 0644 /var/tmp/config_samples* ;
     . /tmp/distro_pkgs.ini ; . /tmp/distro_pkgmgr_funcs.sh ;
     sudo ${pkgmgr_update} > /dev/stderr ;;
 esac
@@ -133,6 +135,7 @@ bsd_info() {
     sep_cmd 'cat /var/run/dmesg.boot | grep -ie cpu' ;
     sep_cmd 'cat /var/run/dmesg.boot | grep -ie "memory[ ]*=" -ie "mem[ ]*="' ;
     sep_cmd 'cat /var/run/dmesg.boot | grep -ie network' ;
+    sep_cmd 'free -h' ; sep_cmd 'top -bt 0' ;
   fi
   if command -v pciconf > /dev/null ; then
     sep_cmd 'pciconf -lv | grep -ie VGA' ;
@@ -153,7 +156,7 @@ ${sep}
 (cd /var/log ; ls -dp * | column -xc 78)
 `(cd /var/log ; ls -dp * | column -xc 78)`
 EOF
-  sep_cmd 'sudo tail /var/log/messages'
+  sep_cmd 'sudo tail -v /var/log/messages'
 
   #configs=$(find -L /boot /etc -type f -maxdepth 2 -name 'rc.conf*' -o -name 'loader.conf*' -o -name 'periodic.conf*' -o -name 'modules.conf*' -o -name 'daily.conf*' -o -name 'weekly.conf*' -o -name 'monthly.conf*')
   #for conf in ${configs} ; do
@@ -334,7 +337,7 @@ linux_info() {
   fi
 
   sep_cmd "lscpu | grep -e 'Architecture:' -e 'Model name:'"
-  sep_cmd 'free -h'
+  sep_cmd 'free -h' ; sep_cmd 'top -bn 1 -p 0'
   sep_cmd "(lspci -kv || lspci -v) | sed -n '/VGA/,/^\s*$/p'"
   sep_cmd "(lspci -kv || lspci -v) | sed -n '/Wireless/,/^\s*$/p'"
   sep_cmd "(lspci -kv || lspci -v) | sed -n '/Ethernet/,/^\s*$/p'"
@@ -360,9 +363,9 @@ ${sep}
 `(cd /var/log ; ls -dp * | column -xc 78)`
 EOF
   if [ -d /var/log/socklog ] ; then
-    sep_cmd 'sudo tail /var/log/socklog/messages/current' ;
+    sep_cmd 'sudo tail -v /var/log/socklog/messages/current' ;
   else
-    sep_cmd 'sudo tail /var/log/messages || sudo tail /var/log/syslog' ;
+    sep_cmd 'sudo tail -v /var/log/messages /var/log/syslog' ;
   fi
   if command -v journalctl > /dev/null ; then
     sep_cmd 'sudo journalctl --identifier systemd-journald --identifier user --lines 10' ;
@@ -444,7 +447,7 @@ EOF
     #sep_cmd 'sudo firewall-cmd --zone=public --list-all' ;
   elif sudo -i command -v nft > /dev/null ; then
     sep_cmd 'sudo nft -V' ; #sep_cmd 'sudo nft list ruleset' ;
-  elif sudo -i command -v iptables-nft || sudo -i command -v iptables > /dev/null ; then
+  elif (sudo -i command -v iptables-nft || sudo -i command -v iptables) > /dev/null ; then
     sep_cmd 'sudo iptables-nft -V || sudo iptables -V' ;
     #sep_cmd 'sudo iptables-nft -L || sudo iptables -L' ;
   elif sudo -i command -v ufw > /dev/null ; then
@@ -593,6 +596,7 @@ EOF
 macos_info() {
   echo "(${NAME} ${MACHINE})" 'collect_info'
   sep_cmd 'uname -a' ; sep_cmd 'sw_vers'
+  sep_cmd 'free -h' ; sep_cmd 'top -l 1 -n 1 -pid 0'
   sep_cmd 'sysctl machdep.cpu.brand_string'
   sep_cmd 'system_profiler SPDisplaysDataType'
   sep_cmd 'system_profiler SPSoftwareDataType'

@@ -123,15 +123,13 @@ ifconfig ; dhclient \${ifdev} ; ifconfig \${ifdev} inet autoconf ; sleep 5
 
 
 services_enabled="sshd"
-pkg_list="sudo-- nano-- pciutils-- python--%3 py3-urllib3-- gtar--"
+pkg_list="sudo-- nano-- pciutils-- py3-pip-- py3-urllib3-- gtar--"
 # vim-- bzip2-- findutils-- ggrep-- zip-- unzip-- xfce4--
 
 #echo "http://${MIRROR}" > /etc/installurl
 echo "https://cdn.openbsd.org/pub/OpenBSD" > /etc/installurl
 pkg_add -u
-for pkgX in \${pkg_list} ; do
-  pkg_add \${pkgX} ;
-done
+pkg_add -ziU \${pkgX_list}
 
 echo "Config services" ; sleep 3
 
@@ -166,7 +164,7 @@ mkdir -p /etc/sudoers.d
 
 cd /etc/mail ; make aliases
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -180,8 +178,8 @@ if [ -z "\$(grep 'Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config)" 
   echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config ;
 fi
 echo "Temporarily permit root login via ssh password" ; sleep 3
-#sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
-sed -i "s|.*PermitRootLogin|#PermitRootLogin|" /etc/ssh/sshd_config
+#sed -i '/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|' /etc/ssh/sshd_config
+sed -i 's|.*PermitRootLogin|#PermitRootLogin|' /etc/ssh/sshd_config
 echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-rootlogin.conf
 
 mv /root/.forward /root/.forward.orig

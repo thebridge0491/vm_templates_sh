@@ -50,6 +50,7 @@ gpt_disk() {
     gpt add -a 1M -s 13312M -t ffs -l "${GRP_NM}-fsRoot" ${DEVX} ;
     gpt add -a 1M -s 5G -t ffs -l "${GRP_NM}-fsVar" ${DEVX} ;
     gpt add -a 1M -t ffs -l "${GRP_NM}-fsHome" ${DEVX} ;
+    #gpt resize [-s 24G] -i 6 ${DEVX} ;
 
     #gpt biosboot -A -i 3 ${DEVX}
     gpt biosboot -L "${GRP_NM}-fsRoot" ${DEVX}

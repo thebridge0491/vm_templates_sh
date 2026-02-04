@@ -19,8 +19,8 @@ crypt_open() {
 
   depmod -a ; modprobe dm-mod ; modprobe dm-crypt
   lsmod | grep -e dm_mod -e dm_crypt ; sleep 5 ; cryptsetup --version
-  #true || dd bs=1m if=/dev/urandom of=${DEV_SWAP}
-  #true || dd bs=1m if=/dev/urandom of=${DEV_HOME}
+  #true || dd bs=4M if=/dev/urandom of=${DEV_SWAP} status=progress
+  #true || dd bs=4M if=/dev/urandom of=${DEV_HOME} status=progress
 
   echo -n vmpacker | cryptsetup luksFormat --key-file - --key-size=256 \
     --cipher=aes-xts-plain64 --iter-time=2000 ${DEV_HOME}
@@ -55,7 +55,7 @@ addkey_hdrbkup() {
   DEV_HOME=$(lsblk -nlpo name,label,partlabel | grep -e "${GRP_NM}-osHome" | cut -d' ' -f1)
 
   mkdir -p ${MNT}etc/obscure ${MNT}var/obscure
-  dd count=1 bs=4096 if=/dev/urandom of=${MNT}etc/obscure/puzzle.dat
+  dd bs=4M if=/dev/urandom of=${MNT}etc/obscure/puzzle.dat count=1 status=progress
   cryptsetup luksDump ${DEV_HOME} ; sleep 5
   echo -n vmpacker | cryptsetup luksAddKey --verbose --key-file - \
     --key-slot 1 ${DEV_HOME} ${MNT}etc/obscure/puzzle.dat

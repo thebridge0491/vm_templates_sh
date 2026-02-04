@@ -38,12 +38,12 @@ variable "qemudisk_interface_x64" {
 
 variable "qemu_firmware_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_CODE.fd"
+  default = "/usr/share/OVMF/OVMF_CODE.4m.fd"
 }
 
 variable "qemu_nvram_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_VARS.fd"
+  default = "/usr/share/OVMF/OVMF_VARS.4m.fd"
 }
 
 variable "qemudisk_interface_aa64" {
@@ -118,10 +118,13 @@ locals {
 
   # OS variant oriented local vars
   #iso_url         = ""
-  iso_urls         = "aarch64" == var.MACHINE ? null : [
-    "file://${var.isos_pardir}/void/${var.iso_base_x64}.iso",
+  iso_urls         = "aarch64" == var.MACHINE ? [
+    "file://${var.isos_pardir}/void/${var.iso_base_aa64}.iso",
+    "https://${var.mirror_host_aa64}${var.iso_url_directory_aa64}/${var.iso_base_aa64}.iso"
+    ] : ["file://${var.isos_pardir}/void/${var.iso_base_x64}.iso",
     "https://${var.mirror_host_x64}${var.iso_url_directory_x64}/${var.iso_base_x64}.iso"]
-  iso_checksum     = ("aarch64" == var.MACHINE ? null :
+  iso_checksum     = ("aarch64" == var.MACHINE ?
+    "file:file://${var.isos_pardir}/void/sha256sum.txt" :
     "file:file://${var.isos_pardir}/void/sha256sum.txt")
 
   # Source provider oriented local vars
@@ -132,7 +135,17 @@ locals {
     var.qemu_firmware_x64)
   qemu_nvram       = ("aarch64" == var.MACHINE ? var.qemu_nvram_aa64 :
     var.qemu_nvram_x64)
-  qemuargs         = "aarch64" == var.MACHINE ? null : [
+  qemuargs         = "aarch64" == var.MACHINE ? [
+    ["-cpu", "cortex-a72"], ["-machine", "virt,gic-version=3,acpi=off"],
+    ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
+    ["-name", "{{.Name}}"],
+    ["-device", "virtio-net,netdev=user.0,mac=52:54:00:${formatdate("hh:mm:ss", timestamp())}"],
+    ["-device", "usb-ehci,id=usb"], ["-usb"], ["-device", "usb-kbd"],
+    ["-device", "usb-tablet"], ["-display", "gtk,show-cursor=on"],
+    ["-vga", "none"], ["-device", "virtio-gpu-pci"],
+    ["-smbios", "type=0,uefi=on"], ["-bios", "${var.qemu_firmware_aa64}"]
+    #, ["-virtfs", "local,id=fsdev0,path=/mnt/Data0,mount_tag=9p_Data0,security_model=passthrough"]
+    ] : [
     ["-cpu", "Skylake-Client"], ["-machine", "q35,accel=kvm:hvf:tcg"],
     ["-smp", "cpus=2"], ["-m", "size=2048"], ["-boot", "order=cdn,menu=on"],
     ["-name", "{{.Name}}"],
@@ -232,8 +245,7 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
-      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -264,18 +276,20 @@ build {
     execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
     inline           = ["cd /tmp",
       "sh init/common/collect_osinfo.sh collect_all"]
-    only             = ["qemu.guest_vm"]
+    except             = ["qemu.guest_vm"]
   }
   provisioner "file" {
     destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
     direction   = "download"
     generated   = true
-    only        = ["qemu.guest_vm"]
+    except        = ["qemu.guest_vm"]
     source      = "/tmp/info.tar"
   }
   provisioner "shell-local" {
-    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
+    inline = ["mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}",
+      "cd output-vms/collect_osinfo/vm_init/${var.variant}",
       "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
+    except        = ["qemu.guest_vm"]
   }
 
   post-processor "checksum" {

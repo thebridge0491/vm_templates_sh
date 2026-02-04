@@ -47,9 +47,9 @@ export CHROOT_CMD=chroot
 _rootfs_extract() {
   tarball_ver=$(curl -Ls http://${MIRROR}/${RELEASE}/releases/${UNAME_M} | sed -n "s|.*alpine-minirootfs-\(.*\)-${UNAME_M}.tar.gz.*|\1|p" | tail -n1)
   curl -Lo /tmp/rootfs.tar.gz \
-    http://${MIRROR}/${RELEASE}/releases/${UNAME_M}/alpine-minirootfs-${tarball_ver:-3.20.3}-${UNAME_M}.tar.gz
+    http://${MIRROR}/${RELEASE}/releases/${UNAME_M}/alpine-minirootfs-${tarball_ver:-3.23.0}-${UNAME_M}.tar.gz
   curl -Lo /tmp/rootfs.tar.gz.CHECKSUM \
-    http://${MIRROR}/${RELEASE}/releases/${UNAME_M}/alpine-minirootfs-${tarball_ver:-3.20.3}-${UNAME_M}.tar.gz.sha256
+    http://${MIRROR}/${RELEASE}/releases/${UNAME_M}/alpine-minirootfs-${tarball_ver:-3.23.0}-${UNAME_M}.tar.gz.sha256
   cp -a /tmp/rootfs.tar.gz.CHECKSUM /tmp/CHECKSUM
   sha256sum --ignore-missing -c /tmp/CHECKSUM
 
@@ -65,14 +65,14 @@ bootstrap() {
   else
     if [ ! "1" = "${USE_ROOTFS:-0}" ] ; then
       apktools_ver=$(curl -Ls http://${MIRROR}/${RELEASE}/main/${UNAME_M} | sed -n 's|.*apk-tools-static-\(.*\).apk.*|\1|p') ;
-      curl -LO http://${MIRROR}/${RELEASE}/main/${UNAME_M}/apk-tools-static-${apktools_ver:-2.12.10-r1}.apk ;
+      curl -LO http://${MIRROR}/${RELEASE}/main/${UNAME_M}/apk-tools-static-${apktools_ver:-3.0.0-r0}.apk ;
       tar -xf apk-tools-static-*.apk ;
       ./sbin/apk.static --arch ${UNAME_M} --repository http://${MIRROR}/${RELEASE}/main --update-cache --allow-untrusted --root /mnt --initdb add ${pkg_list} ;
     else
       mv /mnt/etc/fstab /mnt/etc/fstab.disk_setup ;
       _rootfs_extract ;
       cp -a /mnt/etc/fstab /mnt/etc/fstab.rootfs ;
-      cp -a /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
+      mv /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
       mv /mnt/etc/resolv.conf /mnt/etc/resolv.conf.rootfs ;
       cp /etc/resolv.conf /mnt/etc/resolv.conf ; cp /etc/mtab /mnt/etc/mtab ;
       # LANG=[C|en_US].UTF-8
@@ -143,7 +143,7 @@ cat /etc/apk/repositories ; sleep 5
 
 services_enabled="udev udev-trigger udev-settle udev-postmount networking urandom hostname hwclock modules sysctl bootmisc swap loadkmap mount-ro killprocs savecache devfs dmesg mdev hwdrivers acpid dhcpcd sshd"
 services_disabled="syslog crond"
-pkg_list="eudev eudev-openrc udev-init-scripts lsb-release-minimal man-db man-pages dhcpcd bash sudo mkpasswd util-linux util-linux-misc coreutils iproute2-ss musl-locales pciutils shadow openssh python3 py3-urllib3"
+pkg_list="eudev eudev-openrc udev-init-scripts lsb-release-minimal man-db man-pages dhcpcd bash sudo mkpasswd util-linux util-linux-misc coreutils tar procps-ng grep iproute2-ss musl-locales pciutils shadow openssh python3 py3-urllib3"
 # xfce4
 
 echo "Add software package selection(s)" ; sleep 3
@@ -245,7 +245,7 @@ mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 sleep 5
 
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -253,8 +253,8 @@ cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 EOF
 
 #echo "Temporarily permit root login via ssh password" ; sleep 3
-#sed -i "/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|" /etc/ssh/sshd_config
-#sed -i "s|.*PermitRootLogin|#PermitRootLogin|" /etc/ssh/sshd_config
+#sed -i '/PermitRootLogin/ s|^\(.*\)$|PermitRootLogin yes|' /etc/ssh/sshd_config
+#sed -i 's|.*PermitRootLogin|#PermitRootLogin|' /etc/ssh/sshd_config
 #echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-rootlogin.conf
 
 apk --arch ${UNAME_M} -v cache clean
@@ -276,7 +276,7 @@ pkg_list="linux-lts mkinitfs grub-efi efibootmgr" # xfce4
 if [ "x86_64" = "${UNAME_M}" ] ; then
   pkg_list="\${pkg_list} grub-bios" ;
 fi
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   pkg_list="linux-firmware-none \${pkg_list}" ;
 fi
 
@@ -302,8 +302,8 @@ if [ "zfs" = "${VOL_MGR}" ] ; then
 
   #echo "Hold zfs & kernel package upgrades (require manual upgrade)" ;
   apk --arch ${UNAME_M} fix ; sleep 3 ;
-  if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
-    apk --arch ${UNAME_M} add linux-firmware-none=\$(apk --arch ${UNAME_M} info -ve linux-firmware-none | sed "s|linux-firmware-none-\(.*\)|\1|") ;
+  if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
+    apk --arch ${UNAME_M} add linux-firmware-none=\$(apk --arch ${UNAME_M} info -ve linux-firmware-none | sed 's|linux-firmware-none-\(.*\)|\1|') ;
   fi ;
   for pkgX in linux-lts linux-lts-dev zfs zfs-lts zfs-openrc ; do
     apk --arch ${UNAME_M} add \${pkgX}=\$(apk --arch ${UNAME_M} info -ve \${pkgX} | sed "s|\${pkgX}-\(.*\)|\1|") ;
@@ -377,7 +377,7 @@ else
 fi
 find / -ipath /boot/efi/*/*.efi ; sleep 5
 
-#sed -ie "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
+#sed -ie 's|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|' /etc/default/grub
 if [ -z "\$(grep GRUB_CMDLINE_LINUX_DEFAULT /etc/default/grub)" ] ; then
   echo '#GRUB_CMDLINE_LINUX_DEFAULT="rd.auto=1 rootdelay=5 modules=sd-mod,usb-storage,ext4 nomodeset text"' >> /etc/default/grub ;
   echo 'GRUB_CMDLINE_LINUX_DEFAULT="rd.auto=1 rootdelay=5 modules=sd-mod,usb-storage,ext4 nomodeset text"' >> /etc/default/grub ;
@@ -399,7 +399,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub-mkconfig -o /boot/grub/grub.cfg

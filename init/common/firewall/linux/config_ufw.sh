@@ -32,8 +32,8 @@ cmds_ufw() {
   _cmds_ufw_out${policy_out}
   ufw logging on  # on|off|low|medium|high|full
   # ##########
-  ##(sleep 120 && ufw disable)& && ufw enable
-  #ufw enable
+  #(sleep 120 && ufw disable)& \
+  #  ufw enable
 
   #ufw allow in svc MDNS
   #ufw status ; sleep 5 ; ufw show user-rules ; sleep 5

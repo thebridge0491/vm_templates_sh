@@ -22,9 +22,9 @@ variable "iso_url_directory_x64" {
 
 variable "iso_base_x64" {
   type    = string
-  #default = "void-live-x86_64-20240314-base"
-  #default = "void-hrmpf-x86_64-6.5.12_1-20231124"
-  default = "void-mklive-x86_64-6.0.13_1-20221218"
+  #default = "void-live-x86_64-20250202-base"
+  #default = "void-mklive-x86_64-6.0.13_1-20221218"
+  default = "void-hrmpf-x86_64-20250228"
 }
 
 variable "mirror_host_aa64" {
@@ -39,7 +39,9 @@ variable "iso_url_directory_aa64" {
 
 variable "iso_base_aa64" {
   type    = string
-  default = null
+  #default = "void-live-aarch64-20250202-base"
+  #default = null
+  default = "void-hrmpf-aarch64-20250228"
 }
 
 variable "boot_cmdln_options" {

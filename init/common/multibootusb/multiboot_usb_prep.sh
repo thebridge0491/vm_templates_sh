@@ -1,5 +1,9 @@
 #!/bin/bash -x
 
+## Note - dd single OS to usb:
+## (freebsd) dd bs=4m if=<isofile> of=</dev/daX> oflag=sync status=progress
+## (linux)   dd bs=4M if=<isofile> of=</dev/sdX> oflag=sync status=progress
+
 set -x
 DEVX=${DEVX:-sdb}
 

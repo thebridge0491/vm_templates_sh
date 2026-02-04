@@ -90,18 +90,24 @@ bootstrap() {
   echo "Bootstrap base pkgs" ; sleep 3
   if [ "zfs" = "${VOL_MGR}" ] ; then
     zfs umount ${ZPOOLNM}/var/mail ; zfs destroy ${ZPOOLNM}/var/mail ;
+  elif [ "btrfs" = "${VOL_MGR}" ] ; then
+    umount /mnt/var/mail ; rm -fr /mnt/var/mail ;
+    mkdir -p /mnt/var/spool/mail ;
+    DEV_PV=$(lsblk -nlpo name,partlabel | grep -e ${PV_NM:-pvol0} | cut -d' ' -f1) ;
+    mount -o noatime,compress=lzo,subvol=@/var_mail ${DEV_PV} /mnt/var/spool/mail ;
+    sed -i 's|/var/mail|/var/spool/mail|' /mnt/etc/fstab* ;
   fi
   REPO_DIRECTORY=${REPO_DIRECTORY:-"/${RELEASE}/BaseOS/${UNAME_M}/os"}
   pkg_list="@core dnf dnf-plugins-core yum yum-utils" # basesystem
   if command -v dnf > /dev/null || command -v yum-config-manager > /dev/null ; then
     if command -v dnf > /dev/null ; then
-      #${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck --repofrompath=quickrepo${RELEASE},http://${MIRROR}${REPO_DIRECTORY}/ --repo=quickrepo${RELEASE} install -y ${pkg_list} ;
-      #${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck config-manager -y --set-disabled appstream baseos crb extras epel epel-cisco-openh264 ;
-      ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck config-manager -y --set-disabled '*' ;
-      ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck config-manager -y --add-repo http://${MIRROR}${REPO_DIRECTORY} ;
-      ${DNFCMD} --installroot=/mnt check-update -y ;
-      ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck install -y ${pkg_list} ;
-      ${DNFCMD} --installroot=/mnt repolist -y ;
+      #${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck --repofrompath=quickrepo${RELEASE},http://${MIRROR}${REPO_DIRECTORY}/ --repo=quickrepo${RELEASE} --skip-broken -y install ${pkg_list} ;
+      #${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck -y config-manager --set-disabled appstream baseos crb extras epel epel-cisco-openh264 ;
+      ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck -y config-manager --set-disabled '*' ;
+      ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck -y config-manager --add-repo http://${MIRROR}${REPO_DIRECTORY} ;
+      ${DNFCMD} --installroot=/mnt -y check-update ;
+      ${DNFCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck --skip-broken -y install ${pkg_list} ;
+      ${DNFCMD} --installroot=/mnt -y repolist ;
     elif command -v yum-config-manager > /dev/null ; then
       rm -r /mnt/var/lib/rpm /mnt/var/cache/dnf ;
       mkdir -p /mnt/var/lib/rpm /mnt/var/cache/dnf ;
@@ -117,15 +123,15 @@ bootstrap() {
       #yum-config-manager --releasever=${RELEASE} --installroot=/mnt --nogpgcheck -y --set-disabled appstream baseos crb extras epel epel-cisco-openh264 ;
       yum-config-manager --releasever=${RELEASE} --installroot=/mnt --nogpgcheck -y --set-disabled '*' ;
       yum-config-manager --releasever=${RELEASE} --installroot=/mnt --nogpgcheck -y --add-repo http://${MIRROR}${REPO_DIRECTORY} ;
-      ${YUMCMD} --installroot=/mnt check-update -y ;
-      ${YUMCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck install -y ${pkg_list} ;
-      ${YUMCMD} --installroot=/mnt repolist -y ;
+      ${YUMCMD} --installroot=/mnt -y check-update ;
+      ${YUMCMD} --releasever=${RELEASE} --installroot=/mnt --nogpgcheck -y install ${pkg_list} ;
+      ${YUMCMD} --installroot=/mnt -y repolist ;
     fi ;
   else
     mv /mnt/etc/fstab /mnt/etc/fstab.disk_setup ;
     _rootfs_extract ;
     cp -a /mnt/etc/fstab /mnt/etc/fstab.rootfs ;
-    cp -a /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
+    mv /mnt/etc/fstab.disk_setup /mnt/etc/fstab ;
     mv /mnt/etc/resolv.conf /mnt/etc/resolv.conf.rootfs ;
     cp /etc/resolv.conf /mnt/etc/resolv.conf ; cp /etc/mtab /mnt/etc/mtab ;
     # LANG=[C|en_US].UTF-8
@@ -134,9 +140,9 @@ set -x
 
 unalias -a
 
-${DNFCMD} check-update -y
-${DNFCMD} install -y --nogpgcheck --allowerasing ${pkg_list} 'dnf-command(config-manager)'
-${DNFCMD} check-update -y ; ${DNFCMD} repolist -y
+${DNFCMD} -y check-update
+${DNFCMD} --nogpgcheck --allowerasing --skip-broken -y install ${pkg_list} 'dnf-command(config-manager)'
+${DNFCMD} -y check-update ; ${DNFCMD} -y repolist
 
 exit
 
@@ -196,15 +202,15 @@ VERSION_MAJOR=\$(echo \${VERSION_ID} | cut -d. -f1)
 #yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/AppStream/${UNAME_M}/os
 #yum-config-manager --add-repo http://${MIRROR}/${RELEASE}/extras/${UNAME_M}/os
 
-${DNFCMD} check-update -y
-${DNFCMD} reinstall -y dnf dnf-plugins-core yum yum-utils 'dnf-command(config-manager)'
-${DNFCMD} install -y dnf dnf-plugins-core yum yum-utils 'dnf-command(config-manager)'
-${DNFCMD} --releasever=\${VERSION_MAJOR} install -y epel-release epel-next-release
-${DNFCMD} --releasever=\${VERSION_MAJOR} install -y http://dl.fedoraproject.org/pub/epel/epel-release-latest-\${VERSION_MAJOR}.noarch.rpm http://dl.fedoraproject.org/pub/epel/epel-next-release-latest-\${VERSION_MAJOR}.noarch.rpm
-${DNFCMD} config-manager -y --set-enabled appstream baseos crb extras epel epel-cisco-openh264
+${DNFCMD} -y check-update
+${DNFCMD} --skip-broken -y reinstall dnf dnf-plugins-core yum yum-utils 'dnf-command(config-manager)'
+${DNFCMD} --skip-broken -y install dnf dnf-plugins-core yum yum-utils 'dnf-command(config-manager)'
+${DNFCMD} --releasever=\${VERSION_MAJOR} --skip-broken -y install epel-release epel-next-release
+${DNFCMD} --releasever=\${VERSION_MAJOR} --skip-broken -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-\${VERSION_MAJOR}.noarch.rpm http://dl.fedoraproject.org/pub/epel/epel-next-release-latest-\${VERSION_MAJOR}.noarch.rpm
+${DNFCMD} -y config-manager --set-enabled appstream baseos crb extras epel epel-cisco-openh264
 crb enable ; /usr/bin/crb enable
 #cat /etc/yum.repos.d/* ; sleep 5
-${DNFCMD} repolist -y ; sleep 5
+${DNFCMD} -y repolist ; sleep 5
 
 
 services_enabled="sshd tmp.mount"
@@ -212,14 +218,10 @@ pkg_list="@core pciutils nano sudo tar kbd openssl systemd python3-dnf-plugin-ve
 # @base @^minimal @minimal-environment redhat-lsb-core @xfce-desktop
 
 echo "Add software package selection(s)" ; sleep 3
-for pkgX in \${pkg_list} ; do
-  ${DNFCMD} install -y \${pkgX} ;
-done
-for pkgX in lsb-release dhcpcd ; do
-  ${DNFCMD} --enablerepo=epel install -y \${pkgX} ;
-done
+${DNFCMD} --skip-broken -y install \${pkg_list}
+${DNFCMD} --enablerepo=epel --skip-broken -y install lsb-release dhcpcd
 
-${DNFCMD} install -y openssh-clients openssh-server
+${DNFCMD} --skip-broken -y install openssh-clients openssh-server
 systemctl stop sshd ; systemctl enable sshd
 
 
@@ -299,7 +301,7 @@ mkdir -m 0700 -p /home/packer/.ssh ; chown -R packer /home/packer
 ##chmod 0440 /etc/sudoers.d/99_packernopasswd
 
 
-#sed -i "/^[^#].*requiretty/ s|^|#|" /etc/sudoers
+#sed -i '/^[^#].*requiretty/ s|^|#|' /etc/sudoers
 cat << EOF | EDITOR="tee -a" visudo -f /etc/sudoers.d/99_wheelnopasswd
 #Defaults:%wheel !requiretty
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL
@@ -313,7 +315,7 @@ sed -i 's|SELINUX=.*$|SELINUX=permissive|' /etc/sysconfig/selinux
 sestatus ; sleep 5
 
 
-${DNFCMD} clean -y packages
+${DNFCMD} -y clean packages
 
 exit
 
@@ -330,22 +332,22 @@ set -x
 
 pkg_list="shim-* grub2-* efibootmgr"
 
-${DNFCMD} check-update -y
+${DNFCMD} -y check-update
 
 if [ \$(echo ${RELEASE} | grep -e '-stream') ] ; then
-  ${DNFCMD} install -y centos-release-kmods ;
-  ${DNFCMD} check-update -y ;
-  ${DNFCMD} install -y centos-release-kmods-kernel-6.6 ;
-  ${DNFCMD} update -y ;
-  ${DNFCMD} install -y kernel kernel-core kernel-modules kernel-tools kernel-tools-libs ;
-  ${DNFCMD} install -y kernel-devel ;
+  ${DNFCMD} --skip-broken -y install centos-release-kmods ;
+  ${DNFCMD} -y check-update ;
+  ${DNFCMD} --skip-broken -y install centos-release-kmods-kernel-6.12 || ${DNFCMD} --skip-broken -y install centos-release-kmods-kernel ;
+  ${DNFCMD} -y update ;
+  ${DNFCMD} --skip-broken -y install kernel kernel-core kernel-modules kernel-tools kernel-tools-libs ;
+  ${DNFCMD} --skip-broken -y install kernel-devel ;
 else
   ## Use EL release kernel packages (avoid dkms build errors)
-  #${DNFCMD} --enablerepo=epel install -y kernel kernel-devel ;
-  #${DNFCMD} install -y kernel kernel-devel kernel-core kernel-modules ;
-  ${DNFCMD} install -y elrepo-release ; ${DNFCMD} check-update -y ;
-  ${DNFCMD} install --enablerepo=elrepo-kernel -y kernel-lt kernel-lt-core kernel-lt-modules kernel-lt-tools kernel-lt-tools-libs ;
-  ${DNFCMD} install --enablerepo=elrepo-kernel -y kernel-lt-devel ;
+  #${DNFCMD} --enablerepo=epel --skip-broken -y install kernel kernel-devel ;
+  #${DNFCMD} --skip-broken -y install kernel kernel-devel kernel-core kernel-modules ;
+  ${DNFCMD} --skip-broken -y install elrepo-release ; ${DNFCMD} -y check-update ;
+  ${DNFCMD} --enablerepo=elrepo-kernel --skip-broken -y install kernel-lt kernel-lt-core kernel-lt-modules kernel-lt-tools kernel-lt-tools-libs ;
+  ${DNFCMD} --enablerepo=elrepo-kernel --skip-broken -y install kernel-lt-devel ;
 fi
 
 if [ "x86_64" = "${UNAME_M}" ] ; then
@@ -353,19 +355,17 @@ if [ "x86_64" = "${UNAME_M}" ] ; then
 fi
 #pkg_list="\${pkg_list} dracut-tools dracut-config-generic dracut-config-rescue"
 
-for pkgX in \${pkg_list} ; do
-  ${DNFCMD} install -y \${pkgX} ;
-done
+${DNFCMD} --skip-broken -y install \${pkg_list}
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
-  ${DNFCMD} remove -y linux-firmware iwl*-firmware ;
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
+  ${DNFCMD} -y remove linux-firmware iwl*-firmware ;
 fi
 
 #kver="\$(ls -A /lib/modules/ | tail -1)" # ?? or uname -r
 if [ \$(echo ${RELEASE} | grep -e '-stream') ] ; then
-  kver=\$(${DNFCMD} list -y --installed kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1) ;
+  kver=\$(${DNFCMD} -y --installed list kernel | sed -n 's|kernel[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1) ;
 else
-  kver=\$(${DNFCMD} list -y --installed kernel-lt | sed -n 's|kernel-lt[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1) ;
+  kver=\$(${DNFCMD} -y --installed list kernel-lt | sed -n 's|kernel-lt[a-z0-9._]*[ ]*\([^ ]*\)[ ]*.*$|\1|p' | tail -n1) ;
 fi
 echo \${kver} ; sleep 5
 
@@ -377,17 +377,17 @@ mkdir -p /etc/dracut.conf.d
 modprobe vfat ; lsmod | grep -e fat ; sleep 5
 
 if [ "zfs" = "${VOL_MGR}" ] ; then
-  #${DNFCMD} install -y dracut-tools dracut-config-generic dracut-config-rescue ;
+  #${DNFCMD} --skip-broken -y install dracut-tools dracut-config-generic dracut-config-rescue ;
 
-  ${DNFCMD} install -y https://zfsonlinux.org/epel/zfs-release-2-3.el\${VERSION_MAJOR}.noarch.rpm ;
-  ${DNFCMD} install -y https://zfsonlinux.org/epel/zfs-release-2-3\$(rpm --eval "%{dist}").noarch.rpm ;
+  ${DNFCMD} --skip-broken -y install https://zfsonlinux.org/epel/zfs-release-2-3.el\${VERSION_MAJOR}.noarch.rpm ;
+  ${DNFCMD} --skip-broken -y install https://zfsonlinux.org/epel/zfs-release-2-3\$(rpm --eval "%{dist}").noarch.rpm ;
   #rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-zfsonlinux ;
   #rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-openzfs ;
 
-  ${DNFCMD} repolist -y ; sleep 5 ;
+  ${DNFCMD} -y repolist ; sleep 5 ;
 
-  #${DNFCMD} --enablerepo=epel,zfs-kmod --disablerepo=zfs install -y zfs zfs-dracut ;
-  ${DNFCMD} --enablerepo=epel,zfs install -y zfs ;
+  #${DNFCMD} --enablerepo=epel,zfs-kmod --disablerepo=zfs --skip-broken -y install zfs zfs-dracut ;
+  ${DNFCMD} --enablerepo=epel,zfs --skip-broken -y install zfs ;
   sleep 3 ;
 
   mkdir -p /etc/dkms ; echo REMAKE_INITRD=yes > /etc/dkms/zfs.conf ;
@@ -414,15 +414,15 @@ if [ "zfs" = "${VOL_MGR}" ] ; then
   echo zfs > /etc/modules-load.d/zfs.conf ; # ??
 
   echo "Hold zfs & kernel package upgrades (require manual upgrade)" ;
-  #${DNFCMD} versionlock -y add zfs zfs-dkms zfs-dracut kernel kernel-core \
+  #${DNFCMD} -y versionlock add zfs zfs-dkms zfs-dracut kernel kernel-core \
   #  kernel-modules kernel-tools kernel-tools-libs kernel-devel kernel-headers ;
-  ${DNFCMD} versionlock -y add zfs zfs-dkms zfs-dracut kernel kernel-* ;
-  ${DNFCMD} versionlock -y list ; sleep 3 ;
+  ${DNFCMD} -y versionlock add zfs zfs-dkms zfs-dracut kernel kernel-* ;
+  ${DNFCMD} -y versionlock list ; sleep 3 ;
 elif [ "btrfs" = "${VOL_MGR}" ] ; then
-  ${DNFCMD} --enablerepo=epel install -y btrfs-progs ;
+  ${DNFCMD} --enablerepo=epel --skip-broken -y install btrfs-progs ;
   modprobe btrfs ; modinfo btrfs | grep -e name -e version -e vermagic ; sleep 5 ;
 elif [ "lvm" = "${VOL_MGR}" ] ; then
-  ${DNFCMD} install -y lvm2 ;
+  ${DNFCMD} --skip-broken -y install lvm2 ;
   # cryptsetup
   modprobe dm-mod ; lvm version ; vgscan ; vgchange -ay ; lvs ; sleep 5 ;
 fi
@@ -463,8 +463,8 @@ GRUB_DISABLE_RECOVERY="false"
 
 EOF
 
-#sed -ie "s|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|" /etc/default/grub
-#sed -ie "/GRUB_DEFAULT/ s|=.*$|=saved|" /etc/default/grub
+#sed -ie 's|^GRUB_TIMEOUT=.*$|GRUB_TIMEOUT=1|' /etc/default/grub
+#sed -ie '/GRUB_DEFAULT/ s|=.*$|=saved|' /etc/default/grub
 #echo "GRUB_SAVEDEFAULT=true" >> /etc/default/grub
 #echo "#GRUB_CMDLINE_LINUX='cryptdevice=/dev/sda2:cryptroot'" >> /etc/default/grub
 sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|^\(.*\)$|#\1\n\1|' /etc/default/grub
@@ -480,7 +480,7 @@ elif [ "lvm" = "${VOL_MGR}" ] ; then
   echo 'GRUB_PRELOAD_MODULES="lvm"' >> /etc/default/grub ;
 fi
 
-if [ "\$(dmesg | grep -ie 'Hypervisor detected')" ] ; then
+if [ "\$(dmesg | grep -iE 'kvm|qemu|hypervisor')" ] ; then
   sed -ie '/^GRUB_CMDLINE_LINUX_DEFAULT/ s|="\(.*\)"|="\1 net.ifnames=0 biosdevname=0"|' /etc/default/grub ;
 fi
 grub2-mkconfig -o /boot/grub2/grub.cfg
@@ -496,10 +496,10 @@ else
 fi
 efibootmgr -v ; sleep 3
 
-${DNFCMD} install -y mkpasswd
+${DNFCMD} --skip-broken -y install mkpasswd
 mkpasswd -m help ; sleep 10
 
-${DNFCMD} clean -y all
+${DNFCMD} -y clean all
 
 exit
 

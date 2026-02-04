@@ -24,8 +24,8 @@ config_nftables() {
   cp -n /etc/nftables.conf.new /etc/nftables.conf
   # ##########
   #diff -s /etc/nftables.conf /etc/nftables.conf.new
-  ##(sleep 120 && nft flush ruleset)& && nft -f /etc/nftables.conf
-  #nft -f /etc/nftables.conf
+  #(sleep 120 && nft flush ruleset)& \
+  #  nft -f /etc/nftables.conf
 
   #if [ -z "$(grep -e 'domain.*mdns' /etc/nftables.conf /etc/nftables/out*_nftables.conf)" ] ; then
   #  #nft add rule inet filter in_allow udp port { domain, mdns } accept ;

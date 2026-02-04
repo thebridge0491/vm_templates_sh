@@ -49,6 +49,7 @@ EOF
   fi ;
 done
 
+mkdir -p /usr/local/etc
 for fileX in /var/cron/tabs/root /etc/crontab /usr/local/etc/anacrontab \
     /usr/pkg/etc/anacrontab ; do
   cp -an ${fileX} ${fileX}.orig ;
@@ -75,7 +76,7 @@ echo "02  6-22    *   *   *   root    /usr/local/sbin/anacron -s" > \
 for fileX in /var/cron/tabs/root /etc/crontab /usr/local/etc/anacrontab \
     /usr/pkg/etc/anacrontab /etc/cron.d/periodic /etc/cron.d/anacron ; do
   if [ ! 'FreeBSD' = "$(uname -s)" ] ; then
-    ${sed_inplace} "s|periodic \([daiwekmonth]*ly\)|/bin/sh /etc/\1|" ${fileX} ;
+    ${sed_inplace} "s|nice periodic \([daiwekmonth]*ly\)|nice /bin/sh /etc/\1|" ${fileX} ;
     if [ 'NetBSD' = "$(uname -s)" ] ; then
       ${sed_inplace} "s|/usr/local/sbin|/usr/pkg/sbin|" ${fileX} ;
     fi ;

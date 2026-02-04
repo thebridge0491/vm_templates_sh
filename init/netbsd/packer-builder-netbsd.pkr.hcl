@@ -38,12 +38,12 @@ variable "qemudisk_interface_x64" {
 
 variable "qemu_firmware_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_CODE.fd"
+  default = "/usr/share/OVMF/OVMF_CODE.4m.fd"
 }
 
 variable "qemu_nvram_x64" {
   type    = string
-  default = "/usr/share/OVMF/OVMF_VARS.fd"
+  default = "/usr/share/OVMF/OVMF_VARS.4m.fd"
 }
 
 variable "qemudisk_interface_aa64" {
@@ -229,8 +229,7 @@ build {
     inline = ["mkdir -p ${var.home}/.ssh/publish_krls ${var.home}/.pki/publish_crls",
       "cp -a ${var.home}/.ssh/publish_krls init/common/skel/_ssh/",
       "cp -a ${var.home}/.pki/publish_crls init/common/skel/_pki/",
-      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}",
-      "mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.REL}"]
+      "tar -cf /tmp/scripts_${var.variant}.tar init/common init/${var.variant} -C scripts ${var.variant}"]
   }
   provisioner "file" {
     destination = "/tmp/scripts.tar"
@@ -260,18 +259,20 @@ build {
     execute_command  = "chmod +x {{.Path}} ; env {{.Vars}} sh -c {{.Path}}"
     inline           = ["cd /tmp",
       "sh init/common/collect_osinfo.sh collect_all"]
-    only             = ["qemu.guest_vm"]
+    except             = ["qemu.guest_vm"]
   }
   provisioner "file" {
     destination = "output-vms/collect_osinfo/vm_init/${var.variant}/"
     direction   = "download"
     generated   = true
-    only        = ["qemu.guest_vm"]
+    except        = ["qemu.guest_vm"]
     source      = "/tmp/info.tar"
   }
   provisioner "shell-local" {
-    inline = ["cd output-vms/collect_osinfo/vm_init/${var.variant}",
-      "tar -xf info.tar -C ${local.build_timestamp}#${var.REL} && rm info.tar"]
+    inline = ["mkdir -p output-vms/collect_osinfo/vm_init/${var.variant}/${local.build_timestamp}#${var.RELEASE}",
+      "cd output-vms/collect_osinfo/vm_init/${var.variant}",
+      "tar -xf info.tar -C ${local.build_timestamp}#${var.RELEASE} && rm info.tar"]
+    except        = ["qemu.guest_vm"]
   }
 
   post-processor "checksum" {
