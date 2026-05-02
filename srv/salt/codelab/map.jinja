@@ -9,7 +9,7 @@
 {% endfor %}
 {% load_yaml as defaultdict %}
   default:
-    #pkgs_lang_py = {{salt['cmd.shell']('. /root/scripts/distro_pkgs.ini ; echo ${pkgs_lang_py}', shell='/bin/sh')}}
+    {#pkgs_lang_py = {{salt['cmd.shell']('. /root/scripts/distro_pkgs.ini ; echo ${pkgs_lang_py}', shell='/bin/sh')}}#}
     {#distro_pkgs: {{salt['ini.get_ini']('/root/scripts/distro_pkgs.ini')}}#}
     distro_pkgs: {{dict_distropkgs}}
     langs: py c java

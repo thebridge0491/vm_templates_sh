@@ -1,32 +1,5 @@
-{% set autoconfirm = salt['pillar.get']('state1', {}).get('autoconfirm', 'NO') %}
-{% if (autoconfirm|to_bool) %}
-  {% set arch_s = grains.cpuarch %}
-  {% set rel = grains.osrelease %}
-  {% set setVer = grains.osrelease|replace('.', '') %}
-  {% for setX in ['xbase'] %}
-{#'Fetch & extract missing distribution sets like: {{setX}}*.tgz':
-  archive.extracted:
-    - name: /
-    - source: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
-    - skip_verify: True
-    - options: pz#}
-
-'Fetch, then extract missing distribution sets like: {{setX}}*.tgz':
-  file.managed:
-    - name: '/tmp/{{setX}}{{setVer}}.tgz'
-    - source: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
-    - skip_verify: True
-  {#archive.extracted:
-    - name: /
-    - source: '/tmp/{{setX}}{{setVer}}.tgz'
-    - options: pz#}
-	{% endfor %}
-
-{#sysmerge updates:
-  cmd.run:
-    #- shell: /bin/sh
-    - name: sysmerge#}
-{% endif %}
+{#{% set distrosets = ["xbase"] %}
+{% include 'common/fetch_distrosets.sls' %}#}
 
 {% for item in ['daily', 'weekly', 'monthly'] %}
 '/etc/{{item}}.orig':
@@ -40,6 +13,8 @@ disable mail output from /etc/daily:
     - name: /etc/daily
     - pattern: '^([^#].*mail .*daily insecurity output.*)$'
     - repl: '#\1'
+
+redirect mail output for /etc/daily:
   file.replace:
     - name: /etc/daily
     - pattern: '^([^#].*)mail .*daily output.*$'
@@ -64,6 +39,9 @@ Ensure run dbus-uuidgen in /etc/rc.local:
     #- repl: '/usr/local/bin/dbus-uuidgen --ensure=/etc/machine-id'
     - repl: '/usr/local/bin/dbus-uuidgen --ensure'
     - append_if_not_found: True
+
+mdnsd:
+  service.enabled
 
 config mdns daemon flags:
   cmd.run:

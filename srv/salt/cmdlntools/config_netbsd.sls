@@ -1,26 +1,5 @@
-{% set autoconfirm = salt['pillar.get']('state1', {}).get('autoconfirm', 'NO') %}
-{% if (autoconfirm|to_bool) %}
-  {% set uname_m = grains.cpuarch %}
-  {% set rel = grains.osrelease %}
-  {% for setX in ['xbase'] %}
-{#'Fetch & extract missing distribution sets like: {{setX}}.tar.xz':
-  archive.extracted:
-    - name: /
-    - source: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
-    - skip_verify: True
-    - options: pJ#}
-
-'Fetch, then extract missing distribution sets like: {{setX}}.tar.xz':
-  file.managed:
-    - name: '/tmp/{{setX}}.tar.xz'
-    - source: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
-    - skip_verify: True
-  {#archive.extracted:
-    - name: /
-    - source: '/tmp/{{setX}}.tar.xz'
-    - options: pJ#}
-	{% endfor %}
-{% endif %}
+{#{% set distrosets = ["xbase"] %}
+{% include 'common/fetch_distrosets.sls' %}#}
 
 {% for item in ['/var/run/dbus', '/var/db/dbus'] %}
 {{item}}:
@@ -60,6 +39,14 @@ change daily security mail output to log file:
     - name: /etc/daily
     - pattern: '^(.*)(mail .*daily insecurity output.*)$'
     - repl: '\1#\2\n\1cat $SECOUT > /var/log/security.out'
+
+Ensure run dbus-uuidgen in /etc/rc.local:
+  file.replace:
+    - name: /etc/rc.local
+    - pattern: '.*dbus-uuidgen.*'
+    #- repl: '/usr/pkg/bin/dbus-uuidgen --ensure=/var/lib/dbus/machine-id'
+    - repl: '/usr/pkg/bin/dbus-uuidgen --ensure'
+    - append_if_not_found: True
 
 {#
 group cups:

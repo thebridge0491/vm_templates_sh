@@ -117,7 +117,8 @@
     pkgclean_cmd: pkgin -y clean
     {#idsuffix_result: {{salt['sysctl.get']('machdep.dmi.system-uuid', '0000')[-4:]}}#}
     #idsuffix_cmd: (/sbin/sysctl -n machdep.dmi.system-uuid || printf '0%.0s' {1..36}) | cut -b33-36
-    idsuffix_cmd: test -n "`/sbin/sysctl -n machdep.dmi.system-uuid`" && /sbin/sysctl -n machdep.dmi.system-uuid | cut -b33-36 || echo 0000
+    #idsuffix_cmd: test -n "`/sbin/sysctl -n machdep.dmi.system-uuid`" && /sbin/sysctl -n machdep.dmi.system-uuid | cut -b33-36 || echo 0000
+    idsuffix_cmd: test -e /var/lib/dbus/machine-id && cat /var/lib/dbus/machine-id | cut -b29-32 || echo 0000
     firewall_tool: pf
     smtp_daemon: postfix
     hostname_chgfiles: [/etc/hosts, /etc/rc.conf]
@@ -131,7 +132,7 @@
     pkgclean_cmd: true
     {#idsuffix_result: {{salt['sysctl.get']('hw.uuid', '0000')[-4:]}}#}
     #idsuffix_cmd: (sysctl -n hw.uuid || printf '0%.0s' {1..36}) | cut -b33-36
-    idsuffix_cmd: test -n "`sysctl -n hw.uuid`" && sysctl -n hw.uuid | cut -b33-36 || echo 0000
+    #idsuffix_cmd: test -n "`sysctl -n hw.uuid 2>/dev/null`" && sysctl -n hw.uuid | cut -b33-36 || echo 0000
     firewall_tool: pf
     smtp_daemon: smtpd
     hostname_chgfiles: [/etc/hosts, /etc/myname]

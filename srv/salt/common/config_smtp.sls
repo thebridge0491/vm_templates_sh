@@ -73,7 +73,7 @@ Backup old user mail directories:
         match from local for local ! rcpt-to "root" action "local_maildir"
 
     - insert_before_match: '^action "local" mbox'
-    - append_if_not_found: True
+    #- append_if_not_found: True
   {% else %}
 'Add "local_maildir" maildir in {{path_conf}} ({{grains["kernel"]|lower}})':
   file.blockreplace:
@@ -83,7 +83,7 @@ Backup old user mail directories:
         match for local ! rcpt-to "root" action "local_maildir"
 
     - insert_before_match: '^action "local" mbox'
-    - append_if_not_found: True
+    #- append_if_not_found: True
   {% endif %}
 
 Backup old user mail directories:
@@ -100,9 +100,15 @@ Backup old user mail directories:
   file.directory:
     - user: packer
     - group: wheel
+    - mode: 0700
   {% else %}
+/var/spool/mail/packer:
+  file.directory:
+    - user: packer
+    - mode: 0700
+
     {% for item in ['cur', 'new', 'tmp'] %}
-'/var/mail/packer/{{item}}':
+'/var/spool/mail/packer/{{item}}':
   file.directory:
     - user: packer
     - group: mail
@@ -156,6 +162,7 @@ Backup old user mail directories:
   file.directory:
     - user: packer
     - group: wheel
+    - mode: 0700
   {% endif %}#}
 
   {% if grains['kernel']|lower == 'linux' %}
@@ -163,9 +170,10 @@ Backup old user mail directories:
   file.directory:
     - user: postfix
     - group: postfix
+    - mode: 0700
   {% endif %}
 
-  {% if variant in ['mageia', 'pclinuxos'] %}
+  {% if grains['os_family']|lower in ['mageia', 'pclinuxos'] %}
 Symlink /var/spool/mail/postfix to /var/spool/mail/root:
   file.symlink:
     - name: /var/spool/mail/root

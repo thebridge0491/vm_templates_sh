@@ -8,3 +8,4 @@ guest#01:
 #    grains:
 #      variant: freebsd
 #      osrelease: rolling
+#      virtual: vm

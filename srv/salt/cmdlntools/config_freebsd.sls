@@ -1,26 +1,5 @@
-{% set autoconfirm = salt['pillar.get']('state1', {}).get('autoconfirm', 'NO') %}
-{% if (autoconfirm|to_bool) %}
-  {% set uname_m = grains.cpuarch %}
-  {% set release = grains.osrelease ~ '-RELEASE' %}
-  {% for setX in ['src'] %}
-{#'Fetch & extract missing distribution components like: {{setX}}.txz':
-  archive.extracted:
-    - name: /
-    - source: 'ftp://ftp.freebsd.org/pub/FreeBSD/releases/{{uname_m}}/{{release}}/{{setX}}.txz'
-    - skip_verify: True
-    - options: zv#}
-
-'Fetch, then extract missing distribution components ({{setX}}.txz)':
-  file.managed:
-    - name: '/tmp/{{setX}}.txz'
-    - source: 'ftp://ftp.freebsd.org/pub/FreeBSD/releases/{{uname_m}}/{{release}}/{{setX}}.txz'
-    - skip_verify: True
-  {#archive.extracted:
-    - name: /
-    - source: '/tmp/{{setX}}.txz'
-    - options: zv#}
-	{% endfor %}
-{% endif %}
+{#{% set distrosets = ["src"] %}
+{% include 'common/fetch_distrosets.sls' %}#}
 
 {% for item in ['/boot/loader.conf', '/etc/rc.conf'] %}
 'touch {{item}}':

@@ -7,8 +7,12 @@
     - grains.ls: #}
 
 {#{% set dict1 = salt['slsutil.merge']({'init': ''}, salt['grains.items']().keys()|zip(salt['grains.items']().values())) %} #}
-{% set secs_uptime = salt['status.uptime']()['seconds'] %}
-{% set last_boot = salt['cmd.shell']('who -b', shell='/bin/sh') %}
+{#{% set days_uptime = (salt['status.uptime']()['seconds']/(24*60*60))|round(2) %}#}
+{% if grains['os_family']|lower in ['openbsd'] %}
+  {% set last_boot = salt['cmd.shell']('who | head -n1', shell='/bin/sh') %}
+{% else %}
+  {% set last_boot = salt['cmd.shell']('who -b', shell='/bin/sh') %}
+{% endif %}
 brief Salt grains:
 {% set state1_items = pillar.get('state1', {}).get('items', 'kernel,kernelrelease,kernelversion,os_family,osrelease,lsb_distrib_id,lsb_distrib_codename,cpuarch,nodename,init,saltversion,pythonversion') %}
 {% set dict1 = salt['slsutil.merge']({'init': ''}, salt['grains.item'](*state1_items.split(','))) %}
@@ -18,7 +22,7 @@ brief Salt grains:
   #  - text: "{{dict1|dictsort|map('join', ': ')|list|join(',\\n')}}"
   module.run:
     - test.echo:
-      - text: 'last boot: {{last_boot}}'
+      - text: '{{grains['id']}}: (last boot: {{last_boot}})'
     #- grains.items:
     - grains.item: {{state1_items.split(',')}}
 

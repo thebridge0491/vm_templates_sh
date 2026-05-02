@@ -38,7 +38,7 @@
 '{{varsdict.sudoersd_dir}}':
   file.directory
 
-{% if variant in ['debian'] %}
+{% if grains['os_family']|lower in ['debian'] %}
   {% for item in {'rexp': '^[^#].*requiretty'
      , 'line': '#Defaults:%sudo !requiretty'}
      , {'rexp': '^.*%sudo.*ALL.*NOPASSWD.*'
@@ -168,8 +168,8 @@ touch /etc/ssh/sshd_config.d/99-custom.conf:
      , {'rexp': '^@cert-authority 172.16.* ', 'linepfx': '@cert-authority 172.16.0.0/12'}
      , {'rexp': '^@cert-authority 10.0.* ', 'linepfx': '@cert-authority 10.0.0.0/8'}
      , {'rexp': '^@cert-authority fd00.* ', 'linepfx': '@cert-authority fd00::/8'} %}#}
-  {% for item in {'rexp': '^@cert-authority 192.168.* '
-     , 'linepfx': '@cert-authority 192.168.0.0/16'} %}
+  {% for item in [ {'rexp': '^@cert-authority 192.168.* '
+     , 'linepfx': '@cert-authority 192.168.0.0/16'} ] %}
 'Edit {{item.rexp}} to {{item.linepfx}}':
   file.replace:
     - name: {{varsdict.skeldir_ssh}}/known_hosts

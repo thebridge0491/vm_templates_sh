@@ -6,12 +6,12 @@ Config firewall pf:
         sh /root/init/common/firewall/bsd/config_pf.sh #config_pf allow
         #diff -s /etc/pf.conf /etc/pf.conf.new ; sleep 5
 
-Enable firewall pf:
+{#Enable firewall pf:
   cmd.run:
     #- shell: /bin/sh
     - name: |
-        #(sleep 120 && /sbin/pfctl -d)& && /sbin/pfctl -e
-        /sbin/pfctl -e
+        (sleep 120 && /sbin/pfctl -d)& \
+          /sbin/pfctl -e#}
 
 /etc/pf/outallow_in_allow.rules:
   file.replace:
@@ -35,8 +35,8 @@ Enable firewall ufw & allow mdns traffic:
   cmd.run:
     #- shell: /bin/sh
     - name: |
-        #(sleep 120 && ufw disable)& && ufw enable
-        ufw enable
+        #(sleep 120 && ufw disable)& \
+        #  ufw enable
         ufw allow in svc MDNS
 
 Display firewall info:
@@ -60,11 +60,9 @@ Enable firewall iptables[-nft]:
   cmd.run:
     #- shell: /bin/sh
     - name: |
-        #(sleep 120 && (iptables-nft -F ; iptables-nft -X ; ip6tables-nft -F ; \
-        #  ip6tables-nft -X))& && \
-        #  (iptables-nft-restore /etc/iptables/iptables.rules ; \
-        #  ip6tables-nft-restore /etc/iptables/ip6tables.rules)
-        (iptables-nft-restore /etc/iptables/iptables.rules ;
+        (sleep 120 && (iptables-nft -F ; iptables-nft -X ; ip6tables-nft -F ; \
+          ip6tables-nft -X))& \
+          (iptables-nft-restore /etc/iptables/iptables.rules ; \
           ip6tables-nft-restore /etc/iptables/ip6tables.rules)
 
 /etc/ipset.conf:
@@ -92,8 +90,8 @@ Enable firewall nftables:
   cmd.run:
     #- shell: /bin/sh
     - name: |
-        #(sleep 120 && nft flush ruleset)& && nft -f /etc/nftables.conf
-        nft -f /etc/nftables.conf
+        (sleep 120 && nft flush ruleset)& \
+          nft -f /etc/nftables.conf
 
   {# {% set found_confs = salt['file.find']('/etc', name='.*nftables.conf') | default([]) %} #}
   {% set out_confs = salt['cmd.shell']('find /etc -name "[outalwdeny_]*nftables.conf"', shell='/bin/sh').split() %}
@@ -118,28 +116,35 @@ Config firewall firewalld:
     - name: |
         sh /root/init/common/firewall/linux/config_firewalld.sh #cmds_firewalld allow
 
-Enable firewall firewalld:
+{#Enable firewall firewalld:
   cmd.run:
     #- shell: /bin/sh
     - name: |
-        #(sleep 120 && firewall-offline-cmd --disabled)& && \
-        #  (firewall-offline-cmd --enabled ; firewall-cmd --reload)
-        firewall-offline-cmd --enabled ; firewall-cmd --reload
+        (sleep 120 && firewall-offline-cmd --disabled)& \
+          (firewall-cmd --reload ; firewall-offline-cmd --enabled)#}
 
 Allow mdns traffic in firewall public zone:
+  {% if not salt['sys.list_functions']('firewalld.present') %}
+  cmd.run:
+    #- shell: /bin/sh
+    - name: firewall-cmd --permanent --zone=public --add-service=mdns
+  {% else %}
   firewalld.present:
     - name: public
     - services: ['mdns']
+  {% endif %}
 
 Display firewall info:
-  #cmd.run:
-  #  #- shell: /bin/sh
-  #  - name: |
-  #      firewall-cmd --get-active-zones ; sleep 5
-  #      #ipset list ; sleep 5
-  #      firewall-cmd --state ; sleep 5 ; firewall-cmd --zone=public --list-all ; sleep 5
-
+  {% if not salt['sys.list_functions']('firewalld.list_all') %}
+  cmd.run:
+    #- shell: /bin/sh
+    - name: |
+        firewall-cmd --get-active-zones ; sleep 5
+        #ipset list ; sleep 5
+        firewall-cmd --state ; sleep 5 ; firewall-cmd --zone=public --list-all ; sleep 5
+  {% else %}
   module.run:
-    - firewalld.list_all
+    - firewalld.list_all:
       - zone: public
+  {% endif %}
 {% endif %}

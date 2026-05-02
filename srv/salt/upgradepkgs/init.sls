@@ -3,8 +3,10 @@
      grains['os_family']|lower, grains['os_family'])|lower %}
 
 {% set dateutc = salt['system.get_system_date']('+0000')|strftime('%Y%m%d') %}
-{% set snapshot_name = salt['pillar.get']('state1', {}).get('snapshot_name', grains['os_family']|lower+'_'+grains['osrelease']+'-'+dateutc) %}
+{% set snapshot_name = salt['pillar.get']('state1', {}).get('snapshot_name', variant+'_'+grains['osrelease']+'-'+dateutc) %}
+{% if grains['kernel']|lower not in ['netbsd', 'openbsd'] %}
 {% include 'upgradepkgs/snapshot.sls' %}
+{% endif %}
 
 {% if variant in ['archlinux'] %}
 Service pamac stopped & path /var/lib/pacman/db.lck absent:
@@ -22,20 +24,28 @@ Service pamac stopped & path /var/lib/pacman/db.lck absent:
     - append_if_not_found: True
 {% endif %}
 
+{% if grains['kernel']|lower != 'openbsd' %}
 Refresh pkg db:
-  {% if not salt['sys.list_functions']('pkg.refresh_db') %}
+  {#{% if not salt['sys.list_functions']('pkg.refresh_db') %}#}
+  {% if 'pkg.refresh_db' not in salt['sys.list_functions']() %}
     {% if variant == 'pclinuxos' %}
   cmd.run:
     #- shell: /bin/sh
     - name: apt-get -y update
+    {% else %}
+  module.run:
+    - test.echo:
+      - text: 'Not needed'
     {% endif %}
   {% else %}
   module.run:
     - pkg.refresh_db:
   {% endif %}
+{% endif %}
 
 List repos:
-  {% if not salt['sys.list_functions']('pkg.list_repos') %}
+  {#{% if not salt['sys.list_functions']('pkg.list_repos') %}#}
+  {% if 'pkg.list_repos' not in salt['sys.list_functions']() %}
   cmd.run:
     #- shell: /bin/sh
     - name: {{varsdict.pkgrepos_cmd}}
@@ -45,7 +55,8 @@ List repos:
   {% endif %}
 
 List outdated packages:
-  {% if not salt['sys.list_functions']('pkg.list_upgrades') %}
+  {#{% if not salt['sys.list_functions']('pkg.list_upgrades') %}#}
+  {% if 'pkg.list_upgrades' not in salt['sys.list_functions']() %}
   cmd.run:
     #- shell: /bin/sh
     - name: {{varsdict.pkgoutdated_cmd}}
@@ -80,14 +91,17 @@ Upgrade packages:
   pkg.uptodate
   {% endif %}
 
+{% set name_task = 'install nano' %}
+{#{% set pkgs_var = 'pkgUnknown nano pkgMissing zip' %}#}
 #include:
-#  - upgradepkgs.nano
-{% include 'upgradepkgs/nano.sls' %}
+#  - common.installpkgs
+{% include 'common/installpkgs.sls' %}
 
+{% if grains['kernel']|lower not in ['netbsd', 'openbsd'] %}
 List pkg locks:
   {% set funcs_lock = salt['sys.list_functions']('pkg.list_locked', 'pkg.list_locks'
       , 'pkg.list_holds', 'pkg.get_selections') %}
-  {% if not funcs_lock and variant not in ['netbsd', 'openbsd'] %}
+  {% if not funcs_lock %}
   cmd.run:
     #- shell: /bin/sh
     - name: {{varsdict.pkglocks_cmd}}
@@ -102,17 +116,7 @@ List pkg locks:
     - {{funcs_lock[0]}}:
     {% endif %}
   {% endif %}
-
-Clean pkg cache:
-  {% if not salt['sys.list_functions']('pkg.clean') %}
-  cmd.run:
-    #- shell: /bin/sh
-    - name: {{varsdict.pkgclean_cmd}}
-  {% else %}
-  module.run:
-    - pkg.clean:
-      - clean_all: True
-  {% endif %}
+{% endif %}
 
 
 {#{% if grains['kernel']|lower in ['freebsd'] %}#}
@@ -145,7 +149,6 @@ Dist-upgrade packages:
     - dist_upgrade: True
 {% endif %}
 
-
 {% if grains['kernel']|lower in ['linux'] %}
   {% set found_result = salt['file.find']('/usr', name='qemu-bridge-helper') %}
   {% if [] != found_result %}
@@ -156,3 +159,15 @@ Re-set setuid for qemu-bridge-helper:
     - mode: 4755
   {% endif %}
 {% endif %}
+
+Clean pkg cache:
+  {#{% if not salt['sys.list_functions']('pkg.clean') %}#}
+  {% if 'pkg.clean' not in salt['sys.list_functions']() %}
+  cmd.run:
+    #- shell: /bin/sh
+    - name: {{varsdict.pkgclean_cmd}}
+  {% else %}
+  module.run:
+    - pkg.clean:
+      - clean_all: True
+  {% endif %}

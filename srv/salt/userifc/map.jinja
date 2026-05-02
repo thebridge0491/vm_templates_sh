@@ -10,15 +10,13 @@
 {% set desktop = pillar.get(tpldot, {}).get('desktop', 'xfce') %}
 {% load_yaml as defaultdict %}
   default:
-    #pkgs_displaysvr = {{salt['cmd.shell']('. /root/scripts/distro_pkgs.ini ; echo ${pkgs_displaysvr}', shell='/bin/sh')}}
+    {#pkgs_displaysvr = {{salt['cmd.shell']('. /root/scripts/distro_pkgs.ini ; echo ${pkgs_displaysvr}', shell='/bin/sh')}}#}
     {#distro_pkgs: {{salt['ini.get_ini']('/root/scripts/distro_pkgs.ini')}}#}
     distro_pkgs: {{dict_distropkgs}}
-    desktop: xfce
-    xorgconfd_dir: /etc/X11/xorg.conf.d
+    desktop: lxqt
     etcdir_xdg: /etc/xdg
   FreeBSD:
     pkgclean_cmd: ASSUME_ALWAYS_YES=yes pkg clean -y
-    xorgconfd_dir: /usr/local/etc/X11/xorg.conf.d
     etcdir_xdg: /usr/local/etc/xdg
   Void:
     pkgclean_cmd: xbps-remove -Ooy
@@ -34,17 +32,17 @@
     pkgclean_cmd: zypper --no-refresh --non-interactive clean --all
   RedHat:
     pkgclean_cmd: dnf -C -y clean all
+    desktop: kde
   'CentOS Stream':
     pkgclean_cmd: dnf -C -y clean all
+    desktop: kde
   Mageia:
     pkgclean_cmd: dnf -C -y clean all
   NetBSD:
     pkgclean_cmd: pkgin -y clean
-    xorgconfd_dir: /usr/pkg/etc/X11/xorg.conf.d
   #  etcdir_xdg: /usr/pkg/etc/xdg
   OpenBSD:
     pkgclean_cmd: true
-  #  xorgconfd_dir: /usr/local/etc/X11/xorg.conf.d
   #  etcdir_xdg: /usr/local/etc/xdg
   PCLinuxOS:
     pkgclean_cmd: apt-get -y clean

@@ -10,37 +10,32 @@ snapshot:
   {% set voltypeX = df_found.split()[1] %}
   {#{% if 'zfs' == voltypeX and grains['os_family']|lower in ['freebsd'] %}#}
   {% if 'zfs' == voltypeX and grains['kernel']|lower in ['freebsd', 'linux'] %}
-  {#cmd.run:
+  {#zfs.snapshot_present:
+    - name: "{{dev_root}}@{{snapshot_name | default('snap1-'+dateutc)}}"
+  module.run:
+    #}{#- zfs.snapshot:
+      - snapshot: "{{dev_root}}@{{snapshot_name | default('snap1-'+dateutc)}}"#}{#
+    - zfs.list:
+      - type: snapshot#}
+  cmd.run:
     #- shell: /bin/sh
     - name: |
         zfs snapshot {{dev_root}}@{{snapshot_name | default('snap1-'+dateutc)}}
 
         zfs list -t snapshot
-    #}
-  zfs.snapshot_present:
-    - name: "{{dev_root}}@{{snapshot_name | default('snap1-'+dateutc)}}"
-  module.run:
-    {#- zfs.snapshot:
-      - snapshot: "{{dev_root}}@{{snapshot_name | default('snap1-'+dateutc)}}"#}
-    - zfs.list:
-      - type: snapshot
   {% elif 'btrfs' == voltypeX and grains['kernel']|lower in ['linux'] %}
-  {#cmd.run:
-    #- shell: /bin/sh
-    - name: |
-        btrfs subvolume snapshot / /.snapshots/{{snapshot_name | default('snap1-'+dateutc)}}
-
-        #btrfs filesystem show ; fstrim -av
-        btrfs subvolume list -s / ; fstrim -av
-    #}
-  module.run:
+  {#module.run:
     - btrfs.subvolume_snapshot:
       - source: /
       - dest: /.snapshots
       - name: "{{snapshot_name | default('snap1-'+dateutc)}}"
     #- btrfs.subvolume_list:
     #  - path: /
-    #  - snapshots: True
+    #  - snapshots: True#}
+  cmd.run:
+    #- shell: /bin/sh
+    - name: |
+        btrfs subvolume snapshot / /.snapshots/{{snapshot_name | default('snap1-'+dateutc)}}
   cmd.run:
     #- shell: /bin/sh
     - name: |
@@ -60,17 +55,16 @@ snapshot:
     {% set voltypeX = df_found.split()[1] or lsblk_found.split()[1] %}
     {% if 'lvm' == voltypeX %}
       {% set grp_lv = dev_root.split('/')[3] %}
-  {#cmd.run:
-    #- shell: /bin/sh
-    - name: |
-        lvcreate --snapshot --size 2G --name {{snapshot_name | default('snap1-'+dateutc)}} {{grp_lv.replace('-', '/')}}
-    #}
-  module.run:
+  {#module.run:
     - lvm.lvcreate:
       - lvname: "{{snapshot_name | default('snap1-'+dateutc)}}"
       - vgname: "{{grp_lv.split('-')[0]}}"
       - snapshot: "{{grp_lv.split('-')[1]}}"
-      - size: 2G
+      - size: 2G#}
+  cmd.run:
+    #- shell: /bin/sh
+    - name: |
+        lvcreate --snapshot --size 2G --name {{snapshot_name | default('snap1-'+dateutc)}} {{grp_lv.replace('-', '/')}}
   cmd.run:
     #- shell: /bin/sh
     - name: lvs -S 'lv_attr =~ ^s' || lvs ; fstrim -av

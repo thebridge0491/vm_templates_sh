@@ -15,7 +15,7 @@
   {% if grains['kernel']|lower == 'freebsd' %}
     {% set dailycleantmp_file = '/etc/periodic/daily/999.cleantmp' %}
   {% elif grains['kernel']|lower == 'linux' %}
-    {% if variant == 'alpine' %}
+    {% if grains['os_family']|lower == 'alpine' %}
       {% set dailycleantmp_file = '/etc/periodic/daily/900cleantmp' %}
     {% else %}
       {% set dailycleantmp_file = '/etc/cron.daily/900cleantmp' %}
@@ -77,7 +77,7 @@
     - mode: 0755
     - append_if_not_found: True
       {% if grains['kernel']|lower in ['netbsd'] %}
-Change /usr/local/sbin -> /usr/pkg/sbin (netbsd):
+Change /usr/local/sbin -> /usr/pkg/sbin (netbsd) {{item}}:
   file.replace:
     - name: '/etc/{{item}}/local'
     - pattern: '/usr/local/sbin'
@@ -85,6 +85,9 @@ Change /usr/local/sbin -> /usr/pkg/sbin (netbsd):
       {% endif %}
     {% endif %}
   {% endfor %}
+
+/usr/local/etc:
+  file.directory
 
   {% for item in ['/var/cron/tabs/root', '/etc/crontab'
      , '/usr/local/etc/anacrontab', '/usr/pkg/etc/anacrontab'] %}
@@ -121,7 +124,7 @@ Change /usr/local/sbin -> /usr/pkg/sbin (netbsd):
 Config /usr/pkg/etc/anacrontab:
   file.blockreplace:
     - name: /usr/pkg/etc/anacrontab
-    - content: {{tail_anacrontab.split('\n')}}
+    - content: {{tail_anacrontab|json}}
     - append_if_not_found: True
   {% elif grains['kernel']|lower in ['freebsd', 'openbsd'] %}
 /usr/local/etc/anacrontab:
@@ -132,7 +135,7 @@ Config /usr/pkg/etc/anacrontab:
 Config /usr/local/etc/anacrontab:
   file.blockreplace:
     - name: /usr/local/etc/anacrontab
-    - content: {{tail_anacrontab.split('\n')}}
+    - content: {{tail_anacrontab|json}}
     - append_if_not_found: True
   {% endif %}
 
@@ -153,7 +156,7 @@ touch /etc/crontab:
 Config /var/cron/tabs/root:
   file.blockreplace:
     - name: /var/cron/tabs/root
-    - content: {{tail_crontabroot.split('\n')}}
+    - content: {{tail_crontabroot|json}}
     - append_if_not_found: True
 #}
 
@@ -162,7 +165,7 @@ Config /etc/cron.d/periodic:
   file.blockreplace:
     # name: /etc/cron.d/periodic | /etc/crontab
     - name: /etc/cron.d/periodic
-    - content: {{tail_crondperiodic.split('\n')}}
+    - content: {{tail_crondperiodic|json}}
     - append_if_not_found: True
 
 Config /etc/cron.d/anacron:
@@ -179,8 +182,8 @@ Config /etc/cron.d/anacron:
 'Change periodic daily|weekly|monthly -> /bin/sh /etc/daily|weekly|monthly{{item}}':
   file.replace:
     - name: {{item}}
-    - pattern: 'periodic ([daiwekmonth]*ly)'
-    - repl: '/bin/sh /etc/\1'
+    - pattern: 'nice periodic ([daiwekmonth]*ly)'
+    - repl: 'nice /bin/sh /etc/\1'
       {% if grains['kernel']|lower == 'netbsd' %}
 'Change /usr/local/sbin -> /usr/pkg/sbin (netbsd) {{item}}':
   file.replace:
@@ -205,7 +208,7 @@ Config /etc/cron.d/anacron:
 #    - name: sh /root/init/common/cron/linux/config_cron.sh
 
   {% for item in ['daily', 'weekly', 'monthly'] %}
-    {% if variant == 'alpine' %}
+    {% if grains['os_family']|lower == 'alpine' %}
 'Config /etc/periodic/{{item}}/0anacron':
   file.managed:
     - name: '/etc/periodic/{{item}}/0anacron'
@@ -232,7 +235,7 @@ Config /etc/cron.d/anacron:
     {% endif %}
   {% endfor %}
 
-  {% if variant == 'alpine' %}
+  {% if grains['os_family']|lower == 'alpine' %}
 /etc/periodic/daily/999dailystats:
   file.copy:
     - source: /root/init/common/cron/linux/cron_daily_999dailystats.sample
@@ -256,7 +259,7 @@ Config /etc/cron.d/anacron:
 
   {% for item in ['/var/spool/cron/root', '/var/spool/cron/crontabs/root'
      , '/etc/crontab', '/etc/anacrontab'] %}
-    {% if variant == 'alpine' %}
+    {% if grains['os_family']|lower == 'alpine' %}
 'Comment /etc/periodic/daily|weekly|monthly {{item}}':
   file.replace:
     - name: {{item}}
@@ -268,7 +271,7 @@ Config /etc/cron.d/anacron:
     - name: {{item}}
     - pattern: '^([^#].*cron\.[daiwekmonth]*ly.*)$'
     - repl: '#\1'
-      {% if variant == 'suse' %}
+      {% if grains['os_family']|lower == 'suse' %}
 comment run-crons (suse) {{item}}:
   file.replace:
     - name: {{item}}
@@ -287,7 +290,7 @@ comment run-crons (suse) {{item}}:
 Config /etc/anacrontab:
   file.blockreplace:
     - name: /etc/anacrontab
-    - content: {{tail_anacrontab.split('\n')}}
+    - content: {{tail_anacrontab|json}}
     - append_if_not_found: True
 
 /etc/crontab:
@@ -302,12 +305,12 @@ touch /etc/crontab:
   file.touch:
     - name: /etc/crontab
 
-  {% if variant == 'alpine' %}
+  {% if grains['os_family']|lower == 'alpine' %}
     {% set tail_crontabroot = salt['file.read']('/root/init/common/cron/linux/crontab_roottail.sample') %}
 Config /var/cron/tabs/root:
   file.blockreplace:
     - name: /var/spool/cron/crontabs/root
-    - content: {{tail_crontabroot.split('\n')}}
+    - content: {{tail_crontabroot|json}}
     - append_if_not_found: True
 
 Config /etc/periodic/hourly/0anacron:
@@ -324,9 +327,9 @@ Config /etc/periodic/hourly/0anacron:
     {% set tail_crondperiodic = salt['file.read']('/root/init/common/cron/linux/crond_periodic.sample') %}
 Config /etc/cron.d/periodic:
   file.blockreplace:
-    # name: /etc/cron.d/periodic | /etc/crontab
+    {# name: /etc/cron.d/periodic | /etc/crontab #}
     - name: /etc/cron.d/periodic
-    - content: {{tail_crondperiodic.split('\n')}}
+    - content: {{tail_crondperiodic|json}}
     - append_if_not_found: True
 
 {#Config /etc/cron.hourly/0anacron:
@@ -351,12 +354,12 @@ Config /etc/cron.d/anacron:
   {% set out_runpartscmd = salt['cmd.shell']('run-parts --help | grep -e "--report" || true', shell='/bin/sh') %}
   {% for item in ['/var/spool/cron/root', '/var/spool/cron/crontabs/root'
      , '/etc/crontab', '/etc/anacrontab', '/etc/cron.d/periodic'] %}
-    {% if variant == 'alpine' %}
+    {% if grains['os_family']|lower == 'alpine' %}
 'Change /etc/cron.{job} -> /etc/periodic/{job} (alpine) {{item}}':
   file.replace:
     - name: {{item}}
-    - pattern: '/etc/cron.([daiwekmonth]*ly)'
-    - repl: '/etc/periodic/\1'
+    - pattern: 'run-parts /etc/cron.([daiwekmonth]*ly)'
+    - repl: 'run-parts /etc/periodic/\1'
     {% endif %}
 
     {% if '' != out_runpartscmd %}

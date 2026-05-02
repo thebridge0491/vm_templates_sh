@@ -11,3 +11,5 @@ roster_defaults:
 #    osrelease: rolling
   user: packer
   sudo: True
+timeout: 300
+#ssh_args: -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
