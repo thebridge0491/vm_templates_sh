@@ -1,44 +1,8 @@
 ---
 
-- name: "Fetch missing distribution components? Enter 'yes' to continue [yesNO]:"
-  pause:
-    prompt: |
-      Do you want to fetch missing distribution components?
-      Enter 'yes' to continue, else stop playbook [yesNO]:
-  register: response_fetch
-  when: not (autoconfirm | default(false))|bool
-
-- block:
-  #- name: 'Fetch & extract missing distribution components like: src.txz'
-  #  unarchive:
-  #    remote_src: true
-  #    src: 'ftp://ftp.freebsd.org/pub/FreeBSD/releases/{{uname_m}}/{{release}}-RELEASE/{{setX}}.txz'
-  #    dest: /
-  #    extra_opts: [-z, -v]
-  #  ignore_errors: true
-  #  loop: [src]
-  #  loop_control: {"loop_var": "setX"}
-
-  - block:
-    - name: 'Fetch, then extract missing distribution components like: src.txz'
-      get_url:
-        url: 'ftp://ftp.freebsd.org/pub/FreeBSD/releases/{{uname_m}}/{{release}}-RELEASE/{{setX}}.txz'
-        dest: '/tmp/{{setX}}.txz'
-      ignore_errors: true
-      loop: [src]
-      loop_control: {"loop_var": "setX"}
-    #- unarchive:
-    #    remote_src: true
-    #    src: '/tmp/{{setX}}.txz'
-    #    dest: /
-    #    extra_opts: [-z, -v]
-    #  ignore_errors: true
-    #  loop: [src]
-    #  loop_control: {"loop_var": "setX"}
-  when: (autoconfirm | default(false) or response_fetch.user_input | default(false))|bool
-  vars:
-    uname_m: '{{ansible_facts.get("machine")}}'
-    release: '{{ansible_facts.get("distribution_version")}}'
+#- block:
+#  - set_fact: cacheable=false distrosets=["src"]
+#  - include_tasks: common/fetch_distrosets.yml
 
 - file: path={{item}} state=touch
   loop: [/boot/loader.conf, /etc/rc.conf]

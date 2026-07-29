@@ -1,0 +1,122 @@
+---
+
+- file: path=/etc/profile.d state=directory
+  ignore_errors: true
+
+- stat: path='/etc/profile'
+  ignore_errors: true
+  register: etcprofile_st
+
+- shell: |
+    if [ ! -e /etc/profile ] ; then
+      cat << EOF > /etc/profile ;
+    if [ -d /etc/profile.d ] ; then
+      for i in /etc/profile.d/*.sh ; do
+        if [ -r "${i}" ] ; then
+          . "${i}" ;
+        fi ;
+      done ;
+      unset i ;
+    fi
+
+    EOF
+      chmod +x /etc/profile ;
+    fi
+
+  ignore_errors: true
+  when: not etcprofile_st.stat.exists
+
+- shell: java -version
+  register: out_java
+  ignore_errors: true
+
+#- find:
+#    #paths: /bin, /usr/bin, /usr/local/bin, /usr/pkg/bin
+#    paths: /
+#    recurse: true
+#    patterns: 'java'
+#  register: found_result
+
+- block:
+  - shell: |
+      #dirname $(dirname $(realpath $(which java)))
+      realpath $(which java) | sed "s:/bin/java::"
+    register: out_javahome
+
+  #- lineinfile:
+  #    path: /etc/csh.cshrc
+  #    state: present
+  #    regexp: '^setenv JAVA_HOME.*'
+  #    line: "'setenv JAVA_HOME '~out_javahome.stdout_lines[0]"
+  #  ignore_errors: true
+  #  when: ansible_facts.get("env")["SHELL"] is search("csh")
+
+  #- lineinfile:
+  #    path: /etc/bash.bashrc
+  #    state: present
+  #    regexp: '^export JAVA_HOME.*'
+  #    line: "'export JAVA_HOME='~out_javahome.stdout_lines[0]"
+  #  ignore_errors: true
+  #  when: ansible_facts.get("env")["SHELL"] is search("bash")
+
+  #- lineinfile:
+  #    path: /etc/ksh.kshrc
+  #    state: present
+  #    regexp: '^export JAVA_HOME.*'
+  #    line: "'export JAVA_HOME='~out_javahome.stdout_lines[0]"
+  #  ignore_errors: true
+  #  when: ansible_facts.get("env")["SHELL"] is search("ksh")
+
+  - lineinfile:
+      path: /etc/profile.d/jdk.sh
+      state: present
+      create: true
+      mode: '+x'
+      regexp: '^export JAVA_HOME.*'
+      #line: 'export JAVA_HOME={{out_javahome.stdout_lines[0]}}'
+      line: "'export JAVA_HOME='~out_javahome.stdout_lines[0]"
+    ignore_errors: true
+
+  #- file: follow=true path=/etc/profile.d/jdk.sh mode='+x'
+  #  ignore_errors: true
+
+  - lineinfile:
+      path: /etc/fstab
+      state: present
+      regexp: '^fdesc'
+      line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
+    ignore_errors: true
+    when: ansible_facts.get('system')|lower != 'linux'
+
+  # PATH_TO_FX location varies: # try find javafx[-.]fxml*.jar
+  #  [/usr/lib/jvm/java-[N]-openjfx|/opt/javafx-sdk-[N]]/lib: Arch Linux, Gluon download
+  #  /usr/local/openjfx[N]/lib: FreeBSD
+  #  /usr/share/openjfx: Debian
+  - find:
+      paths: /usr, /opt
+      patterns: 'javafx[-.]fxml.*.jar'
+      recurse: true
+    register: found_jfxjar
+
+  - shell: find /usr /opt -name "javafx[-.]fxml*.jar" | head -n1
+    ignore_errors: true
+    register: out_jfxjar
+
+  - lineinfile:
+      path: /etc/profile.d/jdk.sh
+      state: present
+      create: true
+      mode: '+x'
+      regexp: '^export PATH_TO_FX.*'
+      #line: 'export PATH_TO_FX={{((found_jfxjar.files | json_query("[*].path"))[0] | default("/usr/lib/jvm/java-11-openjfx/lib/javafx.fxml.jar"))|dirname)}}'
+      line: 'export PATH_TO_FX={{(out_jfxjar.stdout_lines[0] | default("/usr/lib/jvm/java-11-openjfx/lib/javafx.fxml.jar"))|dirname}}'
+    ignore_errors: true
+  when: not out_java.get('failed', false)
+  #when: 0 != found_result.matched
+
+- include_tasks: '{{cfgfile}}'
+  with_first_found:
+    - files:
+      - 'codelab/config_{{variant}}.yml'
+      skip: True
+  loop_control: {"loop_var": "cfgfile"}

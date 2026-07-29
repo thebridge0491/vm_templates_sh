@@ -1,0 +1,20 @@
+---
+
+- block:
+  - set_fact: cacheable=false name_task='toggle coding lab related service(s)'
+  - set_fact: cacheable=false svcs_enabled='{{distro_pkgs.labservices_enabled}}'
+  - set_fact: cacheable=false svcs_disabled='{{distro_pkgs.labservices_disabled}}'
+  - include_tasks: common/togglesvcs.yml
+
+- block:
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' clean=true
+    register: out
+    when: pkg_mgr in ['apt', 'pkgin', 'apt_rpm']
+
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    shell: '{{pkgclean_cmd}}'
+    ignore_errors: true
+    register: out
+    when: pkg_mgr not in ['apt', 'pkgin', 'apt_rpm']
+  - debug: var=out.stdout_lines

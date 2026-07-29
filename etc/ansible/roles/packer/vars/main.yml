@@ -6,7 +6,7 @@ variant: "{{({'Artix Linux': 'Archlinux', 'Arch Linux': 'Archlinux', 'openSUSE T
 
 dateutc: "{{'%Y%m%d' | strftime(utc=true)}}"
 distro_pkgs: {'pkgs_cmdln_tools': '', 'services_enabled': '', 'services_disabled': '',
-  'pkgs_displaysvr': '', 'uiservices_enabled_xfce': '', 'uiservices_disabled_xfce': '',
+  'pkgs_xorg_addons': '', 'uiservices_enabled_xfce': '', 'uiservices_disabled_xfce': '',
   'pkgs_deskenv_xfce': '', 'labservices_enabled': '', 'labservices_disabled': '',
   'pkgs_lang_py': '', 'pkgs_lang_c': '', 'pkgs_lang_java': ''}
 
@@ -31,8 +31,7 @@ printname: "{{lookup('env', 'PRINTNAME') or 'printer1'}}"
 etcdir_cups: /etc/cups
 cupsdir_ppd: /usr/share/cups/model
 
-desktop: xfce
-xorgconfd_dir: /etc/X11/xorg.conf.d
+desktop: lxqt
 etcdir_xdg: /etc/xdg
 
 langs: py c java

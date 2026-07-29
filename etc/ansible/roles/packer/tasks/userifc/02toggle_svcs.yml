@@ -1,0 +1,25 @@
+---
+
+- block:
+  - name: "Set graphical.target default for systemd"
+    shell: systemctl set-default graphical.target
+    ignore_errors: true
+    when: service_mgr == 'systemd'
+
+  - set_fact: cacheable=false name_task='toggle user interface related service(s) ({{desktop}})'
+  - set_fact: cacheable=false svcs_enabled='{{distro_pkgs.get("uiservices_enabled_"+desktop, "")}}'
+  - set_fact: cacheable=false svcs_disabled='{{distro_pkgs.get("uiservices_disabled_"+desktop, "")}}'
+  - include_tasks: common/togglesvcs.yml
+
+- block:
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' clean=true
+    register: out
+    when: pkg_mgr in ['apt', 'pkgin', 'apt_rpm']
+
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    shell: '{{pkgclean_cmd}}'
+    ignore_errors: true
+    register: out
+    when: pkg_mgr not in ['apt', 'pkgin', 'apt_rpm']
+  - debug: var=out.stdout_lines

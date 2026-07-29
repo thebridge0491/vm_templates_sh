@@ -30,5 +30,4 @@ skel_shellrc: /usr/share/skel/dot.shrc
 etcdir_cups: /usr/local/etc/cups
 cupsdir_ppd: /usr/local/share/cups/model
 
-xorgconfd_dir: /usr/local/etc/X11/xorg.conf.d
 etcdir_xdg: /usr/local/etc/xdg

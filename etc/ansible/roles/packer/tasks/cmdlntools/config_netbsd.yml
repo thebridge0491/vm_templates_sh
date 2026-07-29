@@ -1,44 +1,8 @@
 ---
 
-- name: "Fetch missing distribution sets? Enter 'yes' to continue [yesNO]:"
-  pause:
-    prompt: |
-      Do you want to fetch missing distribution sets?
-      Enter 'yes' to continue, else stop playbook [yesNO]:
-  register: response_fetch
-  when: not (autoconfirm | default(false))|bool
-
-- block:
-#  - name: 'Fetch & extract missing distribution sets like: xbase.tar.xz'
-#    unarchive:
-#      remote_src: true
-#      src: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
-#      dest: /
-#      extra_opts: [-p, -J]
-#    ignore_errors: true
-#    loop: [xbase]
-#    loop_control: {"loop_var": "setX"}
-
-  - block:
-    - name: 'Fetch, then extract missing distribution sets like: xbase.tar.xz'
-      get_url:
-        url: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
-        dest: '/tmp/{{setX}}.tar.xz'
-      ignore_errors: true
-      loop: [xbase]
-      loop_control: {"loop_var": "setX"}
-    #- unarchive:
-    #    remote_src: true
-    #    src: '/tmp/{{setX}}.tar.xz'
-    #    dest: /
-    #    extra_opts: [-p, -J]
-    #  ignore_errors: true
-    #  loop: [xbase]
-    #  loop_control: {"loop_var": "setX"}
-  when: (autoconfirm | default(false) or response_fetch.user_input | default(false))|bool
-  vars:
-    uname_m: '{{ansible_facts.get("machine")}}'
-    rel: '{{ansible_facts.get("distribution_version")}}'
+#- block:
+#  - set_fact: cacheable=false distrosets=["xbase"]
+#  - include_tasks: common/fetch_distrosets.yml
 
 - block:
   - file: path={{item}} state=directory
@@ -70,6 +34,16 @@
       regexp: '^(.*)(mail .*daily insecurity output.*)$'
       replace: '\1#\2\n\1cat $SECOUT > /var/log/security.out'
     ignore_errors: true
+
+- lineinfile:
+    path: /etc/rc.local
+    state: present
+    create: true
+    mode: 'ugo+x'
+    regexp: '.*dbus-uuidgen.*'
+    #line: '/usr/pkg/bin/dbus-uuidgen --ensure=/var/lib/dbus/machine-id'
+    line: '/usr/pkg/bin/dbus-uuidgen --ensure'
+  ignore_errors: true
 
 #- block:
 #  - group: name=cups gid=193 system=true state=present

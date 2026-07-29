@@ -1,20 +1,23 @@
 ---
 
-- block:
-  - file: path=/usr/local/etc/X11/xorg.conf.d state=directory
-    ignore_errors: true
+#- block:
+#  - set_fact: cacheable=false distrosets=["src", "ports"]
+#  - include_tasks: common/fetch_distrosets.yml
 
-  - shell: "cp -an /usr/local/share/X11/xorg.conf.d/{{confX}} /usr/local/etc/X11/xorg.conf.d/"
+- block:
+  - community.general.sysrc: name={{item.flagX}} value='{{item.valX}}' state={{item.stateX}} path='/boot/loader.conf'
     ignore_errors: true
-    loop: [10-evdev.conf, 40-libinput.conf]
-    loop_control: {"loop_var": "confX"}
+    loop: [{'flagX': 'utouch_load', 'valX': 'YES', 'stateX': 'present'}
+          ]
+    when: ansible_facts.get("virtualization_role") == 'guest'
 
   - community.general.sysrc: name={{item.flagX}} value='{{item.valX}}' state={{item.stateX}}
     ignore_errors: true
-    loop: [{'flagX': 'wpa_supplicant_progam', 'valX': '/usr/local/sbin/wpa_supplicant', 'stateX': 'present'}
+    loop: [{'flagX': 'wpa_supplicant_program', 'valX': '/usr/local/sbin/wpa_supplicant', 'stateX': 'present'}
           # kld_list+=i915kms # i915kms | amdgpu
           , {'flagX': 'kld_list', 'valX': 'i915kms', 'stateX': 'value_present'}
           ]
+    when: ansible_facts.get("virtualization_role") != 'guest'
 
   - lineinfile:
       path: /boot/loader.conf
@@ -35,16 +38,72 @@
     loop: [{rexp: '^LANG=.*', line: 'LANG=en_US.UTF-8 ; export LANG'},
       {rexp: '^CHARSET=.*', line: 'CHARSET=UTF-8 ; export CHARSET'}]
 
-## /usr/local/etc/X11/xorg.conf.d/20-[intel|radeon|scfb].conf
-#- copy:
-#    dest: /usr/local/etc/X11/xorg.conf.d/20-intel.conf
-#    #mode: 'ugo+x'
-#    force: false
-#    content: |
-#      Section "Device"
-#        Identifier "Card0"
-#        Driver "intel" # intel | radeon | scfb
-#        #BusID "PCI:0:2:0"
-#      EndSection
-#
-#  ignore_errors: true
+
+- stat: path=/usr/local/share/X11/xorg.conf.d
+  ignore_errors: true
+  register: xorgconfd_dir_st
+
+- block:
+  - file: path=/usr/local/etc/X11/xorg.conf.d state=directory
+    ignore_errors: true
+
+  - shell: "cp -an /usr/local/share/X11/xorg.conf.d/{{confX}} /usr/local/etc/X11/xorg.conf.d/"
+    ignore_errors: true
+    loop: [10-evdev.conf, 40-libinput.conf]
+    loop_control: {"loop_var": "confX"}
+
+  - copy:
+      dest: /usr/local/etc/X11/xorg.conf.d/20-scfb.conf
+      #mode: 'ugo+x'
+      force: false
+      content: |
+        Section "Device"
+          Identifier "Card0"
+          Driver "scfb"
+          #BusID "PCI:0:2:0"
+        EndSection
+
+    ignore_errors: true
+    when: ansible_facts.get("virtualization_role") == 'guest'
+
+  # /usr/local/etc/X11/xorg.conf.d/20-[intel|radeon|scfb].conf
+  - copy:
+      dest: /usr/local/etc/X11/xorg.conf.d/20-intel.conf
+      #mode: 'ugo+x'
+      force: false
+      content: |
+        #Section "Device"
+        #  Identifier "Card0"
+        #  Driver "intel" # intel | radeon | scfb
+        #  #BusID "PCI:0:2:0"
+        #EndSection
+
+    ignore_errors: true
+    when: ansible_facts.get("virtualization_role") != 'guest'
+
+  - copy:
+      dest: /usr/local/etc/X11/xorg.conf.d/10-modesetting.conf
+      #mode: 'ugo+x'
+      force: false
+      content: |
+        #Section "Device"
+        #  Identifier "Card0"
+        #  Driver "modesetting"
+        #  #BusID "PCI:0:2:0"
+        #EndSection
+
+    ignore_errors: true
+
+  #- shell: sh /root/init/common/misc_config.sh cfg_xorgtouchpad /usr/local/etc/X11/xorg.conf.d
+  #  ignore_errors: true
+
+  - lineinfile:
+      path: '/usr/local/etc/X11/xorg.conf.d/{{confX}}'
+      state: present
+      insertafter: '^[^#]\s*MatchIsTouchpad.*'
+      regexp: '.*Option "Tapping" "on".*'
+      line: '       Option "Tapping" "on"'
+    ignore_errors: true
+    loop: [10-evdev.conf, 40-libinput.conf]
+    loop_control: {"loop_var": "confX"}
+  when: xorgconfd_dir_st.stat.exists and xorgconfd_dir_st.stat.isdir

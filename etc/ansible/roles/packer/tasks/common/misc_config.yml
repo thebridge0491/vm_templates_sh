@@ -50,7 +50,7 @@
     loop: [{rexp: '^[^#].*requiretty', line: '#Defaults:%sudo !requiretty'},
       {rexp: '^.*%sudo.*ALL.*NOPASSWD.*', line: '%sudo ALL=(ALL:ALL) NOPASSWD: ALL'}
       ]
-    when: variant in ['debian']
+    when: ansible_facts.get('os_family')|lower in ['debian']
 
   - lineinfile:
       path: "{{sudoersd_dir + '/99_wheelnopasswd'}}"
@@ -62,7 +62,7 @@
     loop: [{rexp: '^[^#].*requiretty', line: '#Defaults:%wheel !requiretty'},
       {rexp: '^.*%wheel.*ALL.*NOPASSWD.*', line: '%wheel ALL=(ALL:ALL) NOPASSWD: ALL'}
       ]
-    when: variant not in ['debian']
+    when: ansible_facts.get('os_family')|lower not in ['debian']
 
 - block:
   #- shell: sh /root/init/common/misc_config.sh cfg_inputrc_histsearch
@@ -112,6 +112,7 @@
   - lineinfile:
       path: /etc/ssh/sshd_config
       state: present
+      create: true
       regexp: '^.*Include /etc/ssh/sshd_config.d/\*.conf.*'
       line: 'Include /etc/ssh/sshd_config.d/*.conf'
     ignore_errors: true
@@ -182,8 +183,9 @@
         state: present
         create: true
         regexp: '{{item.rexp}}'
-        #line: '{{item.linepfx}} {{sshca_pubkey.stdout}}'
-        line: '{{item.linepfx}} {{b64_sshca_pubkey|b64decode}}'
+        #line: item.linepfx ~ ' ' ~ sshca_pubkey.stdout
+        #line: '{{item.linepfx}} {{b64_sshca_pubkey|b64decode}}'
+        line: item.linepfx ~ ' ' ~ b64_sshca_pubkey|b64decode
       ignore_errors: true
       loop: [{rexp: '^@cert-authority 192.168.* ', linepfx: '@cert-authority 192.168.0.0/16'}
         #, {rexp: '^@cert-authority 172.16.* ', linepfx: '@cert-authority 172.16.0.0/12'}

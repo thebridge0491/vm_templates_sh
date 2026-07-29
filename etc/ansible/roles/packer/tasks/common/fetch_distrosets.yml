@@ -1,0 +1,133 @@
+---
+
+- block:
+  - name: "Extract after fetch distribution components/sets? Enter 'yes' to continue [yesNO]:"
+    pause:
+      prompt: |
+        Do you want to extract after fetch distribution components/sets?
+        Enter 'yes' to continue, else skip extracting distribution components/sets [yesNO]:
+    register: response_extract
+  when: not (autoextract | default(false))|bool
+
+- block:
+  #- block:
+  #  - name: 'Fetch & extract distribution components like: src.txz'
+  #    unarchive:
+  #      remote_src: true
+  #      src: 'ftp://ftp.freebsd.org/pub/FreeBSD/releases/{{uname_m}}/{{release}}-RELEASE/{{setX}}.txz'
+  #      dest: /
+  #      extra_opts: [-z, -v]
+  #    ignore_errors: true
+  #    # ["src", "ports"]
+  #    loop: '{{distrosets | default(["src"])}}'
+  #    loop_control: {"loop_var": "setX"}
+  #  when: (autoextract | default(false) or response_extract.user_input | default(false))|bool
+
+  - block:
+    - name: 'Fetch, then extract distribution components like: src.txz'
+      get_url:
+        url: 'ftp://ftp.freebsd.org/pub/FreeBSD/releases/{{uname_m}}/{{release}}-RELEASE/{{setX}}.txz'
+        dest: '/tmp/{{setX}}.txz'
+      ignore_errors: true
+      # ["src", "ports"]
+      loop: '{{distrosets | default(["src"])}}'
+      loop_control: {"loop_var": "setX"}
+
+    - unarchive:
+        remote_src: true
+        src: '/tmp/{{setX}}.txz'
+        dest: /
+        extra_opts: [-z, -v]
+      ignore_errors: true
+      # ["src", "ports"]
+      loop: '{{distrosets | default(["src"])}}'
+      loop_control: {"loop_var": "setX"}
+      when: (autoextract | default(false) or response_extract.user_input | default(false))|bool
+  vars:
+    uname_m: '{{ansible_facts.get("machine")}}'
+    release: '{{ansible_facts.get("distribution_version")}}'
+  when: ansible_facts.get('system')|lower == 'freebsd'
+
+- block:
+  #- block:
+  #  - name: 'Fetch & extract distribution sets like: xbase.tar.xz'
+  #    unarchive:
+  #      remote_src: true
+  #      src: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
+  #      dest: /
+  #      extra_opts: [-p, -J]
+  #    ignore_errors: true
+  #    # ["xbase", "xserver", "xfont", "xetc"]
+  #    loop: '{{distrosets | default(["xbase"])}}'
+  #    loop_control: {"loop_var": "setX"}
+  #  when: (autoextract | default(false) or response_extract.user_input | default(false))|bool
+
+  - block:
+    - name: 'Fetch, then extract distribution sets like: xbase.tar.xz'
+      get_url:
+        url: 'http://cdn.netbsd.org/pub/NetBSD/NetBSD-{{rel}}/{{uname_m}}/binary/sets/{{setX}}.tar.xz'
+        dest: '/tmp/{{setX}}.tar.xz'
+      ignore_errors: true
+      # ["xbase", "xserver", "xfont", "xetc"]
+      loop: '{{distrosets | default(["xbase"])}}'
+      loop_control: {"loop_var": "setX"}
+
+    - unarchive:
+        remote_src: true
+        src: '/tmp/{{setX}}.tar.xz'
+        dest: /
+        extra_opts: [-p, -J]
+      ignore_errors: true
+      # ["xbase", "xserver", "xfont", "xetc"]
+      loop: '{{distrosets | default(["xbase"])}}'
+      loop_control: {"loop_var": "setX"}
+      when: (autoextract | default(false) or response_extract.user_input | default(false))|bool
+  vars:
+    uname_m: '{{ansible_facts.get("machine")}}'
+    rel: '{{ansible_facts.get("distribution_version")}}'
+  when: ansible_facts.get('system')|lower == 'netbsd'
+
+- block:
+  #- block:
+  #  - name: 'Fetch & extract distribution sets like: xbase*.tgz'
+  #    unarchive:
+  #      remote_src: true
+  #      src: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
+  #      dest: /
+  #      extra_opts: [-p, -z]
+  #    ignore_errors: true
+  #    # ["xbase", "xserv", "xfont", "xshare"]
+  #    loop: '{{distrosets | default(["xbase"])}}'
+  #    loop_control: {"loop_var": "setX"}
+  #  when: (autoextract | default(false) or response_extract.user_input | default(false))|bool
+
+  - block:
+    - name: 'Fetch, then extract distribution sets like: xbase*.tgz'
+      get_url:
+        url: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
+        dest: '/tmp/{{setX}}{{setVer}}.tgz'
+      ignore_errors: true
+      # ["xbase", "xserv", "xfont", "xshare"]
+      loop: '{{distrosets | default(["xbase"])}}'
+      loop_control: {"loop_var": "setX"}
+
+    - unarchive:
+        remote_src: true
+        src: '/tmp/{{setX}}{{setVer}}.tgz'
+        dest: /
+        extra_opts: [-p, -z]
+      ignore_errors: true
+      # ["xbase", "xserv", "xfont", "xshare"]
+      loop: '{{distrosets | default(["xbase"])}}'
+      loop_control: {"loop_var": "setX"}
+      when: (autoextract | default(false) or response_extract.user_input | default(false))|bool
+
+  - name: sysmerge updates
+    shell: sysmerge
+    ignore_errors: true
+    when: (autoextract | default(false) or response_extract.user_input | default(false))|bool
+  vars:
+    arch_s: '{{ansible_facts.get("machine")}}'
+    rel: '{{ansible_facts.get("distribution_version")}}'
+    setVer: '{{ansible_facts.get("distribution_version")|replace(".", "")}}'
+  when: ansible_facts.get('system')|lower == 'openbsd'

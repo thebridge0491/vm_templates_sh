@@ -1,0 +1,42 @@
+---
+
+- block:
+  - name: '{{name_task}}'
+    package: use='{{pkg_mgr}}' name='{{pkgs_commasep}}' state=present extra_args_precommand='--ignore-unknown'
+    ignore_errors: true
+    when: pkg_mgr == 'zypper'
+
+  - name: '{{name_task}}'
+    package: use='{{pkg_mgr}}' name='{{pkgs_commasep}}' state=present skip_broken=true
+    ignore_errors: true
+    when: pkg_mgr == 'dnf'
+
+  - block:
+    - name: '{{name_task}}'
+      package: use='{{pkg_mgr}}' name='{{pkgs_commasep}}' state=present extra_args="--needed --noconfirm"
+      ignore_errors: true
+      register: out1
+
+    - name: 'retry failed {{name_task}}'
+      package: use='{{pkg_mgr}}' name='{{item}}' state=present extra_args="--needed --noconfirm"
+      ignore_errors: true
+      loop: '{{pkgs_list}}'
+      when: out1.get('failed', false)
+    when: pkg_mgr == 'pacman'
+
+  - block:
+    - name: '{{name_task}}'
+      package: use='{{pkg_mgr}}' name='{{pkgs_commasep}}' state=present
+      ignore_errors: true
+      register: out0
+
+    - name: 'retry failed {{name_task}}'
+      package: use='{{pkg_mgr}}' name='{{item}}' state=present
+      ignore_errors: true
+      loop: '{{pkgs_list}}'
+      when: out0.get('failed', false)
+    when: pkg_mgr not in ['pacman', 'zypper', 'dnf']
+  vars:
+    name_task: '{{name_task | default("install packages")}}'
+    pkgs_commasep: '{{(pkgs_var | default("pkgUnknown nano pkgMissing zip")).replace(" ", ",")}}'
+    pkgs_list: '{{(pkgs_var | default("pkgUnknown nano pkgMissing zip")).split(" ")}}'

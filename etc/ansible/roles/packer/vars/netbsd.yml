@@ -9,7 +9,8 @@ pkgoutdated_cmd: pkgin -l\< list
 #pkglocks_cmd:
 
 #idsuffix_cmd: (/sbin/sysctl -n machdep.dmi.system-uuid || printf '0%.0s' {1..36}) | cut -b33-36
-idsuffix_cmd: test -n "`/sbin/sysctl -n machdep.dmi.system-uuid`" && /sbin/sysctl -n machdep.dmi.system-uuid | cut -b33-36 || echo 0000
+#idsuffix_cmd: test -n "`/sbin/sysctl -n machdep.dmi.system-uuid`" && /sbin/sysctl -n machdep.dmi.system-uuid | cut -b33-36 || echo 0000
+idsuffix_cmd: test -e /var/lib/dbus/machine-id && cat /var/lib/dbus/machine-id | cut -b29-32 || echo 0000
 
 firewall_tool: pf
 smtp_daemon: postfix
@@ -20,5 +21,4 @@ skel_shellrc: /etc/skel/.shrc
 etcdir_cups: /usr/pkg/etc/cups
 cupsdir_ppd: /usr/pkg/share/cups/model
 
-xorgconfd_dir: /usr/pk/etc/X11/xorg.conf.d
 #etcdir_xdg: /usr/pkg/etc/xdg

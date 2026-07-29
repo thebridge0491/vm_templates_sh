@@ -92,6 +92,8 @@
       when: ansible_facts.get('system')|lower in ['netbsd', 'openbsd']
 
   - block:
+    - file: path=/usr/local/etc state=directory
+
     - copy:
         src: '{{item}}'
         dest: '{{item}}.orig'
@@ -215,8 +217,8 @@
     - block:
       - replace:
           path: '{{item}}'
-          regexp: 'periodic ([daiwekmonth]*ly)'
-          replace: '/bin/sh /etc/\1'
+          regexp: 'nice periodic ([daiwekmonth]*ly)'
+          replace: 'nice /bin/sh /etc/\1'
         ignore_errors: true
         loop: [/var/cron/tabs/root, /etc/crontab, /usr/local/etc/anacrontab
               , /usr/pkg/etc/anacrontab, /etc/cron.d/periodic]
@@ -421,8 +423,8 @@
     - block:
       - replace:
           path: '{{item}}'
-          regexp: '/etc/cron.([daiwekmonth]*ly)'
-          replace: '/etc/periodic/\1'
+          regexp: 'run-parts /etc/cron.([daiwekmonth]*ly)'
+          replace: 'run-parts /etc/periodic/\1'
         ignore_errors: true
         loop: [/var/spool/cron/root, /var/spool/cron/crontabs/root, /etc/crontab
             , /etc/anacrontab, /etc/cron.d/periodic]

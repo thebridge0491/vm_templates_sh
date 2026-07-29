@@ -1,0 +1,133 @@
+---
+
+- block:
+  - name: Set snapshot name
+    set_fact: cacheable=false snapshot_name='{{"pre_codelab-"+dateutc}}'
+
+  - include_tasks: snapshot.yml
+
+- block:
+  - block:
+    - service: name=pamac state=stopped
+      ignore_errors: true
+
+    - file: path=/var/lib/pacman/db.lck state=absent
+      ignore_errors: true
+    when: pkg_mgr == 'pacman'
+
+  - block:
+    - shell: |
+        apt-config dump | grep -we Recommends -e Suggests | sed 's|1|0|' | \
+          tee /etc/apt/apt.conf.d/999norecommends
+      ignore_errors: true
+
+    - lineinfile:
+        path: /etc/apt/apt.conf.d/99force-ipv4
+        state: present
+        create: true
+        regexp: 'Acquire::ForceIPv4.*;'
+        line: '#Acquire::ForceIPv4 "true";'
+      ignore_errors: true
+
+    - lineinfile:
+        path: /etc/apt/apt.conf.d/99retries03
+        state: present
+        create: true
+        regexp: '^Acquire::Retries.*;'
+        line: 'Acquire::Retries "3";'
+      ignore_errors: true
+    when: pkg_mgr in ['apt', 'apt_rpm']
+
+  - block:
+    - lineinfile:
+        path: /etc/zypp/zypp.conf
+        state: present
+        create: true
+        regexp: '.*solver.onlyRequires.*=.*'
+        line: 'solver.onlyRequires = true'
+      ignore_errors: true
+
+    - lineinfile:
+        path: /etc/zypp/zypp.conf
+        state: present
+        create: true
+        regexp: '.*installRecommends.*=.*'
+        line: 'installRecommends = no'
+      ignore_errors: true
+
+    - package: use='{{pkg_mgr}}' name=netcat-openbsd state=absent
+      ignore_errors: true
+    when: pkg_mgr == 'zypper'
+
+  - shell: |
+      dnf --setopt=install_weak_deps=False config-manager --save
+      dnf config-manager --dump | grep -we install_weak_deps
+    ignore_errors: true
+    when: pkg_mgr == 'dnf'
+
+  - block:
+    - name: "Refresh pkg db (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' name=pkg
+      register: out
+      when: pkg_mgr == 'pkgng'
+
+    - name: "Refresh pkg db (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' update_cache=true name=zypper
+      register: out
+      when: pkg_mgr == 'zypper'
+
+    - name: "Refresh pkg db (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' update_cache=true
+      register: out
+      when: pkg_mgr not in ['pkgng', 'zypper', 'openbsd_pkg']
+    - debug: var=out
+
+    - name: "Display coding lab packages (lang: {{langX}})"
+      #shell: |
+      #  . /root/scripts/distro_pkgs.ini
+      #  for langX in ${LANGS} ; do
+      #    echo ${pkgs_lang_${langX}} ;
+      #  done
+      #ignore_errors: true
+      debug: msg={{distro_pkgs.get("pkgs_lang_"+langX, "").split(" ")|to_yaml}}
+      loop: '{{langs.split(" ")}}'
+      loop_control: {"loop_var": "langX"}
+
+- block:
+  - block:
+    - name: "Enter 'yes' to continue [noYES]:"
+      pause:
+        prompt: "Enter 'yes' to continue, else stop playbook [noYES]: "
+      register: response
+
+    - name: "Check autoconfirm or response is 'yes'"
+      #fail: msg="Stopping playbook"
+      meta: end_host
+      when: not (('' == response.get('user_input', '') or response.user_input | default(true))|bool)
+    when: not (autoconfirm | default(true))|bool
+
+  - set_fact: cacheable=false langs_list='{{langs.split(" ")}}'
+
+  - block:
+    - set_fact: cacheable=false name_task='install ({{langs_list[0]}}) coding lab packages'
+    - set_fact: cacheable=false pkgs_var='{{distro_pkgs.get("pkgs_lang_"+langs_list[0], "")}}'
+    - include_tasks: common/installpkgs.yml
+    when: 0 < (langs_list|count)
+
+  - block:
+    - set_fact: cacheable=false name_task='install ({{langs_list[1]}}) coding lab packages'
+    - set_fact: cacheable=false pkgs_var='{{distro_pkgs.get("pkgs_lang_"+langs_list[1], "")}}'
+    - include_tasks: common/installpkgs.yml
+    when: 1 < (langs_list|count)
+
+  - block:
+    - set_fact: cacheable=false name_task='install ({{langs_list[2]}}) coding lab packages'
+    - set_fact: cacheable=false pkgs_var='{{distro_pkgs.get("pkgs_lang_"+langs_list[2], "")}}'
+    - include_tasks: common/installpkgs.yml
+    when: 2 < (langs_list|count)
+
+  - block:
+    - set_fact: cacheable=false name_task='install ({{langs_list[3]}}) coding lab packages'
+    - set_fact: cacheable=false pkgs_var='{{distro_pkgs.get("pkgs_lang_"+langs_list[3], "")}}'
+    - include_tasks: common/installpkgs.yml
+    when: 3 < (langs_list|count)

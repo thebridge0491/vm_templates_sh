@@ -9,7 +9,7 @@ pkgoutdated_cmd: pkg_add -n -u
 #pkglocks_cmd:
 
 #idsuffix_cmd: (sysctl -n hw.uuid || printf '0%.0s' {1..36}) | cut -b33-36
-idsuffix_cmd: test -n "`sysctl -n hw.uuid`" && sysctl -n hw.uuid | cut -b33-36 || echo 0000
+#idsuffix_cmd: test -n "`sysctl -n hw.uuid`" && sysctl -n hw.uuid | cut -b33-36 || echo 0000
 
 firewall_tool: pf
 smtp_daemon: smtpd
@@ -18,5 +18,4 @@ hostname_chgfiles: [/etc/hosts, /etc/myname]
 skel_shellrc: /etc/skel/.shrc
 cupsdir_ppd: /usr/local/share/cups/model
 
-#xorgconfd_dir: /etc/X11/xorg.conf.d
 #etcdir_xdg: /etc/xdg

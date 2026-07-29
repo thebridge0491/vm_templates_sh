@@ -1,6 +1,14 @@
 ---
 
 - block:
+  - name: Set snapshot name
+    set_fact:
+      cacheable: false
+      snapshot_name: '{{variant+"_"+ansible_facts.get("distribution_version")+"-"+dateutc}}'
+
+  - include_tasks: snapshot.yml
+
+- block:
   - block:
     - service: name=pamac state=stopped
       ignore_errors: true
@@ -25,9 +33,14 @@
       when: pkg_mgr == 'pkgng'
 
     - name: "Refresh pkg db (pkg_mgr: {{pkg_mgr}})"
+      package: use='{{pkg_mgr}}' update_cache=true name=zypper
+      register: out
+      when: pkg_mgr == 'zypper'
+
+    - name: "Refresh pkg db (pkg_mgr: {{pkg_mgr}})"
       package: use='{{pkg_mgr}}' update_cache=true
       register: out
-      when: pkg_mgr not in ['pkgng', 'openbsd_pkg']
+      when: pkg_mgr not in ['pkgng', 'zypper', 'openbsd_pkg']
     - debug: var=out
 
   - name: "List repos (pkg_mgr: {{pkg_mgr}})"
@@ -66,7 +79,7 @@
     when: pkg_mgr == 'pkgin'
 
   - name: "Upgrade packages (pkgr_mgr: {{pkg_mgr}})"
-    package: use='{{pkg_mgr}}' name='*' state=latest upgrade=true
+    package: use='{{pkg_mgr}}' name='*' state=latest update_cache=false
     register: out
     when: pkg_mgr == 'apt'
 
@@ -82,7 +95,10 @@
     when: pkg_mgr not in ['xbps', 'pacman', 'apk', 'apt', 'pkgin', 'apt_rpm']
   - debug: var=out.stdout_lines
 
-- include_tasks: nano.yml
+- block:
+  - set_fact: cacheable=false name_task="install nano"
+  #- set_fact: cacheable=false pkgs_var="pkgUnknown nano pkgMissing zip"
+  - include_tasks: common/installpkgs.yml
 
 - name: "List pkg locks (pkg_mgr: {{pkg_mgr}})"
   shell: '{{pkglocks_cmd}}'
@@ -90,19 +106,6 @@
   register: out
   when: pkg_mgr not in ['pkgin', 'openbsd_pkg']
 - debug: var=out.stdout_lines
-
-- block:
-  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
-    package: use='{{pkg_mgr}}' clean=true
-    register: out
-    when: pkg_mgr in ['apt', 'pkgin', 'apt_rpm']
-
-  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
-    shell: '{{pkgclean_cmd}}'
-    ignore_errors: true
-    register: out
-    when: pkg_mgr not in ['apt', 'pkgin', 'apt_rpm']
-  - debug: var=out.stdout_lines
 
 
 - block:
@@ -127,7 +130,7 @@
 
   - block:
     - name: "Dist-upgrade packages (pkg_mgr: {{pkg_mgr}})"
-      package: use='{{pkg_mgr}}' name="*" state=latest upgrade=dist
+      package: use='{{pkg_mgr}}' upgrade=dist
       register: out
       when: pkg_mgr == 'apt'
 
@@ -137,7 +140,6 @@
       when: pkg_mgr == 'zypper'
     - debug: var=out.stdout_lines
     when: pkg_mgr in ['apt', 'zypper']
-
 
 - block:
   - name: "Find file qemu-bridge-helper"
@@ -154,3 +156,16 @@
       mode: u+s
     when: 0 != found_result.matched
   when: ansible_facts.get('system')|lower in ['linux']
+
+- block:
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' clean=true
+    register: out
+    when: pkg_mgr in ['apt', 'pkgin', 'apt_rpm']
+
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    shell: '{{pkgclean_cmd}}'
+    ignore_errors: true
+    register: out
+    when: pkg_mgr not in ['apt', 'pkgin', 'apt_rpm']
+  - debug: var=out.stdout_lines

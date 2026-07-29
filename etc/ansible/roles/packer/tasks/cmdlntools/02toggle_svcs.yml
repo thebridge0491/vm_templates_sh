@@ -1,0 +1,37 @@
+---
+
+- block:
+  - set_fact: cacheable=false name_task='toggle cmdline-tools service(s)'
+  - set_fact: cacheable=false svcs_enabled='{{distro_pkgs.services_enabled|replace("rsyslog ", "")}}'
+  - set_fact: cacheable=false svcs_disabled='{{distro_pkgs.services_disabled|replace("syslog ", "")}}'
+
+  - name: "Enable {{name_task}} rsyslog runlevel boot ({{service_mgr}})"
+    service: name=rsyslog enabled=true runlevel=boot
+    ignore_errors: true
+
+  - name: "Disable {{name_task}} syslog runlevel boot ({{service_mgr}})"
+    service: name=syslog enabled=false runlevel=boot
+    ignore_errors: true
+
+  - include_tasks: common/togglesvcs.yml
+  when: service_mgr == 'openrc'
+
+- block:
+  - set_fact: cacheable=false name_task='toggle cmdline-tools service(s)'
+  - set_fact: cacheable=false svcs_enabled='{{distro_pkgs.services_enabled}}'
+  - set_fact: cacheable=false svcs_disabled='{{distro_pkgs.services_disabled}}'
+  - include_tasks: common/togglesvcs.yml
+  when: service_mgr != 'openrc'
+
+- block:
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    package: use='{{pkg_mgr}}' clean=true
+    register: out
+    when: pkg_mgr in ['apt', 'pkgin', 'apt_rpm']
+
+  - name: "Clean pkg cache (pkg_mgr: {{pkg_mgr}})"
+    shell: '{{pkgclean_cmd}}'
+    ignore_errors: true
+    register: out
+    when: pkg_mgr not in ['apt', 'pkgin', 'apt_rpm']
+  - debug: var=out.stdout_lines

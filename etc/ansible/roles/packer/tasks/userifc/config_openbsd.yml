@@ -1,74 +1,17 @@
 ---
 
-- name: "Fetch missing distribution sets? Enter 'yes' to continue [yesNO]:"
-  pause:
-    prompt: |
-      Do you want to fetch missing distribution sets?
-      Enter 'yes' to continue, else stop playbook [yesNO]:
-  register: response_fetch
-  when: not (autoconfirm | default(false))|bool
+#- block:
+#  - set_fact: cacheable=false distrosets=["xbase", "xserv", "xfont", "xshare"]
+#  - include_tasks: common/fetch_distrosets.yml
 
 - block:
-#  - name: 'Fetch & extract missing distribution sets like: xbase*.tgz'
-#    unarchive:
-#      remote_src: true
-#      src: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
-#      dest: /
-#      extra_opts: [-p, -z]
-#    ignore_errors: true
-#    loop: [xbase, xserv, xfont, xshare]
-#    loop_control: {"loop_var": "setX"}
-
-  - block:
-    - name: 'Fetch, then extract missing distribution sets like: xbase*.tgz'
-      get_url:
-        url: 'http://cdn.openbsd.org/pub/OpenBSD/{{rel}}/{{arch_s}}/{{setX}}{{setVer}}.tgz'
-        dest: '/tmp/{{setX}}{{setVer}}.tgz'
-      ignore_errors: true
-      loop: [xbase, xserv, xfont, xshare]
-      loop_control: {"loop_var": "setX"}
-    - unarchive:
-        remote_src: true
-        src: '/tmp/{{setX}}{{setVer}}.tgz'
-        dest: /
-        extra_opts: [-p, -z]
-      ignore_errors: true
-      loop: [xbase, xserv, xfont, xshare]
-      loop_control: {"loop_var": "setX"}
-
-  - name: sysmerge updates
-    shell: sysmerge
-    ignore_errors: true
-  when: (autoconfirm | default(false) or response_fetch.user_input | default(false))|bool
-  vars:
-    arch_s: '{{ansible_facts.get("machine")}}'
-    rel: '{{ansible_facts.get("distribution_version")}}'
-    setVer: '{{ansible_facts.get("distribution_version")|replace(".", "")}}'
-
-- lineinfile:
-    path: /etc/rc.local
-    state: present
-    mode: 'ugo+x'
-    regexp: '.*dbus-uuidgen.*'
-    #line: '/usr/local/bin/dbus-uuidgen --ensure=/etc/machine-id'
-    line: '/usr/local/bin/dbus-uuidgen --ensure'
-  ignore_errors: true
-
-- block:
-  - file: path=/etc/X11/xorg.conf.d state=directory
-    ignore_errors: true
-
-  #- shell: "cp -an /usr/local/share/X11/xorg.conf.d/{{confX}} /etc/X11/xorg.conf.d/"
-  #  ignore_errors: true
-  #  loop: [10-evdev.conf, 40-libinput.conf]
-  #  loop_control: {"loop_var": "confX"}
-
   - lineinfile:
       path: /etc/rc.local
       state: present
-      create: yes
-      regexp: '^export XDG_CONFIG_HOME=.*'
-      line: 'export XDG_CONFIG_HOME=/etc/xdg'
+      mode: 'ugo+x'
+      regexp: '.*dbus-uuidgen.*'
+      #line: '/usr/local/bin/dbus-uuidgen --ensure=/etc/machine-id'
+      line: '/usr/local/bin/dbus-uuidgen --ensure'
     ignore_errors: true
 
   - lineinfile:
@@ -79,16 +22,70 @@
       line: 'machdep.allowaperture=2'
     ignore_errors: true
 
-- block:
   - lineinfile:
-      path: /root/.xinitrc
+      path: /etc/rc.local
       state: present
       create: yes
-      regexp: '^ck-launch-session.*'
-      line: 'ck-launch-session dbus-launch --exit-with-session startlxqt'
+      regexp: '^export XDG_CONFIG_HOME=.*'
+      line: 'export XDG_CONFIG_HOME=/etc/xdg'
     ignore_errors: true
-    when: desktop in ['lxqt']
 
+- file: path=/etc/X11/xorg.conf.d state=directory
+  ignore_errors: true
+
+- stat: path=/usr/local/share/X11/xorg.conf.d
+  ignore_errors: true
+  register: xorgconfd_dir_st
+
+- block:
+  #- shell: "cp -an /usr/local/share/X11/xorg.conf.d/{{confX}} /etc/X11/xorg.conf.d/"
+  #  ignore_errors: true
+  #  loop: [10-evdev.conf, 40-libinput.conf]
+  #  loop_control: {"loop_var": "confX"}
+
+  #- shell: sh /root/init/common/misc_config.sh cfg_xorgtouchpad /etc/X11/xorg.conf.d
+  #  ignore_errors: true
+
+  - lineinfile:
+      path: '/etc/X11/xorg.conf.d/{{confX}}'
+      state: present
+      insertafter: '^[^#]\s*MatchIsTouchpad.*'
+      regexp: '.*Option "Tapping" "on".*'
+      line: '       Option "Tapping" "on"'
+    ignore_errors: true
+    loop: [10-evdev.conf, 40-libinput.conf]
+    loop_control: {"loop_var": "confX"}
+  when: xorgconfd_dir_st.stat.exists and xorgconfd_dir_st.stat.isdir
+
+- block:
+  # /etc/X11/xorg.conf.d/20-[wsfb|intel|radeon].conf
+  - copy:
+      dest: /etc/X11/xorg.conf.d/20-wsfb.conf
+      #mode: 'ugo+x'
+      force: false
+      content: |
+        Section "Device"
+          Identifier "Card0"
+          Driver "wsfb" # wsfb | intel | radeon
+          #BusID "PCI:0:2:0"
+        EndSection
+
+    ignore_errors: true
+
+  - copy:
+      dest: /etc/X11/xorg.conf.d/10-modesetting.conf
+      #mode: 'ugo+x'
+      force: false
+      content: |
+        #Section "Device"
+        #  Identifier "Card0"
+        #  Driver "modesetting"
+        #  #BusID "PCI:0:2:0"
+        #EndSection
+
+    ignore_errors: true
+
+- block:
   - lineinfile:
       path: /root/.xinitrc
       state: present
@@ -98,7 +95,26 @@
     ignore_errors: true
     when: desktop in ['xfce']
 
-  - copy: src=/root/.xinitrc dest=/home/packer/.xinitrc owner=packer
+  - lineinfile:
+      path: /root/.xinitrc
+      state: present
+      create: yes
+      regexp: '^ck-launch-session.*'
+      #line: 'ck-launch-session dbus-launch --exit-with-session startkde'
+      line: 'ck-launch-session dbus-launch --exit-with-session startplasma-x11'
+    ignore_errors: true
+    when: desktop in ['kde']
+
+  - lineinfile:
+      path: /root/.xinitrc
+      state: present
+      create: yes
+      regexp: '^ck-launch-session.*'
+      line: 'ck-launch-session dbus-launch --exit-with-session startlxqt'
+    ignore_errors: true
+    when: desktop in ['lxqt']
+
+  - copy: src=/root/.xinitrc dest=/home/packer/ owner=packer
     ignore_errors: true
 
   - file: src={{item}}/.xinitrc dest={{item}}/.xsession state=link

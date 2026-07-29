@@ -1,0 +1,149 @@
+---
+
+- file: path=/etc/profile.d state=directory
+  ignore_errors: true
+
+- stat: path='/etc/profile'
+  ignore_errors: true
+  register: etcprofile_st
+
+- shell: |
+    if [ ! -e /etc/profile ] ; then
+      cat << EOF > /etc/profile ;
+    if [ -d /etc/profile.d ] ; then
+      for i in /etc/profile.d/*.sh ; do
+        if [ -r "${i}" ] ; then
+          . "${i}" ;
+        fi ;
+      done ;
+      unset i ;
+    fi
+
+    EOF
+      chmod +x /etc/profile ;
+    fi
+
+  ignore_errors: true
+  when: not etcprofile_st.stat.exists
+
+- shell: java -version
+  register: out_java
+  ignore_errors: true
+
+#- find:
+#    #paths: /bin, /usr/bin, /usr/local/bin, /usr/pkg/bin
+#    paths: /
+#    recurse: true
+#    patterns: 'java'
+#  register: found_result
+
+- block:
+  - shell: |
+      #dirname $(dirname $(realpath $(which java)))
+      realpath $(which java) | sed "s:/bin/java::"
+    register: out_javahome
+
+  #- lineinfile:
+  #    path: /etc/csh.cshrc
+  #    state: present
+  #    regexp: '^setenv JAVA_HOME.*'
+  #    line: "'setenv JAVA_HOME '~out_javahome.stdout_lines[0]"
+  #  ignore_errors: true
+  #  when: ansible_facts.get("env")["SHELL"] is search("csh")
+
+  #- lineinfile:
+  #    path: /etc/bash.bashrc
+  #    state: present
+  #    regexp: '^export JAVA_HOME.*'
+  #    line: "'export JAVA_HOME='~out_javahome.stdout_lines[0]"
+  #  ignore_errors: true
+  #  when: ansible_facts.get("env")["SHELL"] is search("bash")
+
+  #- lineinfile:
+  #    path: /etc/ksh.kshrc
+  #    state: present
+  #    regexp: '^export JAVA_HOME.*'
+  #    line: "'export JAVA_HOME='~out_javahome.stdout_lines[0]"
+  #  ignore_errors: true
+  #  when: ansible_facts.get("env")["SHELL"] is search("ksh")
+
+  - lineinfile:
+      path: /etc/profile.d/jdk.sh
+      state: present
+      create: true
+      mode: '+x'
+      regexp: '^export JAVA_HOME.*'
+      #line: 'export JAVA_HOME={{out_javahome.stdout_lines[0]}}'
+      line: "'export JAVA_HOME='~out_javahome.stdout_lines[0]"
+    ignore_errors: true
+
+  #- file: follow=true path=/etc/profile.d/jdk.sh mode='+x'
+  #  ignore_errors: true
+
+  - lineinfile:
+      path: /etc/fstab
+      state: present
+      regexp: '^fdesc'
+      line: 'fdesc  /dev/fd  fdescfs  rw  0  0'
+    ignore_errors: true
+    when: ansible_facts.get('system')|lower != 'linux'
+  when: not out_java.get('failed', false)
+  #when: 0 != found_result.matched
+
+- name: gather package facts
+  package_facts:
+    manager: '{{pkg_mgr}}'
+  when: variant not in ['void', 'netbsd', 'openbsd']
+
+- shell: xbps-query -l
+  ignore_errors: true
+  register: outpkgs_void
+  when: variant == 'void'
+
+- include_tasks: '{{cfgfile}}'
+  with_first_found:
+    - files:
+      - 'userifc/config_{{variant}}.yml'
+      skip: True
+  loop_control: {"loop_var": "cfgfile"}
+
+- block:
+  - lineinfile:
+      path: /etc/profile.d/qt_qpa.sh
+      state: present
+      create: true
+      mode: '+x'
+      regexp: '^export QT_QPA_PLATFORM.*'
+      line: 'export QT_QPA_PLATFORM="wayland;xcb"'
+    ignore_errors: true
+
+  #- file: follow=true path=/etc/profile.d/qt_qpa.sh mode='+x'
+  #  ignore_errors: true
+
+  - lineinfile:
+      path: /etc/profile.d/gdk_backend.sh
+      state: present
+      create: true
+      mode: '+x'
+      regexp: '^export GDK_BACKEND.*'
+      line: 'export GDK_BACKEND="wayland;x11"'
+    ignore_errors: true
+
+- block:
+  #- shell: sh /root/init/common/misc_config.sh cfg_xdguserdirs {{etcdir_xdg}}
+  #  ignore_errors: true
+
+  - name: Add directory bin to XDG directories config
+    lineinfile:
+      path: '{{etcdir_xdg}}/user-dirs.defaults'
+      state: present
+      create: true
+      regexp: '^BIN=.*'
+      line: 'BIN=bin'
+    ignore_errors: true
+
+  - name: Run xdg-user-dirs-update
+    shell: |
+      export LANG=en_US.UTF-8 ; export CHARSET=UTF-8
+      xdg-user-dirs-update ; chmod 1777 /tmp
+    ignore_errors: true

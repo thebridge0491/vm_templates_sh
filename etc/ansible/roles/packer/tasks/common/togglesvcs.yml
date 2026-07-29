@@ -1,0 +1,29 @@
+---
+
+- block:
+  - name: "Enable {{name_task}} ({{service_mgr}})"
+    systemd_service: name={{item}} enabled=true masked=false
+    ignore_errors: true
+    loop: '{{svcs_enabled | split(" ") if "" != (svcs_enabled | default("")) else []}}'
+    when: service_mgr == 'systemd'
+
+  - name: "Disable {{name_task}} ({{service_mgr}})"
+    systemd_service: name={{item}} enabled=false masked=true
+    ignore_errors: true
+    loop: '{{svcs_disabled | split(" ") if "" != (svcs_disabled | default("")) else []}}'
+    when: service_mgr == 'systemd'
+
+  - name: "Enable {{name_task}} ({{service_mgr}})"
+    service: name={{item}} enabled=true
+    ignore_errors: true
+    #loop: '{{(svcs_enabled | default("")).split(" ")}}'
+    loop: '{{svcs_enabled | split(" ") if "" != (svcs_enabled | default("")) else []}}'
+    when: service_mgr != 'systemd'
+
+  - name: "Disable {{name_task}} ({{service_mgr}})"
+    service: name={{item}} enabled=false
+    ignore_errors: true
+    loop: '{{svcs_disabled | split(" ") if "" != (svcs_disabled | default("")) else []}}'
+    when: service_mgr != 'systemd'
+  vars:
+    name_task: '{{name_task | default("toggle service(s)")}}'

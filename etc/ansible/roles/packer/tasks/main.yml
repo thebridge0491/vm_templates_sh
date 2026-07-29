@@ -14,11 +14,11 @@
     include_vars: '{{item}}'
     with_first_found:
       - files:
-        #- "{{(ansible_lsb['id'] or ansible_lsb['codename'])|lower}}.yml"
-        - "{{(ansible_os_family or ansible_distribution)|lower}}.yml"
-        - "{{{'Artix Linux': 'Artix', 'Arch Linux': 'Archlinux', 'openSUSE Tumbleweed-Slowroll': 'Suse'}.get(ansible_os_family or ansible_distribution)|lower}}.yml"
+        #- "{{(ansible_facts['lsb']['id'] or ansible_facts['lsb']['codename'])|lower}}.yml"
+        - "{{(ansible_facts['os_family'] or ansible_facts['distribution'])|lower}}.yml"
+        - "{{{'Artix Linux': 'Artix', 'Arch Linux': 'Archlinux', 'openSUSE Tumbleweed-Slowroll': 'Suse'}.get(ansible_facts['os_family'] or ansible_facts['distribution'])|lower}}.yml"
         skip: True
-  #tags: never, upgradepkgs, nanopkg, cmdlntools, userifc, codelab
+  #tags: never, upgradepkgs, cmdlntools, userifc, codelab
   tags: always
 
 - block:
@@ -54,59 +54,82 @@
       distro_pkgs: "{{ distro_pkgs|default({})|combine({item: lookup('ini', item ~ ' type=properties file=/tmp/{{inventory_hostname}}/root/scripts/distro_pkgs.ini')|replace('\"', '')|regex_replace('\\${service_mgr:-[a-z]*}', service_mgr)}) }}"
     loop: '{{keysout.stdout_lines}}'
   #- debug: var=distro_pkgs
-  tags: never, cmdlntools, userifc, codelab
+  #tags: never, cmdlntools, userifc, codelab
+  tags: >
+    never, cmdlntools-00install_pkgs, cmdlntools-02toggle_svcs, cmdlntools,
+    userifc-00install_pkgs, userifc-02toggle_svcs, userifc, codelab-00install_pkgs,
+    codelab-02toggle_svcs, codelab
   #tags: always
 
 - block:
   - name: "Set distribution version"
-    set_fact: cacheable=true ansible_distribution_version='rolling'
+    set_fact: cacheable=true ansible_facts['distribution_version']='rolling'
     when: variant in ['archlinux']
   tags: always
 
 - block:
-  - name: Set snapshot name
-    set_fact:
-      cacheable: false
-      snapshot_name: '{{ansible_facts.get("distribution").split(" ")[0]|lower+"_"+ansible_facts.get("distribution_version")+"-"+dateutc}}'
-  tags: upgradepkgs
+  - name: "Set pkg mgr"
+    set_fact: cacheable=true ansible_facts['pkg_mgr']='dnf'
+    when: variant in ['mageia']
+  tags: always
 
-- block:
-  - name: Set snapshot name
-    set_fact: cacheable=false snapshot_name='{{"pre_cmdlntools-"+dateutc}}'
-  tags: never, cmdlntools
-
-- block:
-  - name: Set snapshot name
-    set_fact: cacheable=false snapshot_name='{{"pre_userifc-"+dateutc}}'
-  tags: never, userifc
-
-- block:
-  - name: Set snapshot name
-    set_fact: cacheable=false snapshot_name='{{"pre_codelab-"+dateutc}}'
-  tags: never, codelab
-
-#- import_tasks: nano.yml
-#  tags: never, nanopkg
 - import_tasks: snapshot.yml
-  tags: never, snapshot, upgradepkgs, cmdlntools, userifc, codelab
+  tags: never, snapshot
 
 - block:
-  - block:
-    - include_tasks: nano.yml
-    tags: never, nanopkg
+  #- set_fact: cacheable=false distrosets=["src"] # FreeBSD
+  #- set_fact: cacheable=false distrosets=["xbase"] # NetBSD,OpenBSD
+  - import_tasks: common/fetch_distrosets.yml
+  tags: never, fetch_distrosets
 
-  - block:
-    - include_tasks: upgradepkgs.yml
+- block:
+  - import_tasks: upgradepkgs.yml
     tags: upgradepkgs
 
+  - import_tasks: cmdlntools/00install_pkgs.yml
+    tags: never, cmdlntools-00install_pkgs
+
+  - import_tasks: cmdlntools/01config_sys.yml
+    tags: never, cmdlntools-01config_sys
+
+  - import_tasks: cmdlntools/02toggle_svcs.yml
+    tags: never, cmdlntools-02toggle_svcs
+
   - block:
-    - include_tasks: cmdlntools.yml
+    #- include_tasks: cmdlntools.yml
+    - include_tasks: cmdlntools/00install_pkgs.yml
+    - include_tasks: cmdlntools/01config_sys.yml
+    - include_tasks: cmdlntools/02toggle_svcs.yml
     tags: never, cmdlntools
 
-  - block:
-    - include_tasks: userifc.yml
-    tags: never, userifc
+  - import_tasks: userifc/00install_pkgs.yml
+    tags: never, userifc-00install_pkgs
+
+  - import_tasks: userifc/01config_sys.yml
+    tags: never, userifc-01config_sys
+
+  - import_tasks: userifc/02toggle_svcs.yml
+    tags: never, userifc-02toggle_svcs
 
   - block:
-    - include_tasks: codelab.yml
+    #- include_tasks: userifc.yml
+    - include_tasks: userifc/00install_pkgs.yml
+    - include_tasks: userifc/01config_sys.yml
+    - include_tasks: userifc/02toggle_svcs.yml
+    tags: never, userifc
+
+  - import_tasks: codelab/00install_pkgs.yml
+    tags: never, codelab-00install_pkgs
+
+  - import_tasks: codelab/01config_sys.yml
+    tags: never, codelab-01config_sys
+
+  - import_tasks: codelab/02toggle_svcs.yml
+    tags: never, codelab-02toggle_svcs
+
+  - block:
+    #- include_tasks: codelab.yml
+    - include_tasks: codelab/00install_pkgs.yml
+    - include_tasks: codelab/01config_sys.yml
+    - include_tasks: codelab/02toggle_svcs.yml
     tags: never, codelab

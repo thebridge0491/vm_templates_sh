@@ -11,3 +11,5 @@ pkglocks_cmd: dnf -C -y versionlock list
 firewall_tool: firewalld
 smtp_daemon: postfix
 hostname_chgfiles: [/etc/hosts, /etc/hostname, /etc/sysconfig/network]
+
+desktop: kde

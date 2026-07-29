@@ -23,11 +23,11 @@
       #  when: not ansible_check_mode
         setup: gather_subset={{items}}
         register: out
-      #- debug: var=[out.ansible_facts,'ansible_uptime_seconds={{ansible_uptime_seconds}}','ansible_version={{ansible_version.string}}']
-      - shell: who -b
+      - shell: who -b || (who | head -n1)
         register: last_boot
         ignore_errors: true
-      - debug: var=[out,'last_boot='~last_boot.stdout,'ansible_version={{ansible_version.string}}']
+      #- debug: var=[out,'uptime='~(ansible_facts.get('uptime_seconds')/(24*60*60))|round(2)~' days ','last_boot='~last_boot.stdout,'ansible_version='~ansible_version.string]
+      - debug: var=[out,'last_boot='~last_boot.stdout,'ansible_version='~ansible_version.string]
         when: not ansible_check_mode
       - copy:
           owner: packer
@@ -87,5 +87,5 @@
   roles:
     - role: packer
       #vars:
-      #  variant: "{{(ansible_facts.get('os_family') or ansible_facts.get('distribution'))|lower}}"
+      #  variant: (ansible_facts.get('os_family') or ansible_facts.get('distribution'))|lower
 

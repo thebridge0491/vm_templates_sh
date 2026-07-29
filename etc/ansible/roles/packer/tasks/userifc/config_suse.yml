@@ -1,5 +1,9 @@
 ---
 
+- stat: path=/usr/share/X11/xorg.conf.d
+  ignore_errors: true
+  register: xorgconfd_dir_st
+
 - block:
   - file: path=/etc/X11/xorg.conf.d state=directory
     ignore_errors: true
@@ -9,13 +13,41 @@
     loop: [10-evdev.conf, 40-libinput.conf]
     loop_control: {"loop_var": "confX"}
 
+  - copy:
+      dest: /etc/X11/xorg.conf.d/10-modesetting.conf
+      #mode: 'ugo+x'
+      force: false
+      content: |
+        #Section "Device"
+        #  Identifier "Device0"
+        #  Driver "modesetting"
+        #  #BusID "PCI:0:2:0"
+        #EndSection
+
+    ignore_errors: true
+
+  #- shell: sh /root/init/common/misc_config.sh cfg_xorgtouchpad /etc/X11/xorg.conf.d
+  #  ignore_errors: true
+
+  - lineinfile:
+      path: '/etc/X11/xorg.conf.d/{{confX}}'
+      state: present
+      insertafter: '^[^#]\s*MatchIsTouchpad.*'
+      regexp: '.*Option "Tapping" "on".*'
+      line: '       Option "Tapping" "on"'
+    ignore_errors: true
+    loop: [10-evdev.conf, 40-libinput.conf]
+    loop_control: {"loop_var": "confX"}
+  when: xorgconfd_dir_st.stat.exists and xorgconfd_dir_st.stat.isdir
+
+- block:
   - name: "Fix text mode only default grub config"
     replace:
       path: /etc/default/grub
       regexp: '{{item}}'
       replace: ''
     ignore_errors: true
-    loop: ['nomodeset ', 'text ', 'xdriver=vesa ']
+    loop: [' nomodeset', ' text', ' xdriver=vesa']
 
   - name: "Run grub2-mkconfig"
     shell: grub2-mkconfig -o /boot/grub2/grub.cfg

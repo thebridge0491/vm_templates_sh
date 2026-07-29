@@ -7,10 +7,10 @@
       #diff -s /etc/pf.conf /etc/pf.conf.new ; sleep 5
     ignore_errors: true
 
-  - shell: |
-      #(sleep 120 && /sbin/pfctl -d)& && /sbin/pfctl -e
-      /sbin/pfctl -e
-    ignore_errors: true
+  #- shell: |
+  #    (sleep 120 && /sbin/pfctl -d)& \
+  #      /sbin/pfctl -e
+  #  ignore_errors: true
 
   - lineinfile:
       path: /etc/pf/outallow_in_allow.rules
@@ -31,8 +31,8 @@
     ignore_errors: true
 
   - shell: |
-      #(sleep 120 && ufw disable)& && ufw enable
-      ufw enable
+      #(sleep 120 && ufw disable)& \
+      #  ufw enable
       ufw allow in svc MDNS
     ignore_errors: true
 
@@ -51,11 +51,9 @@
     ignore_errors: true
 
   - shell: |
-      #(sleep 120 && (iptables-nft -F ; iptables-nft -X ; ip6tables-nft -F ; \
-      #  ip6tables-nft -X))& && \
-      #  (iptables-nft-restore /etc/iptables/iptables.rules ; \
-      #  ip6tables-nft-restore /etc/iptables/ip6tables.rules)
-      (iptables-nft-restore /etc/iptables/iptables.rules ;
+      (sleep 120 && (iptables-nft -F ; iptables-nft -X ; ip6tables-nft -F ; \
+        ip6tables-nft -X))& \
+        (iptables-nft-restore /etc/iptables/iptables.rules ; \
         ip6tables-nft-restore /etc/iptables/ip6tables.rules)
     ignore_errors: true
 
@@ -80,8 +78,8 @@
     ignore_errors: true
 
   - shell: |
-      #(sleep 120 && nft flush ruleset)& && nft -f /etc/nftables.conf
-      nft -f /etc/nftables.conf
+      (sleep 120 && nft flush ruleset)& \
+        nft -f /etc/nftables.conf
     ignore_errors: true
 
   - find:
@@ -113,28 +111,34 @@
       sh /root/init/common/firewall/linux/config_firewalld.sh #cmds_firewalld allow
     ignore_errors: true
 
-  - shell: |
-      #(sleep 120 && firewall-offline-cmd --disabled)& && \
-      #  (firewall-offline-cmd --enabled ; firewall-cmd --reload)
-      firewall-offline-cmd --enabled ; firewall-cmd --reload
-    ignore_errors: true
+  #- shell: |
+  #    (sleep 120 && firewall-offline-cmd --disabled)& \
+  #      (firewall-cmd --reload ; firewall-offline-cmd --enabled)
+  #  ignore_errors: true
 
   - ansible.posix.firewalld:
       permanent: true
       zone: public
       service: mdns
       state: enabled
+    register: out_firewalld
     ignore_errors: true
 
-  #- shell: |
-  #    firewall-cmd --get-active-zones ; sleep 5
-  #    #ipset list ; sleep 5
-  #    firewall-cmd --state ; sleep 5 ; firewall-cmd --zone=public --list-all ; sleep 5
-  #  ignore_errors: true
+  - shell: |
+      firewall-cmd --permanent --zone=public --add-service=mdns
+    ignore_errors: true
+    when: out_firewalld.get('failed', false)
 
   - ansible.posix.firewalld_info:
       zones: [public]
     register: out_fwinfo
     ignore_errors: true
   - debug: var=out_fwinfo.firewalld_info
+
+  - shell: |
+      firewall-cmd --get-active-zones ; sleep 5
+      #ipset list ; sleep 5
+      firewall-cmd --state ; sleep 5 ; firewall-cmd --zone=public --list-all ; sleep 5
+    ignore_errors: true
+    when: out_fwinfo.get('failed', false)
   when: firewall_tool == 'firewalld' and ansible_facts.get('system')|lower == 'linux'

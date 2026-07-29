@@ -104,11 +104,15 @@
       done
     ignore_errors: true
 
-  - file: path=/var/mail/packer state=directory owner=packer group=wheel
+  - file: path=/var/mail/packer state=directory owner=packer group=wheel mode=0700
     ignore_errors: true
     when: ansible_facts.get('system')|lower != 'linux'
 
-  - file: path=/var/mail/packer/{{item}} state=directory owner=packer group=mail
+  - file: path=/var/spool/mail/packer state=directory owner=packer mode=0700
+    ignore_errors: true
+    when: ansible_facts.get('system')|lower == 'linux'
+
+  - file: path=/var/spool/mail/packer/{{item}} state=directory owner=packer group=mail
     ignore_errors: true
     loop: [cur, new, tmp]
     when: ansible_facts.get('system')|lower == 'linux'
@@ -147,11 +151,11 @@
       done
     ignore_errors: true
 
-  #- file: path=/var/mail/packer state=directory owner=packer group=wheel
+  #- file: path=/var/mail/packer state=directory owner=packer group=wheel mode=0700
   #  ignore_errors: true
   #  when: ansible_facts.get('system')|lower != 'linux'
 
-  - file: path=/var/spool/mail/postfix state=directory owner=postfix group=postfix
+  - file: path=/var/spool/mail/postfix state=directory owner=postfix group=postfix mode=0700
     ignore_errors: true
     when: ansible_facts.get('system')|lower == 'linux'
 
